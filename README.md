@@ -9,13 +9,17 @@
 ```bash
 cd project-kanban
 npm install          # 首次需要：安装 xlsx / xlsx-js-style
-node server.js
-# 打开 http://localhost:5180
+node server.js       # 正式版：http://localhost:5180（真实数据，写操作需令牌）
+node server.js --demo  # 演示版：http://localhost:5181（脱敏数据，免令牌）
 ```
+
+两个版本**同时运行**（由 `watchdog.js` 守护双实例）：
+- **5180 = 演示版**（`--demo`，脱敏数据 + 免令牌，公网隧道指向它，评委访问）
+- **5181 = 正式版**（真实数据，写操作需 `data/auth.token`，本机日常使用）
 
 （使用内置 Node 运行：`.../node/versions/22.22.2/node.exe server.js`）
 
-建议通过 `watchdog.js` 运行（崩溃自动拉起 + 自动维护 Cloudflare 隧道）：
+建议通过 `watchdog.js` 运行（崩溃自动拉起双实例 + 自动维护 Cloudflare 隧道）：
 
 ```bash
 node watchdog.js

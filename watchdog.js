@@ -1,25 +1,32 @@
 // =========================================================
 // 看板崩溃守护（watchdog）
-// 每 15 秒探测一次本地服务：挂了自动拉起 server.js；
+// 每 15 秒探测本地服务：挂了自动拉起 server.js；
 // 同时保证 Cloudflare 隧道进程存活（新链接写入 data/tunnel-url.txt）。
 // 由任务计划程序在登录时启动：node watchdog.js
+// 双实例：5180 = 演示版(--demo, 公网隧道指向它)；5181 = 正式版(真实数据, 本机使用)
 // =========================================================
 const { spawn, execSync } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 5180;
 const ROOT = __dirname;
 const NODE = process.execPath;
 const SERVER = path.join(ROOT, 'server.js');
 const CLOUDFLARED = 'C:/Users/Administrator/.workbuddy/binaries/cloudflared/cloudflared.exe';
 const URL_FILE = path.join(ROOT, 'data', 'tunnel-url.txt');
 const INTERVAL = 15000;
+const TUNNEL_PORT = 5180;
 
-function isUp() {
+// 守护的实例：演示版(--demo 免令牌脱敏数据) + 正式版(真实数据需令牌)
+const SERVERS = [
+  { port: 5180, args: ['--demo'], env: {}, name: '演示版(公网评委)' },
+  { port: 5181, args: [], env: { PORT: '5181' }, name: '正式版(本机日常)' }
+];
+
+function isUp(port) {
   return new Promise(resolve => {
-    const req = http.get({ host: '127.0.0.1', port: PORT, path: '/', timeout: 2500 }, r => { r.resume(); resolve(true); });
+    const req = http.get({ host: '127.0.0.1', port, path: '/', timeout: 2500 }, r => { r.resume(); resolve(true); });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
@@ -28,9 +35,12 @@ function isUp() {
 function log(msg) { console.log(new Date().toISOString() + ' [watchdog] ' + msg); }
 
 async function ensureServer() {
-  if (await isUp()) return;
-  log('服务器未响应，重新拉起 server.js');
-  try { spawn(NODE, [SERVER, '--demo'], { cwd: ROOT, detached: true, stdio: 'ignore' }).unref(); } catch (e) { log('拉起失败: ' + e.message); }
+  for (const s of SERVERS) {
+    if (await isUp(s.port)) continue;
+    log(s.name + ' 未响应（端口 ' + s.port + '），重新拉起 server.js ' + s.args.join(' '));
+    try { spawn(NODE, [SERVER, ...s.args], { cwd: ROOT, detached: true, stdio: 'ignore', env: { ...process.env, ...s.env } }).unref(); }
+    catch (e) { log('拉起失败: ' + e.message); }
+  }
 }
 
 function cloudflaredRunning() {
@@ -42,9 +52,9 @@ function cloudflaredRunning() {
 
 function ensureTunnel() {
   if (cloudflaredRunning()) return;
-  log('cloudflared 未运行，重新建立隧道');
+  log('cloudflared 未运行，重新建立隧道（指向 5180 演示版）');
   try {
-    const c = spawn(CLOUDFLARED, ['tunnel', '--url', 'http://localhost:' + PORT, '--no-autoupdate'], { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const c = spawn(CLOUDFLARED, ['tunnel', '--url', 'http://localhost:' + TUNNEL_PORT, '--no-autoupdate'], { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     c.unref();
     c.stdout.on('data', d => {
       const m = String(d).match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
@@ -53,7 +63,7 @@ function ensureTunnel() {
   } catch (e) { log('隧道拉起失败: ' + e.message); }
 }
 
-log('守护已启动（每 ' + INTERVAL / 1000 + ' 秒检测一次）');
+log('守护已启动（每 ' + INTERVAL / 1000 + ' 秒检测一次，双实例：5180 演示 / 5181 正式）');
 setInterval(() => { ensureServer(); ensureTunnel(); }, INTERVAL);
 ensureServer();
 ensureTunnel();
