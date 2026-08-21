@@ -588,15 +588,31 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/ai/summarize' && req.method === 'POST') {
       const body = await readBody(req);
-      const proj = body.project;
-      if (!proj || !proj.tasks) return send(res, 400, { error: '缺少项目数据' });
       const c = loadAI();
       if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
-      const total = (proj.tasks || []).length, done = (proj.tasks || []).filter(t => t.done).length;
-      const overdue = (proj.tasks || []).filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
-      const phaseStat = (proj.phases || []).map(ph => { const ts = (proj.tasks || []).filter(t => t.phaseId === ph.id); return ph.name + '：' + ts.filter(t => t.done).length + '/' + ts.length + ' 完成'; }).join('；');
-      const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文写一段 120 字以内的项目周报/总结，突出进度、风险与下一步。';
-      const user = `项目：${proj.name}\n整体进度：${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）\n逾期节点：${overdue}\n各阶段：${phaseStat}`;
+      const projects = Array.isArray(body.projects) ? body.projects : (body.project ? [body.project] : null);
+      if (!projects || !projects.length) return send(res, 400, { error: '缺少项目数据' });
+      const modeLabel = body.mode === 'daily' ? '日报' : body.mode === 'weekly' ? '周报' : '月报';
+      // 单项目 → 详细复盘；多项目（全局汇报）→ 组合概览
+      if (projects.length === 1) {
+        const proj = projects[0];
+        const total = (proj.tasks || []).length, done = (proj.tasks || []).filter(t => t.done).length;
+        const overdue = (proj.tasks || []).filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
+        const phaseStat = (proj.phases || []).map(ph => { const ts = (proj.tasks || []).filter(t => t.phaseId === ph.id); return ph.name + '：' + ts.filter(t => t.done).length + '/' + ts.length + ' 完成'; }).join('；');
+        const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文写一段 120 字以内的项目总结，突出进度、风险与下一步。';
+        const user = `项目：${proj.name}\n整体进度：${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）\n逾期节点：${overdue}\n各阶段：${phaseStat}`;
+        try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
+        catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
+      }
+      const lines = projects.map(proj => {
+        const ts = proj.tasks || []; const total = ts.length, done = ts.filter(t => t.done).length;
+        const overdue = ts.filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
+        const cur = (proj.phases || []).find(ph => ts.some(t => t.phaseId === ph.id && !t.done));
+        const arch = (proj.status || 'active') === 'archived' ? '（已归档）' : '';
+        return `「${proj.name}」进度${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）${overdue ? '，逾期' + overdue + '项' : ''}${cur ? '，当前阶段：' + cur.name : ''}${arch}`;
+      }).join('\n');
+      const sys = '你是项目组合复盘助手。根据以下所有项目的结构化摘要，用简洁中文写一段 160 字以内的全局' + modeLabel + '，归纳整体进展、点名风险项目、给出下一步建议。';
+      const user = `共 ${projects.length} 个项目：\n${lines}`;
       try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
       catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
     }

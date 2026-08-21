@@ -88,7 +88,8 @@ function render() {
   ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly'].forEach(id => $('#' + id).classList.add('hidden'));
   if (secMap[state.view]) $('#' + secMap[state.view]).classList.remove('hidden');
   $('#viewActions').innerHTML = '';
-  if (!p) {
+  const globalViews = ['daily', 'weekly', 'monthly', 'panorama'];
+  if (!p && !globalViews.includes(state.view)) {
     $('#projTitle').innerHTML = '<span class="muted">未选择项目</span>';
     $('#projMeta').innerHTML = '';
     $('#board').innerHTML = '<div class="empty" style="margin:auto">从左侧「新建项目」开始：从模版导入，或从 xlsx 导入已有计划。</div>';
@@ -98,12 +99,20 @@ function render() {
     applyReadOnly();
     return;
   }
-  const c = typeColor(p.type);
-  const lc = levelColor(p.level);
-  const ptc = productTypeColor(p.productType);
-  $('#projTitle').innerHTML = `<span class="pdot" style="background:${p.color}"></span> ${esc(p.name)} <span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}`;
-  const isArch = (p.status || 'active') === 'archived';
-  $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">' + ICON.box + ' 已归档</span>' : ''}`;
+  if (!p) {
+    // 全局类视图（日报/周报/月报/全景）不依赖选中项目，标题显示占位即可
+    $('#projTitle').innerHTML = '<span class="muted">全局视图（不依赖选中项目）</span>';
+    $('#projMeta').innerHTML = '';
+    $('#board').innerHTML = ''; $('#gantt').innerHTML = ''; $('#calendar').innerHTML = ''; $('#panorama').innerHTML = ''; $('#report').innerHTML = '';
+  }
+  if (p) {
+    const c = typeColor(p.type);
+    const lc = levelColor(p.level);
+    const ptc = productTypeColor(p.productType);
+    $('#projTitle').innerHTML = `<span class="pdot" style="background:${p.color}"></span> ${esc(p.name)} <span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}`;
+    const isArch = (p.status || 'active') === 'archived';
+    $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">' + ICON.box + ' 已归档</span>' : ''}`;
+  }
   if (state.view === 'board') renderBoard(p);
   else if (state.view === 'gantt') renderGantt(p);
   else if (state.view === 'calendar') renderCalendar(p);
@@ -165,6 +174,8 @@ function renderBoard(p) {
     <div class="stat"><div class="stat-num">${p.tasks.filter(t => t.done).length}</div><div class="stat-lbl">已完成</div></div>
     <div class="stat"><div class="stat-num">${p.tasks.filter(t => !t.done).length}</div><div class="stat-lbl">进行中</div></div>`;
   const board = $('#board'); board.innerHTML = '';
+  // ≤6 阶段：列宽自适应均分占满（无需横向滚动条）；>6 阶段：固定 264px + 横向滚动
+  board.classList.toggle('cols-fit', p.phases.length <= 6);
   p.phases.forEach(ph => {
     const col = document.createElement('div'); col.className = 'col';
     const tasks = p.tasks.filter(t => t.phaseId === ph.id);
@@ -852,11 +863,19 @@ $('#aiSaveBtn').onclick = async () => {
 };
 
 /* ---- AI 项目总结 ---- */
-async function aiSummarize() {
-  const p = proj(); if (!p) { toast('请先选择项目'); return; }
+async function aiSummarize(mode) {
   const m = $('#aiSummaryModal'); const ta = $('#aiSummaryText');
   m.classList.remove('hidden'); ta.value = '生成中…';
-  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ project: p }) }); ta.value = r.text || ''; }
+  let projects;
+  if (mode === 'daily' || mode === 'weekly' || mode === 'monthly') {
+    projects = reportProjects(mode); // 全局：全部进行中 + 归档时间窗口内的归档项目
+  } else {
+    const p = proj();
+    if (!p) { toast('请先选择项目'); m.classList.add('hidden'); return; }
+    projects = [p];
+  }
+  if (!projects.length) { ta.value = '当前没有可总结的项目'; return; }
+  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ projects, mode }) }); ta.value = r.text || ''; }
   catch (e) { ta.value = '生成失败：' + e.message; }
 }
 $('#aiSummaryClose').onclick = () => $('#aiSummaryModal').classList.add('hidden');
@@ -1175,8 +1194,8 @@ function currentPhaseOf(p) {
 }
 function renderReport() {
   const wrap = $('#report'); wrap.innerHTML = '';
-  if (proj()) { $('#viewActions').innerHTML = `<button class="btn" id="aiSummaryBtn">${ICON.spark} AI 总结</button>`; const b = $('#aiSummaryBtn'); if (b) b.onclick = aiSummarize; }
-  else $('#viewActions').innerHTML = '';
+  $('#viewActions').innerHTML = `<button class="btn" id="aiSummaryBtn">${ICON.spark} AI 总结</button>`;
+  const b = $('#aiSummaryBtn'); if (b) b.onclick = () => aiSummarize(state.view);
   if (state.view === 'daily') buildDaily(wrap);
   else buildWeekly(wrap);
 }
@@ -1345,8 +1364,8 @@ function buildWeekly(wrap) {
 
 /* ---------- 月度计划：本月内「试产发布」的项目 + 勾选纳入计划 ---------- */
 function renderMonthly() {
-  if (proj()) { $('#viewActions').innerHTML = `<button class="btn" id="aiSummaryBtn">${ICON.spark} AI 总结</button>`; const b = $('#aiSummaryBtn'); if (b) b.onclick = aiSummarize; }
-  else $('#viewActions').innerHTML = '';
+  $('#viewActions').innerHTML = `<button class="btn" id="aiSummaryBtn">${ICON.spark} AI 总结</button>`;
+  const b = $('#aiSummaryBtn'); if (b) b.onclick = () => aiSummarize(state.view);
   const y = state.monthlyDate.getFullYear(), mo = state.monthlyDate.getMonth();
   const moIso = y + '-' + String(mo + 1).padStart(2, '0');
   const moFirst = isoDate(new Date(y, mo, 1)), moEnd = isoDate(new Date(y, mo + 1, 0));
