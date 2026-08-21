@@ -5,10 +5,12 @@ const cp = require('child_process');
 const XLSX = require('xlsx');
 
 const PORT = process.env.PORT || 5180;
+const DEMO_MODE = process.argv.includes('--demo');
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const DATA = path.join(ROOT, 'data');
-const PROJECTS_FILE = path.join(DATA, 'projects.json');
+// 演示模式：加载脱敏数据集 projects.demo.json（真实 projects.json 不受影响），且免令牌鉴权
+const PROJECTS_FILE = path.join(DATA, DEMO_MODE ? 'projects.demo.json' : 'projects.json');
 const TEMPLATES_FILE = path.join(ROOT, 'templates.json');
 const RO_FLAG = path.join(DATA, 'readonly.flag');
 const MAPPINGS_FILE = path.join(DATA, 'mappings.json');
@@ -30,7 +32,7 @@ function saveJSON(file, data) {
 let GIT_OK = false;
 try { GIT_OK = cp.execSync('git rev-parse --is-inside-work-tree', { cwd: ROOT, stdio: 'pipe' }).toString().trim() === 'true'; } catch (e) { GIT_OK = false; }
 function gitAutoCommit(file) {
-  if (!GIT_OK || !file) return;
+  if (!GIT_OK || !file || DEMO_MODE) return;
   try {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
     cp.spawn('git', ['add', '--', rel], { cwd: ROOT, stdio: 'ignore' }).on('exit', () => {
@@ -324,7 +326,7 @@ function ensureToken() {
   return t;
 }
 const AUTH_TOKEN = ensureToken();
-function authorized(req) { return req.headers['x-auth-token'] === AUTH_TOKEN; }
+function authorized(req) { return DEMO_MODE || req.headers['x-auth-token'] === AUTH_TOKEN; }
 
 function createFromTemplate(tpl, name, opts) {
   opts = opts || {};
@@ -586,6 +588,6 @@ const server = http.createServer(async (req, res) => {
   });
 });
 server.listen(PORT, () => {
-  console.log('Multi-project kanban running at http://localhost:' + PORT);
-  console.log('写操作访问令牌 (X-Auth-Token): ' + AUTH_TOKEN + '  (文件: data/auth.token，可在页面首次写操作时输入一次)');
+  console.log('Multi-project kanban running at http://localhost:' + PORT + (DEMO_MODE ? '  [演示模式：脱敏数据 + 免令牌]' : ''));
+  if (!DEMO_MODE) console.log('写操作访问令牌 (X-Auth-Token): ' + AUTH_TOKEN + '  (文件: data/auth.token，可在页面首次写操作时输入一次)');
 });
