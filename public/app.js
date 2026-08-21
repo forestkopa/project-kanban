@@ -483,52 +483,108 @@ function openTplModal() {
   });
   $('#tplModal').classList.remove('hidden');
 }
-/* ---- 项目信息选项：动态渲染（可配置，可新增） ---- */
+/* ---- 项目信息选项：动态渲染（可新增 / 编辑 / 删除，可配置颜色） ---- */
+let optMode = { kind: 'type', editName: null }; // kind: type|product|level|engineer|cert
 function renderPiOptions() {
   const types = TYPE_COLORS(), pts = PRODUCT_TYPE_COLORS(), lvs = LEVEL_COLORS();
   const opts = state.options || {};
   const certs = opts.certs || ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'];
   const engineers = opts.engineers || ['张工', '李工', '王工', '赵工', '陈工', '刘工'];
-  $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}</div>`).join('');
-  $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}</div>`).join('');
-  $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}</div>`).join('');
-  $('#dlCerts').innerHTML = certs.map(c => `<option value="${esc(c)}">`).join('');
-  $('#dlEngineers').innerHTML = engineers.map(e => `<option value="${esc(e)}">`).join('');
-  // 绑定选择
-  $$('#typeOpts .type-opt').forEach(o => o.onclick = () => { $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
-  $$('#productTypeOpts .type-opt').forEach(o => o.onclick = () => { $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
-  $$('#levelOpts .level-opt').forEach(o => o.onclick = () => { $$('#levelOpts .level-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+  const optActs = (key, name, color) => `<button class="opt-act opt-act-edit" data-opt-edit="${key}|${esc(name)}" title="编辑">${ICON.edit}</button><button class="opt-act opt-act-del" data-opt-del="${key}|${esc(name)}" title="删除">${ICON.del}</button>`;
+  $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}${optActs('type', t, types[t])}</div>`).join('');
+  $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}${optActs('product', t, pts[t])}</div>`).join('');
+  $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}${optActs('level', l, lvs[l])}</div>`).join('');
+  // 工程师 / 认证：字段输入框保留 + 独立下拉选择 + 选项 chips（可删除）
+  const fillSel = (selId, list, cur) => { const sel = $(selId); if (!sel) return; sel.innerHTML = '<option value="">选择…</option>' + list.map(e => `<option value="${esc(e)}"${e === cur ? ' selected' : ''}>${esc(e)}</option>`).join(''); };
+  fillSel('#selHardware', engineers, $('#piHardware').value);
+  fillSel('#selStructure', engineers, $('#piStructure').value);
+  fillSel('#selProject', engineers, $('#piProject').value);
+  fillSel('#selCert', certs, $('#piCert').value);
+  const chips = (list, key) => list.map(e => `<span class="opt-chip">${esc(e)}<button data-opt-del="${key}|${esc(e)}" title="删除">×</button></span>`).join('') + `<button class="btn opt-add" data-opt-add="${key}">+ 新增</button>`;
+  $('#chipsEngineers').innerHTML = chips(engineers, 'engineer');
+  $('#chipsCerts').innerHTML = chips(certs, 'cert');
+  // 绑定：选项点击选中
+  $$('#typeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+  $$('#productTypeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+  $$('#levelOpts .level-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#levelOpts .level-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+  // 绑定：编辑 / 删除 / 新增（事件委托，避免重复绑定）
+  bindOptActs();
+  // 绑定：工程师 / 认证独立下拉 → 填入输入框
+  const bindFill = (selId, inputId) => { const sel = $(selId), inp = $(inputId); if (sel && inp) sel.onchange = () => { if (sel.value) inp.value = sel.value; }; };
+  bindFill('#selHardware', '#piHardware');
+  bindFill('#selStructure', '#piStructure');
+  bindFill('#selProject', '#piProject');
+  bindFill('#selCert', '#piCert');
+}
+function bindOptActs() {
+  $$('[data-opt-edit]').forEach(b => b.onclick = (e) => { e.stopPropagation(); const [kind, name] = b.dataset.optEdit.split('|'); openOptModal(kind, name); });
+  $$('[data-opt-del]').forEach(b => b.onclick = (e) => { e.stopPropagation(); const [kind, name] = b.dataset.optDel.split('|'); delOption(kind, name); });
+  $$('[data-opt-add]').forEach(b => b.onclick = (e) => { e.stopPropagation(); openOptModal(b.dataset.optAdd, null); });
 }
 async function saveOptions(next) {
   try { state.options = await api('/options', { method: 'POST', body: JSON.stringify(next) }); renderPiOptions(); toast('选项已更新'); }
   catch (e) { toast('保存失败：' + e.message); }
 }
-function promptAddOption(label, pickColor) {
-  const name = prompt(`新增${label}（输入名称）`);
-  if (!name || !name.trim()) return;
-  const n = name.trim();
+function openOptModal(kind, editName) {
+  optMode = { kind, editName };
+  const map = { type: '项目类型', product: '产品类型', level: '项目等级', cert: '认证标签', engineer: '工程师' };
+  $('#optTitle').textContent = (editName ? '编辑' : '新增') + map[kind] || '选项';
+  $('#optName').value = editName || '';
+  const colorRow = $('#optColor').parentElement;
+  const o = state.options || {};
+  if (editName) {
+    const pool = kind === 'type' ? (o.types || {}) : kind === 'product' ? (o.productTypes || {}) : kind === 'level' ? (o.levels || {}) : {};
+    $('#optColor').value = pool[editName] || '#0A84FF';
+  } else {
+    $('#optColor').value = '#0A84FF';
+  }
+  colorRow.style.display = (kind === 'type' || kind === 'product' || kind === 'level') ? '' : 'none';
+  $('#optModal').classList.remove('hidden'); $('#optName').focus();
+}
+$('#optSave').onclick = async () => {
+  const n = $('#optName').value.trim();
+  if (!n) { toast('请输入名称'); return; }
   const o = Object.assign({ types: {}, productTypes: {}, levels: {}, certs: [], engineers: [] }, state.options || {});
-  const colors = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF453A', '#64D2FF', '#FFD60A', '#8B5CF6', '#FF9F0A', '#00C7BE'];
-  if (pickColor === 'type') { o.types = Object.assign({}, o.types, { [n]: pickColor ? colors[Object.keys(o.types).length % colors.length] : '#0A84FF' }); }
-  else if (pickColor === 'level') { o.levels = Object.assign({}, o.levels, { [n]: colors[Object.keys(o.levels).length % colors.length] }); }
-  else if (pickColor === 'product') { o.productTypes = Object.assign({}, o.productTypes, { [n]: colors[Object.keys(o.productTypes).length % colors.length] }); }
-  else if (pickColor === 'cert') { if (!o.certs.includes(n)) o.certs.push(n); }
-  else if (pickColor === 'engineer') { if (!o.engineers.includes(n)) o.engineers.push(n); }
+  const k = optMode.kind;
+  if (k === 'type' || k === 'product' || k === 'level') {
+    const poolKey = k === 'type' ? 'types' : k === 'product' ? 'productTypes' : 'levels';
+    const pool = Object.assign({}, o[poolKey] || {});
+    if (optMode.editName) delete pool[optMode.editName];
+    pool[n] = $('#optColor').value || '#0A84FF';
+    o[poolKey] = pool;
+  } else if (k === 'cert') {
+    if (optMode.editName) o.certs = (o.certs || []).filter(x => x !== optMode.editName);
+    if (!o.certs.includes(n)) o.certs.push(n);
+  } else {
+    if (optMode.editName) o.engineers = (o.engineers || []).filter(x => x !== optMode.editName);
+    if (!o.engineers.includes(n)) o.engineers.push(n);
+  }
+  $('#optModal').classList.add('hidden');
+  saveOptions(o);
+};
+$('#optCancel').onclick = () => $('#optModal').classList.add('hidden');
+$('#optX').onclick = () => $('#optModal').classList.add('hidden');
+async function delOption(kind, name) {
+  if (!confirm(`删除选项「${name}」？已有项目不受影响。`)) return;
+  const o = Object.assign({ types: {}, productTypes: {}, levels: {}, certs: [], engineers: [] }, state.options || {});
+  if (kind === 'type') { const t = Object.assign({}, o.types); delete t[name]; o.types = t; }
+  else if (kind === 'product') { const t = Object.assign({}, o.productTypes); delete t[name]; o.productTypes = t; }
+  else if (kind === 'level') { const t = Object.assign({}, o.levels); delete t[name]; o.levels = t; }
+  else if (kind === 'cert') { o.certs = (o.certs || []).filter(x => x !== name); }
+  else { o.engineers = (o.engineers || []).filter(x => x !== name); }
   saveOptions(o);
 }
-$('#addTypeBtn').onclick = () => promptAddOption('项目类型', 'type');
-$('#addProductTypeBtn').onclick = () => promptAddOption('产品类型', 'product');
-$('#addLevelBtn').onclick = () => promptAddOption('项目等级', 'level');
-$('#addCertBtn').onclick = () => promptAddOption('认证标签', 'cert');
-$('#addEngineerBtn').onclick = () => promptAddOption('工程师', 'engineer');
+$('#addTypeBtn').onclick = () => openOptModal('type', null);
+$('#addProductTypeBtn').onclick = () => openOptModal('product', null);
+$('#addLevelBtn').onclick = () => openOptModal('level', null);
 function openProjInfo(name, existing) {
-  renderPiOptions();
   $('#piName').value = existing ? existing.name : (name || '');
   const eng = existing && existing.engineers ? existing.engineers : {};
   $('#piHardware').value = eng.hardware && eng.hardware !== '—' ? eng.hardware : '';
   $('#piStructure').value = eng.structure && eng.structure !== '—' ? eng.structure : '';
   $('#piProject').value = eng.project && eng.project !== '—' ? eng.project : '';
   $('#piCert').value = existing ? (existing.cert || '') : '';
+  renderPiOptions();
   const t = existing ? existing.type : null, l = existing ? existing.level : null, pt = existing ? existing.productType : null;
   $$('#typeOpts .type-opt').forEach(o => o.classList.toggle('active', o.dataset.type === t));
   $$('#levelOpts .level-opt').forEach(o => o.classList.toggle('active', o.dataset.level === l));
@@ -1078,6 +1134,24 @@ function weekRange(d) {
   return { mon, days };
 }
 function activeProjects() { return state.projects.filter(p => (p.status || 'active') !== 'archived'); }
+// 汇报用项目集合：全部进行中项目 + 仅在归档发生的时间窗口内的归档项目
+// 日报=当天归档，周报=当周归档，月报=当月归档
+function reportProjects(mode) {
+  const active = activeProjects();
+  const arch = state.projects.filter(p => (p.status || 'active') === 'archived' && p.completedAt);
+  if (mode === 'daily') {
+    const d = isoDate(state.dailyDate);
+    return active.concat(arch.filter(p => p.completedAt === d));
+  }
+  if (mode === 'weekly') {
+    const { mon, days } = weekRange(state.weekDate);
+    const mI = isoDate(mon), sI = isoDate(days[6]);
+    return active.concat(arch.filter(p => p.completedAt >= mI && p.completedAt <= sI));
+  }
+  const y = state.monthlyDate.getFullYear(), mo = state.monthlyDate.getMonth();
+  const mF = isoDate(new Date(y, mo, 1)), mE = isoDate(new Date(y, mo + 1, 0));
+  return active.concat(arch.filter(p => p.completedAt >= mF && p.completedAt <= mE));
+}
 function allPhaseUnion() {
   const map = new Map();
   state.projects.forEach(p => (p.phases || []).forEach(ph => { if (!map.has(ph.id)) map.set(ph.id, ph); }));
@@ -1096,7 +1170,7 @@ function renderReport() {
 }
 function buildPhaseSwim(box, mode) {
   const phases = allPhaseUnion();
-  let projs = activeProjects();
+  let projs = reportProjects(mode);
   const refD = isoDate(state.dailyDate);
   const wk = weekRange(state.weekDate), mI = isoDate(wk.mon), sI = isoDate(wk.days[6]);
   const phaseIdx = {}; phases.forEach((ph, i) => phaseIdx[ph.id] = i);
@@ -1139,7 +1213,7 @@ function buildPhaseSwim(box, mode) {
 }
 function buildDaily(wrap) {
   const d = state.dailyDate, dIso = isoDate(d);
-  const projs = activeProjects();
+  const projs = reportProjects('daily');
   let due = 0, doneT = 0, over = 0, activeN = 0;
   projs.forEach(p => {
     if ((p.tasks || []).length) activeN++;
@@ -1188,7 +1262,7 @@ function buildDaily(wrap) {
 function buildWeekly(wrap) {
   const { mon, days } = weekRange(state.weekDate);
   const monIso = isoDate(mon), sunIso = isoDate(days[6]);
-  const projs = activeProjects();
+  const projs = reportProjects('weekly');
   let wkTotal = 0, wkDone = 0, wkMs = 0;
   projs.forEach(p => (p.tasks || []).forEach(t => {
     if (t.dueDate && t.dueDate >= monIso && t.dueDate <= sunIso) { wkTotal++; if (t.done) wkDone++; if (t.isMilestone) wkMs++; }
@@ -1267,7 +1341,7 @@ function renderMonthly() {
   const today = isoDate(new Date());
   const names = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const wrap = $('#monthly');
-  const projs = activeProjects();
+  const projs = reportProjects('monthly');
   // 只统计本月内「试产发布」的项目：达成率 = 已完成试产发布 / 本月计划试产发布
   const rows = [];
   projs.forEach(p => {
