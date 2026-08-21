@@ -335,6 +335,7 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 /* ---------- 移动端抽屉 + 汉堡 ---------- */
 .icon-btn { padding: 9px 11px; display: none; }
 #menuBtn { display: none; }
+.demo-badge { display: inline-flex; align-items: center; margin-left: 8px; padding: 2px 9px; font-size: 12px; line-height: 1.6; border-radius: 999px; background: rgba(10,132,255,.15); color: #0a84ff; border: 1px solid rgba(10,132,255,.35); white-space: nowrap; }
 
 /* ---------- AI 助手 ---------- */
 .ai-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }

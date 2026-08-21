@@ -13,7 +13,7 @@ const ICON = {
   box: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg>',
   tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>'
 };
-let state = { projects: [], templates: [], mappings: [], currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), readonly: false };
+let state = { projects: [], templates: [], mappings: [], currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -21,21 +21,25 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 async function api(path, opts = {}) {
   const method = opts.method || 'GET';
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  if (method !== 'GET') {
+  const doFetch = () => fetch(API + path, { ...opts, method, headers });
+  // 演示模式（--demo）：服务端免令牌鉴权，前端不再弹"访问令牌"输入框
+  if (method !== 'GET' && !state.demo) {
     let tok = ''; try { tok = localStorage.getItem('kb-token') || ''; } catch (e) {}
     if (tok) headers['X-Auth-Token'] = tok;
-  }
-  const doFetch = () => fetch(API + path, { ...opts, method, headers });
-  let r = await doFetch();
-  if (r.status === 401) {
-    // 写操作需要访问令牌：提示输入一次并记住（令牌在服务器 data/auth.token 或启动日志中）
-    const t = prompt('写操作需要访问令牌，请输入（本机服务器 data/auth.token 文件里可以查看）：');
-    if (t && t.trim()) {
-      try { localStorage.setItem('kb-token', t.trim()); } catch (e) {}
-      headers['X-Auth-Token'] = t.trim();
-      r = await doFetch();
+    let r = await doFetch();
+    if (r.status === 401) {
+      // 写操作需要访问令牌：提示输入一次并记住（令牌在服务器 data/auth.token 或启动日志中）
+      const t = prompt('写操作需要访问令牌，请输入（本机服务器 data/auth.token 文件里可以查看）：');
+      if (t && t.trim()) {
+        try { localStorage.setItem('kb-token', t.trim()); } catch (e) {}
+        headers['X-Auth-Token'] = t.trim();
+        r = await doFetch();
+      }
     }
+    if (!r.ok) { const e = await r.json().catch(() => ({ error: r.status })); throw new Error(e.error || r.status); }
+    return r.status === 204 ? null : r.json();
   }
+  let r = await doFetch();
   if (!r.ok) { const e = await r.json().catch(() => ({ error: r.status })); throw new Error(e.error || r.status); }
   return r.status === 204 ? null : r.json();
 }
@@ -64,7 +68,7 @@ async function loadAll() {
     state.templates = await api('/templates');
     state.projects = await api('/projects');
     try { state.mappings = await api('/mappings'); } catch (e) {}
-    try { const r = await api('/readonly'); state.readonly = !!(r && r.on); } catch (e) {}
+    try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
   refreshMappingSelect();

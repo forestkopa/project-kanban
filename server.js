@@ -423,7 +423,7 @@ const server = http.createServer(async (req, res) => {
     }
     // 只读模式：查询 / 切换（始终可用）
     if (p === '/api/readonly') {
-      if (req.method === 'GET') return send(res, 200, { on: isRO() });
+      if (req.method === 'GET') return send(res, 200, { on: isRO(), demo: DEMO_MODE });
       if (req.method === 'POST') {
         const body = await readBody(req);
         try { fs.writeFileSync(RO_FLAG, (body && body.on) ? '1' : '0'); }
