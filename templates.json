@@ -718,5 +718,22 @@
         "assignee": ""
       }
     ]
+  },
+  {
+    "id": "tpl_community_1",
+    "name": "社区共享-智能台灯",
+    "phases": [
+      {
+        "id": "p1",
+        "name": "需求立项"
+      }
+    ],
+    "tasks": [
+      {
+        "title": "光学方案",
+        "phaseId": "p1",
+        "estimateDays": 6
+      }
+    ]
   }
 ]
