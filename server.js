@@ -45,11 +45,12 @@ function gitAutoCommit(file) {
 function uid() { return 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function isoDate(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
-/* ---------- 可配置选项（项目类型/产品类型/等级），默认值 + 可新增；工程师/认证为手填字段 ---------- */
+/* ---------- 可配置选项（项目类型/产品类型/等级/工程师类型），默认值 + 可新增；姓名/认证为手填字段 ---------- */
 const DEFAULT_OPTIONS = {
   types: { 'C端': '#0A84FF', 'B端': '#30D158', '预研': '#FF9F0A', '迭代': '#BF5AF2' },
   productTypes: { 'AI': '#10a37f', 'CC线': '#06b6d4', 'DOCK': '#0ea5e9', 'MI': '#a3e635', 'MST': '#eab308', 'PD+HUB': '#f97316', 'SSD HUB': '#64748b', 'TB5': '#6366f1', 'U4': '#a855f7', 'WiFi dongle': '#14b8a6', '基础hub': '#94a3b8' },
-  levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' }
+  levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' },
+  engineerTypes: ['硬件工程师', '结构工程师', '项目工程师', '测试工程师']
 };
 function loadOptions() { return Object.assign({}, DEFAULT_OPTIONS, loadJSON(OPTIONS_FILE, {})); }
 function scheduleTasks(phases, tasks, startStr) {
@@ -497,7 +498,7 @@ const server = http.createServer(async (req, res) => {
       if (!body || typeof body !== 'object') return send(res, 400, { error: '参数无效' });
       const o = loadOptions();
       ['types', 'productTypes', 'levels'].forEach(k => { if (body[k] && typeof body[k] === 'object') o[k] = body[k]; });
-      ['certs', 'engineers'].forEach(k => { if (Array.isArray(body[k])) o[k] = body[k]; });
+      ['engineerTypes'].forEach(k => { if (Array.isArray(body[k])) o[k] = body[k]; });
       saveJSON(OPTIONS_FILE, o);
       return send(res, 200, o);
     }

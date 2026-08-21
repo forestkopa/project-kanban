@@ -483,7 +483,8 @@ function openTplModal() {
   $('#tplModal').classList.remove('hidden');
 }
 /* ---- 项目信息选项：动态渲染（可新增 / 编辑 / 删除，可配置颜色） ---- */
-let optMode = { kind: 'type', editName: null }; // kind: type|product|level|engineer|cert
+let optMode = { kind: 'type', editName: null }; // kind: type|product|level|engineerType
+let optColorVal = '#0A84FF'; // 当前选中颜色（色板）
 // WPS 风格主题色板：5 行 10 列
 const COLOR_PALETTE = [
   ['#FFFFFF','#F2F2F2','#D9D9D9','#BFBFBF','#A6A6A6','#808080','#595959','#3F3F3F','#1F1F1F','#000000'],
@@ -493,12 +494,29 @@ const COLOR_PALETTE = [
   ['#A61C00','#CC4125','#B45F06','#BF8F00','#38761D','#134F5C','#0B5394','#351C75','#741B47','#595959']
 ];
 function renderOptPalette() {
-  $('#optPalette').innerHTML = COLOR_PALETTE.map((row, ri) => `<div class="opt-pal-row">${row.map(c => `<button class="opt-swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`).join('');
-  $('#optPalette').onclick = e => { const b = e.target.closest('.opt-swatch'); if (!b) return; setOptColor(b.dataset.color); };
+  $('#optPalette').innerHTML = COLOR_PALETTE.map((row, ri) => `<div class="opt-pal-row">${row.map(c => `<button class="opt-swatch${c.toLowerCase() === optColorVal.toLowerCase() ? ' sel' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`).join('');
+  $('#optPalette').onclick = e => { const b = e.target.closest('.opt-swatch'); if (!b) return; optColorVal = b.dataset.color; renderOptPalette(); };
 }
-function setOptColor(c) {
-  $('#optColor').value = c;
-  const p = $('#optColorPrev'), h = $('#optColorHex'); if (p) p.style.background = c; if (h) h.textContent = c;
+function engTypesList() { const o = state.options || {}; return Array.isArray(o.engineerTypes) ? o.engineerTypes : ['硬件工程师', '结构工程师', '项目工程师']; }
+// 兼容旧数据：hardware/structure/project → 中文类型名
+function readEngMap(eng) {
+  const legacy = { hardware: '硬件工程师', structure: '结构工程师', project: '项目工程师' };
+  const map = {};
+  if (eng && typeof eng === 'object') {
+    Object.keys(legacy).forEach(k => { if (eng[k] !== undefined && eng[k] !== '') map[legacy[k]] = eng[k]; });
+    engTypesList().forEach(t => { if (eng[t] !== undefined && eng[t] !== '') map[t] = eng[t]; });
+  }
+  return map;
+}
+function renderEngFields() {
+  const vals = readEngMap(pendingEng);
+  const rows = engTypesList().map(t => `
+    <div class="pi-field eng-row" data-eng-type="${esc(t)}">
+      <label>${esc(t)}<button class="eng-del" data-opt-del="engineerType|${esc(t)}" title="删除类型">×</button></label>
+      <input class="inp eng-name" placeholder="手填姓名" value="${esc(vals[t] || '')}" autocomplete="off">
+    </div>`).join('');
+  $('#engFields').innerHTML = rows || '<div class="pi-sub" style="color:var(--text-3)">暂无工程师类型，点右上角「+ 新增工程师类型」</div>';
+  $$('#engFields .eng-del').forEach(b => b.onclick = (e) => { e.stopPropagation(); const [, name] = b.dataset.optDel.split('|'); delOption('engineerType', name); });
 }
 function renderPiOptions() {
   const types = TYPE_COLORS(), pts = PRODUCT_TYPE_COLORS(), lvs = LEVEL_COLORS();
@@ -506,6 +524,7 @@ function renderPiOptions() {
   $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}${optActs('type', t)}</div>`).join('');
   $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}${optActs('product', t)}</div>`).join('');
   $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}${optActs('level', l)}</div>`).join('');
+  renderEngFields();
   // 绑定：选项点击选中
   $$('#typeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
   $$('#productTypeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
@@ -515,7 +534,6 @@ function renderPiOptions() {
 function bindOptActs() {
   $$('[data-opt-edit]').forEach(b => b.onclick = (e) => { e.stopPropagation(); const [kind, name] = b.dataset.optEdit.split('|'); openOptModal(kind, name); });
   $$('[data-opt-del]').forEach(b => b.onclick = (e) => { e.stopPropagation(); const [kind, name] = b.dataset.optDel.split('|'); delOption(kind, name); });
-  $$('[data-opt-add]').forEach(b => b.onclick = (e) => { e.stopPropagation(); openOptModal(b.dataset.optAdd, null); });
 }
 async function saveOptions(next) {
   try { state.options = await api('/options', { method: 'POST', body: JSON.stringify(next) }); renderPiOptions(); toast('选项已更新'); }
@@ -523,39 +541,36 @@ async function saveOptions(next) {
 }
 function openOptModal(kind, editName) {
   optMode = { kind, editName };
-  const map = { type: '项目类型', product: '产品类型', level: '项目等级', cert: '认证标签', engineer: '工程师' };
+  const map = { type: '项目类型', product: '产品类型', level: '项目等级', engineerType: '工程师类型' };
   $('#optTitle').textContent = (editName ? '编辑' : '新增') + (map[kind] || '选项');
   $('#optName').value = editName || '';
   const o = state.options || {};
-  let curColor = '#0A84FF';
-  if (editName) {
-    const pool = kind === 'type' ? (o.types || {}) : kind === 'product' ? (o.productTypes || {}) : kind === 'level' ? (o.levels || {}) : {};
-    curColor = pool[editName] || '#0A84FF';
+  optColorVal = '#0A84FF';
+  if (editName && (kind === 'type' || kind === 'product' || kind === 'level')) {
+    const pool = kind === 'type' ? (o.types || {}) : kind === 'product' ? (o.productTypes || {}) : (o.levels || {});
+    optColorVal = pool[editName] || '#0A84FF';
   }
-  const colorRow = $('.opt-color-row');
-  if (colorRow) colorRow.style.display = (kind === 'type' || kind === 'product' || kind === 'level') ? '' : 'none';
-  setOptColor(curColor);
+  // 工程师类型无色板
+  const pal = $('#optPalette'); if (pal) pal.style.display = (kind === 'type' || kind === 'product' || kind === 'level') ? '' : 'none';
   renderOptPalette();
   $('#optModal').classList.remove('hidden'); $('#optName').focus();
 }
-$('#optColor').oninput = () => setOptColor($('#optColor').value);
 $('#optSave').onclick = async () => {
   const n = $('#optName').value.trim();
   if (!n) { toast('请输入名称'); return; }
-  const o = Object.assign({ types: {}, productTypes: {}, levels: {}, certs: [], engineers: [] }, state.options || {});
+  const o = Object.assign({ types: {}, productTypes: {}, levels: {}, engineerTypes: [] }, state.options || {});
   const k = optMode.kind;
   if (k === 'type' || k === 'product' || k === 'level') {
     const poolKey = k === 'type' ? 'types' : k === 'product' ? 'productTypes' : 'levels';
     const pool = Object.assign({}, o[poolKey] || {});
     if (optMode.editName) delete pool[optMode.editName];
-    pool[n] = $('#optColor').value || '#0A84FF';
+    pool[n] = optColorVal;
     o[poolKey] = pool;
-  } else if (k === 'cert') {
-    if (optMode.editName) o.certs = (o.certs || []).filter(x => x !== optMode.editName);
-    if (!o.certs.includes(n)) o.certs.push(n);
-  } else {
-    if (optMode.editName) o.engineers = (o.engineers || []).filter(x => x !== optMode.editName);
-    if (!o.engineers.includes(n)) o.engineers.push(n);
+  } else if (k === 'engineerType') {
+    const list = Array.isArray(o.engineerTypes) ? o.engineerTypes.slice() : [];
+    if (optMode.editName) { const i = list.indexOf(optMode.editName); if (i >= 0) list[i] = n; }
+    else if (!list.includes(n)) list.push(n);
+    o.engineerTypes = list;
   }
   $('#optModal').classList.add('hidden');
   saveOptions(o);
@@ -564,23 +579,21 @@ $('#optCancel').onclick = () => $('#optModal').classList.add('hidden');
 $('#optX').onclick = () => $('#optModal').classList.add('hidden');
 async function delOption(kind, name) {
   if (!confirm(`删除选项「${name}」？已有项目不受影响。`)) return;
-  const o = Object.assign({ types: {}, productTypes: {}, levels: {}, certs: [], engineers: [] }, state.options || {});
+  const o = Object.assign({ types: {}, productTypes: {}, levels: {}, engineerTypes: [] }, state.options || {});
   if (kind === 'type') { const t = Object.assign({}, o.types); delete t[name]; o.types = t; }
   else if (kind === 'product') { const t = Object.assign({}, o.productTypes); delete t[name]; o.productTypes = t; }
   else if (kind === 'level') { const t = Object.assign({}, o.levels); delete t[name]; o.levels = t; }
-  else if (kind === 'cert') { o.certs = (o.certs || []).filter(x => x !== name); }
-  else { o.engineers = (o.engineers || []).filter(x => x !== name); }
+  else if (kind === 'engineerType') { o.engineerTypes = (o.engineerTypes || []).filter(x => x !== name); }
   saveOptions(o);
 }
 $('#addTypeBtn').onclick = () => openOptModal('type', null);
 $('#addProductTypeBtn').onclick = () => openOptModal('product', null);
 $('#addLevelBtn').onclick = () => openOptModal('level', null);
+$('#addEngineerTypeBtn').onclick = () => openOptModal('engineerType', null);
+let pendingEng = {}; // openProjInfo 传入的工程师值（渲染用）
 function openProjInfo(name, existing) {
   $('#piName').value = existing ? existing.name : (name || '');
-  const eng = existing && existing.engineers ? existing.engineers : {};
-  $('#piHardware').value = eng.hardware && eng.hardware !== '—' ? eng.hardware : '';
-  $('#piStructure').value = eng.structure && eng.structure !== '—' ? eng.structure : '';
-  $('#piProject').value = eng.project && eng.project !== '—' ? eng.project : '';
+  pendingEng = existing && existing.engineers ? existing.engineers : {};
   $('#piCert').value = existing ? (existing.cert || '') : '';
   renderPiOptions();
   const t = existing ? existing.type : null, l = existing ? existing.level : null, pt = existing ? existing.productType : null;
@@ -605,7 +618,8 @@ $('#piConfirm').onclick = async () => {
   if (!level) { toast('请选择项目等级'); return; }
   if (!productType) { toast('请选择产品类型'); return; }
   if (!cert) { toast('请填写认证标签'); return; }
-  const eng = { hardware: $('#piHardware').value.trim() || '—', structure: $('#piStructure').value.trim() || '—', project: $('#piProject').value.trim() || '—' };
+  const eng = {};
+  $$('#engFields .eng-row').forEach(row => { const v = row.querySelector('.eng-name').value.trim(); eng[row.dataset.engType] = v || '—'; });
   $('#projInfoModal').classList.add('hidden');
   try {
     if (pending && pending.mode === 'tpl') {
@@ -1013,7 +1027,7 @@ function renderLevelDonut() {
 function renderLoad() {
   const counts = {};
   state.projects.filter(p => (p.status || 'active') !== 'archived').forEach(p => {
-    const set = new Set([(p.engineers || {}).hardware, (p.engineers || {}).structure, (p.engineers || {}).project].filter(Boolean));
+    const set = new Set(Object.values(p.engineers || {}).filter(Boolean));
     set.forEach(name => { if (name && name !== '—') counts[name] = (counts[name] || 0) + 1; });
   });
   const palette = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#64D2FF', '#FF453A', '#FFD60A', '#5E5CE6'];

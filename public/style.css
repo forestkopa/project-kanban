@@ -158,6 +158,10 @@ textarea.inp { resize: vertical; min-height: 64px; }
 .pi-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pi-field label { flex: 0 0 70px; font-size: 12.5px; color: var(--text-2); }
 .pi-field .inp { flex: 1; min-width: 0; }
+/* 工程师行：类型标签可删除 */
+.eng-row label { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; min-width: 84px; }
+.eng-del { border: none; background: none; color: var(--text-3); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; }
+.eng-del:hover { color: var(--danger); }
 /* 选项卡片上的编辑 / 删除按钮（hover 显示） */
 .type-opt, .level-opt { position: relative; }
 .opt-act { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text-2); cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; }
@@ -167,6 +171,11 @@ textarea.inp { resize: vertical; min-height: 64px; }
 .opt-act-del:hover { color: var(--danger); border-color: var(--danger); }
 .opt-act-edit { right: 27px; }
 .opt-act-del { right: 5px; }
+/* 等级方块内编辑/删除按钮：小尺寸 + 垂直居中，避免溢出 46px 方块 */
+.level-opt .opt-act { top: 50%; transform: translateY(-50%); width: 15px; height: 15px; border-radius: 4px; }
+.level-opt .opt-act svg { width: 9px; height: 9px; }
+.level-opt .opt-act-edit { right: 24px; }
+.level-opt .opt-act-del { right: 6px; }
 /* 选项编辑弹窗：颜色输入 + WPS 风格色板 */
 .opt-color-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .opt-color-input { width: 40px; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer; padding: 2px; }
