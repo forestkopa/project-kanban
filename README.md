@@ -2,12 +2,13 @@
 
 一个本地网页应用，用于管理多个智能硬件产品项目。内置 4 份优秀产品模板，支持多项目切换、看板拖拽、任务增删改与完成跟踪。
 
-> 注：前端为零框架 / 零 CDN（全部原生 JS + 内联 SVG 图标，离线可用），运行时仅依赖一个 npm 包 `xlsx`（用于计划表导入导出，已随包内置）。
+> 注：前端为零框架 / 零 CDN（全部原生 JS + 内联 SVG 图标，离线可用），运行时依赖两个 npm 包：`xlsx`（计划表导入导出）与 `xlsx-js-style`（带样式的 Excel 导出，如周报待办清单）。
 
 ## 启动
 
 ```bash
 cd project-kanban
+npm install          # 首次需要：安装 xlsx / xlsx-js-style
 node server.js
 # 打开 http://localhost:5180
 ```
@@ -19,6 +20,21 @@ node server.js
 ```bash
 node watchdog.js
 ```
+
+## 换机 / 回家继续开发
+
+本仓库托管在 GitHub（私有）：https://github.com/forestkopa/project-kanban
+
+```bash
+git clone https://github.com/forestkopa/project-kanban.git
+cd project-kanban
+npm install
+node server.js --demo     # 演示模式（脱敏数据 + 免令牌），或去掉 --demo 用真实数据
+```
+
+- 公网访问：隧道地址每次重启会变，运行 `node watchdog.js` 后查看 `data/tunnel-url.txt` 获取最新网址。
+- 敏感文件（`data/ai.json` 的 API Key、`data/auth.token`、`data/tunnel-url.txt`、`data/options.json`、`public/brand-logo.png`）已在 `.gitignore` 排除，不会进版本库，换机后按需重新配置（AI Key 在页面「AI 设置」填写）。
+- 提交规范：改动后 `git add` + `git commit` + `git push origin main`。
 
 ## 访问令牌（写操作鉴权）
 
