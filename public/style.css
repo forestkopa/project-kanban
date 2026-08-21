@@ -54,6 +54,8 @@ body {
 .proj:hover .proj-edit { opacity: 1; }
 .proj-edit:hover { background: var(--border); color: var(--text); }
 .proj.archived { opacity: .6; }
+.proj.dragging { opacity: .45; transform: scale(.98); }
+.side-group { position: relative; }
 .side-sec { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin: 4px 2px 0; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; padding: 4px 2px; border-radius: 6px; transition: .15s; }
 .side-sec:hover { color: var(--text-2); background: var(--bg-2); }
 .side-sec::before { content: ''; width: 6px; height: 6px; border-radius: 2px; background: var(--text-3); flex: none; }

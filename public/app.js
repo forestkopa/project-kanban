@@ -135,6 +135,10 @@ function applyReadOnly() {
 function projCard(p, dim) {
   const el = document.createElement('div');
   el.className = 'proj' + (p.id === state.currentId ? ' active' : '') + (dim ? ' archived' : '');
+  el.draggable = !state.readonly;
+  el.dataset.pid = p.id;
+  el.ondragstart = e => { e.dataTransfer.setData('text/plain', p.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); };
+  el.ondragend = () => el.classList.remove('dragging');
   el.onclick = () => { state.currentId = p.id; render(); };
   const pc = progress(p);
   const c = typeColor(p.type);
@@ -169,6 +173,32 @@ function renderSidebar() {
     const wrap = document.createElement('div'); wrap.className = 'side-group' + (folded ? ' hidden' : '');
     items.forEach(p => wrap.appendChild(projCard(p, dim)));
     list.appendChild(wrap);
+    // 拖拽排序：仅同一分组内可移动
+    const getAfter = (y) => {
+      const els = [...wrap.querySelectorAll('.proj:not(.dragging)')];
+      let closest = null, off = Number.NEGATIVE_INFINITY;
+      els.forEach(c => { const b = c.getBoundingClientRect(); const o = y - b.top - b.height / 2; if (o < 0 && o > off) { off = o; closest = c; } });
+      return closest;
+    };
+    wrap.ondragover = e => {
+      e.preventDefault();
+      const drag = wrap.querySelector('.proj.dragging'); if (!drag) return;
+      const after = getAfter(e.clientY);
+      if (after == null) wrap.appendChild(drag); else wrap.insertBefore(drag, after);
+    };
+    wrap.ondrop = async e => {
+      e.preventDefault();
+      const cur = [...wrap.querySelectorAll('.proj')].map(el => el.dataset.pid);
+      const before = state.projects.map(p => p.id).join();
+      const map = new Map(state.projects.map(p => [p.id, p]));
+      const idset = new Set(cur);
+      let pos = 0;
+      state.projects = state.projects.map(p => idset.has(p.id) ? map.get(cur[pos++]) : p);
+      renderSidebar();
+      if (state.projects.map(p => p.id).join() !== before) {
+        try { await api('/projects/order', { method: 'PUT', body: JSON.stringify({ ids: cur }) }); } catch (err) { toast('排序保存失败：' + err.message); }
+      }
+    };
   };
   group('正在进行', active, 'active', false);
   group('已归档', archived, 'archived', true);

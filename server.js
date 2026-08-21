@@ -707,6 +707,21 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return send(res, 400, { error: '图片数据无效' }); }
     }
 
+    // 项目排序（左侧项目卡片拖拽后保存顺序）
+    if (p === '/api/projects/order' && req.method === 'PUT') {
+      const body = await readBody(req);
+      if (!Array.isArray(body.ids) || !body.ids.length) return send(res, 400, { error: '缺少 ids 数组' });
+      const projects = loadJSON(PROJECTS_FILE, []);
+      const map = new Map(projects.map(x => [x.id, x]));
+      if (body.ids.some(id => !map.has(id))) return send(res, 400, { error: '包含未知项目 id' });
+      const ids = new Set(body.ids);
+      let pos = 0;
+      // 只重排 ids 内的项目，其余项目保持原位置
+      const next = projects.map(x => ids.has(x.id) ? map.get(body.ids[pos++]) : x);
+      saveJSON(PROJECTS_FILE, next);
+      return send(res, 200, { ok: true });
+    }
+
     const m = p.match(/^\/api\/projects(?:\/([^/]+)(?:\/tasks(?:\/([^/]+))?|\/reschedule)?)?$/);
     if (m) {
       const projects = loadJSON(PROJECTS_FILE, []);
