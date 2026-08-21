@@ -157,12 +157,21 @@ function renderSidebar() {
   const active = state.projects.filter(p => (p.status || 'active') !== 'archived');
   const archived = state.projects.filter(p => (p.status || 'active') === 'archived');
   if (!state.projects.length) { list.innerHTML = '<div class="empty">还没有项目。<br>点上方「新建项目」，用模板快速搭建。</div>'; return; }
-  active.forEach(p => list.appendChild(projCard(p, false)));
-  if (archived.length) {
-    const sec = document.createElement('div'); sec.className = 'side-sec'; sec.textContent = '已归档 · ' + archived.length;
+  let folds = {}; try { folds = JSON.parse(localStorage.getItem('kb-side-folds') || '{}'); } catch (e) {}
+  const group = (label, items, key, dim) => {
+    if (!items.length) return;
+    const folded = !!folds[key];
+    const sec = document.createElement('div');
+    sec.className = 'side-sec' + (folded ? ' folded' : '');
+    sec.innerHTML = `<span class="ss-arr">${folded ? '▸' : '▾'}</span><span class="ss-label">${label}</span><span class="ss-cnt">${items.length}</span>`;
+    sec.onclick = () => { folds[key] = !folds[key]; try { localStorage.setItem('kb-side-folds', JSON.stringify(folds)); } catch (e) {} renderSidebar(); };
     list.appendChild(sec);
-    archived.forEach(p => list.appendChild(projCard(p, true)));
-  }
+    const wrap = document.createElement('div'); wrap.className = 'side-group' + (folded ? ' hidden' : '');
+    items.forEach(p => wrap.appendChild(projCard(p, dim)));
+    list.appendChild(wrap);
+  };
+  group('正在进行', active, 'active', false);
+  group('已归档', archived, 'archived', true);
 }
 
 function renderBoard(p) {
