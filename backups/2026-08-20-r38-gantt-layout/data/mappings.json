@@ -1,0 +1,33 @@
+[
+  {
+    "id": "id_mt1874um1uzugb",
+    "name": "hub项目映射模版",
+    "fields": {
+      "task": [
+        "内容"
+      ],
+      "taskFallback": [
+        "任务"
+      ],
+      "phase": [],
+      "groupPhase": true,
+      "who": [],
+      "start": [
+        "开始日期"
+      ],
+      "due": [
+        "结束日期"
+      ],
+      "days": [
+        "天数"
+      ],
+      "status": [
+        "进度"
+      ],
+      "note": [],
+      "skip": "插入新行|提示|说明|汇总|合计"
+    },
+    "createdAt": "2026-08-20T07:55:33.839Z",
+    "default": true
+  }
+]

@@ -1,0 +1,5483 @@
+[
+  {
+    "id": "id_mt0w4vycxum3d6",
+    "name": "智能门锁",
+    "templateId": "tpl_lock",
+    "icon": "📡",
+    "color": "#0a84ff",
+    "createdAt": "2026-08-20T02:17:53.604Z",
+    "phases": [
+      {
+        "id": "p1",
+        "name": "需求立项",
+        "color": "#7F77DD"
+      },
+      {
+        "id": "p2",
+        "name": "设计开发",
+        "color": "#378ADD"
+      },
+      {
+        "id": "p3",
+        "name": "打样试制",
+        "color": "#1D9E75"
+      },
+      {
+        "id": "p4",
+        "name": "测试验证",
+        "color": "#EF9F27"
+      },
+      {
+        "id": "p5",
+        "name": "量产导入",
+        "color": "#639922"
+      },
+      {
+        "id": "p6",
+        "name": "上市运营",
+        "color": "#D4537E"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt0w4vyc7prxba",
+        "title": "安全合规调研(国标锁具)",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-07-03",
+        "dueDate": "2026-07-09"
+      },
+      {
+        "id": "id_mt0w4vycqs5ekh",
+        "title": "产品定义与立项",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-07-09",
+        "dueDate": "2026-07-13"
+      },
+      {
+        "id": "id_mt0w4vycbj3ucc",
+        "title": "ID 防撬外观",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-07-13",
+        "dueDate": "2026-07-23"
+      },
+      {
+        "id": "id_mt0w4vyc6zsj0x",
+        "title": "锁体/离合结构",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-07-23",
+        "dueDate": "2026-08-04"
+      },
+      {
+        "id": "id_mt0w4vycnqa5vv",
+        "title": "主控板(EVT, 蓝牙/NFC)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 14,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-04",
+        "dueDate": "2026-08-18"
+      },
+      {
+        "id": "id_mt0w4vyc68nkq5",
+        "title": "指纹+密码模组",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-26"
+      },
+      {
+        "id": "id_mt0w4vyc4ynson",
+        "title": "电机驱动",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-26",
+        "dueDate": "2026-09-01"
+      },
+      {
+        "id": "id_mt0w4vycy7x7bz",
+        "title": "配套 App",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-01",
+        "dueDate": "2026-09-09"
+      },
+      {
+        "id": "id_mt0w4vycfvze0c",
+        "title": "EVT 样板",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-09",
+        "dueDate": "2026-09-17"
+      },
+      {
+        "id": "id_mt0w4vyc6da1ha",
+        "title": "指纹识别率调优",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-17",
+        "dueDate": "2026-09-23"
+      },
+      {
+        "id": "id_mt0w4vycb7ig8m",
+        "title": "离合电机寿命验证",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-23",
+        "dueDate": "2026-09-28"
+      },
+      {
+        "id": "id_mt0w4vyc4ixd08",
+        "title": "防技术开启安全测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-28",
+        "dueDate": "2026-10-05"
+      },
+      {
+        "id": "id_mt0w4vycqqx4hp",
+        "title": "10 万次寿命测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-15"
+      },
+      {
+        "id": "id_mt0w4vycnikfwa",
+        "title": "环境(-20~60℃)测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-15",
+        "dueDate": "2026-10-20"
+      },
+      {
+        "id": "id_mt0w4vycqjgkjw",
+        "title": "认证(无线电/锁具)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-20",
+        "dueDate": "2026-11-01"
+      },
+      {
+        "id": "id_mt0w4vycayxsyk",
+        "title": "锌合金压铸模具",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 26,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-01",
+        "dueDate": "2026-11-27"
+      },
+      {
+        "id": "id_mt0w4vycqay58l",
+        "title": "PVT 试产",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-27",
+        "dueDate": "2026-12-07"
+      },
+      {
+        "id": "id_mt0w4vycix9v4l",
+        "title": "来料检验标准",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-07",
+        "dueDate": "2026-12-11"
+      },
+      {
+        "id": "id_mt0w4vycm99vru",
+        "title": "安装指引",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-11",
+        "dueDate": "2026-12-15"
+      },
+      {
+        "id": "id_mt0w4vycse1t4f",
+        "title": "渠道铺货",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-15",
+        "dueDate": "2026-12-21"
+      },
+      {
+        "id": "id_mt0w4vycbn0z3v",
+        "title": "OTA 升级机制",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-21",
+        "dueDate": "2026-12-27"
+      }
+    ],
+    "startDate": "2026-07-03",
+    "baseline": [
+      {
+        "id": "id_mt0w4vyc7prxba",
+        "title": "安全合规调研(国标锁具)",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-07-02",
+        "dueDate": "2026-07-08"
+      },
+      {
+        "id": "id_mt0w4vycqs5ekh",
+        "title": "产品定义与立项",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-07-08",
+        "dueDate": "2026-07-12"
+      },
+      {
+        "id": "id_mt0w4vycbj3ucc",
+        "title": "ID 防撬外观",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-07-12",
+        "dueDate": "2026-07-22"
+      },
+      {
+        "id": "id_mt0w4vyc6zsj0x",
+        "title": "锁体/离合结构",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-07-22",
+        "dueDate": "2026-08-03"
+      },
+      {
+        "id": "id_mt0w4vycnqa5vv",
+        "title": "主控板(EVT, 蓝牙/NFC)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 14,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-03",
+        "dueDate": "2026-08-17"
+      },
+      {
+        "id": "id_mt0w4vyc68nkq5",
+        "title": "指纹+密码模组",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-17",
+        "dueDate": "2026-08-25"
+      },
+      {
+        "id": "id_mt0w4vyc4ynson",
+        "title": "电机驱动",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-25",
+        "dueDate": "2026-08-31"
+      },
+      {
+        "id": "id_mt0w4vycy7x7bz",
+        "title": "配套 App",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-31",
+        "dueDate": "2026-09-08"
+      },
+      {
+        "id": "id_mt0w4vycfvze0c",
+        "title": "EVT 样板",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-08",
+        "dueDate": "2026-09-16"
+      },
+      {
+        "id": "id_mt0w4vyc6da1ha",
+        "title": "指纹识别率调优",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-16",
+        "dueDate": "2026-09-22"
+      },
+      {
+        "id": "id_mt0w4vycb7ig8m",
+        "title": "离合电机寿命验证",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-22",
+        "dueDate": "2026-09-27"
+      },
+      {
+        "id": "id_mt0w4vyc4ixd08",
+        "title": "防技术开启安全测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-27",
+        "dueDate": "2026-10-04"
+      },
+      {
+        "id": "id_mt0w4vycqqx4hp",
+        "title": "10 万次寿命测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-04",
+        "dueDate": "2026-10-14"
+      },
+      {
+        "id": "id_mt0w4vycnikfwa",
+        "title": "环境(-20~60℃)测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-14",
+        "dueDate": "2026-10-19"
+      },
+      {
+        "id": "id_mt0w4vycqjgkjw",
+        "title": "认证(无线电/锁具)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-19",
+        "dueDate": "2026-10-31"
+      },
+      {
+        "id": "id_mt0w4vycayxsyk",
+        "title": "锌合金压铸模具",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 26,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-31",
+        "dueDate": "2026-11-26"
+      },
+      {
+        "id": "id_mt0w4vycqay58l",
+        "title": "PVT 试产",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-26",
+        "dueDate": "2026-12-06"
+      },
+      {
+        "id": "id_mt0w4vycix9v4l",
+        "title": "来料检验标准",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-06",
+        "dueDate": "2026-12-10"
+      },
+      {
+        "id": "id_mt0w4vycm99vru",
+        "title": "安装指引",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-10",
+        "dueDate": "2026-12-14"
+      },
+      {
+        "id": "id_mt0w4vycse1t4f",
+        "title": "渠道铺货",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-14",
+        "dueDate": "2026-12-20"
+      },
+      {
+        "id": "id_mt0w4vycbn0z3v",
+        "title": "OTA 升级机制",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-20",
+        "dueDate": "2026-12-26"
+      }
+    ],
+    "status": "active",
+    "completedAt": null,
+    "type": "C端",
+    "level": "S",
+    "engineers": {
+      "hardware": "test",
+      "structure": "test",
+      "project": "test"
+    },
+    "productType": "MST",
+    "cert": "非认证"
+  },
+  {
+    "id": "id_mt0w5y02tt90oz",
+    "name": "智能手表",
+    "templateId": "tpl_wearable",
+    "icon": "W",
+    "color": "#8b5cf6",
+    "createdAt": "2026-08-20T02:18:42.914Z",
+    "phases": [
+      {
+        "id": "p1",
+        "name": "需求立项",
+        "color": "#7F77DD"
+      },
+      {
+        "id": "p2",
+        "name": "设计开发",
+        "color": "#378ADD"
+      },
+      {
+        "id": "p3",
+        "name": "打样试制",
+        "color": "#1D9E75"
+      },
+      {
+        "id": "p4",
+        "name": "测试验证",
+        "color": "#EF9F27"
+      },
+      {
+        "id": "p5",
+        "name": "量产导入",
+        "color": "#639922"
+      },
+      {
+        "id": "p6",
+        "name": "上市运营",
+        "color": "#D4537E"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt0w5y02h8mcy5",
+        "title": "用户调研与竞品分析",
+        "phaseId": "p1",
+        "note": "明确目标人群与核心卖点",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-07-31",
+        "dueDate": "2026-08-10"
+      },
+      {
+        "id": "id_mt0w5y02y9m6i8",
+        "title": "产品定义书(PRD)与立项评审",
+        "phaseId": "p1",
+        "note": "确定规格、BOM 目标成本",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-10",
+        "dueDate": "2026-08-15"
+      },
+      {
+        "id": "id_mt0w5y02e09p36",
+        "title": "ID 外观与 CMF 设计",
+        "phaseId": "p2",
+        "note": "整机造型与配色工艺",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-15",
+        "dueDate": "2026-08-27"
+      },
+      {
+        "id": "id_mt0w5y02kehhf3",
+        "title": "结构堆叠(主板/电池/1.4\"屏)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-27",
+        "dueDate": "2026-09-06"
+      },
+      {
+        "id": "id_mt0w5y02rp3vcc",
+        "title": "低功耗硬件方案(EVT)",
+        "phaseId": "p2",
+        "note": "主控+传感器+充电",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-09-06",
+        "dueDate": "2026-09-21"
+      },
+      {
+        "id": "id_mt0w5y0252afjp",
+        "title": "嵌入式固件框架",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-09-21",
+        "dueDate": "2026-10-06"
+      },
+      {
+        "id": "id_mt0w5y0295z426",
+        "title": "配套 App 原型",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-06",
+        "dueDate": "2026-10-18"
+      },
+      {
+        "id": "id_mt0w5y02d2v7iu",
+        "title": "EVT 样板制作",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-18",
+        "dueDate": "2026-10-26"
+      },
+      {
+        "id": "id_mt0w5y02ogf02h",
+        "title": "心率/血氧传感器验证",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-26",
+        "dueDate": "2026-11-01"
+      },
+      {
+        "id": "id_mt0w5y02bczukd",
+        "title": "天线(LDS)调试",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-11-01",
+        "dueDate": "2026-11-05"
+      },
+      {
+        "id": "id_mt0w5y02mouxhy",
+        "title": "可靠性测试(1.5m 跌落 / IP68)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-11-05",
+        "dueDate": "2026-11-12"
+      },
+      {
+        "id": "id_mt0w5y02sc8nra",
+        "title": "DVT 整机验证",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-12",
+        "dueDate": "2026-11-22"
+      },
+      {
+        "id": "id_mt0w5y02tgkmm4",
+        "title": "续航与功耗测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-22",
+        "dueDate": "2026-11-27"
+      },
+      {
+        "id": "id_mt0w5y02p1eljk",
+        "title": "认证(CE/FCC/蓝牙 BQB)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 14,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-27",
+        "dueDate": "2026-12-11"
+      },
+      {
+        "id": "id_mt0w5y02yvrtbi",
+        "title": "双色注塑模具(T0/T1)",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 20,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-11",
+        "dueDate": "2026-12-31"
+      },
+      {
+        "id": "id_mt0w5y02n5rc46",
+        "title": "PVT 试产与良率提升",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-31",
+        "dueDate": "2027-01-10"
+      },
+      {
+        "id": "id_mt0w5y02tn51kw",
+        "title": "包装与说明书",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-10",
+        "dueDate": "2027-01-15"
+      },
+      {
+        "id": "id_mt0w5y02i0faev",
+        "title": "渠道备货",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-15",
+        "dueDate": "2027-01-22"
+      },
+      {
+        "id": "id_mt0w5y024wugl6",
+        "title": "上市后 OTA 迭代",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-22",
+        "dueDate": "2027-01-28"
+      }
+    ],
+    "baseline": [
+      {
+        "id": "id_mt0w5y02h8mcy5",
+        "title": "用户调研与竞品分析",
+        "phaseId": "p1",
+        "note": "明确目标人群与核心卖点",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02y9m6i8",
+        "title": "产品定义书(PRD)与立项评审",
+        "phaseId": "p1",
+        "note": "确定规格、BOM 目标成本",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02e09p36",
+        "title": "ID 外观与 CMF 设计",
+        "phaseId": "p2",
+        "note": "整机造型与配色工艺",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02kehhf3",
+        "title": "结构堆叠(主板/电池/1.4\"屏)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02rp3vcc",
+        "title": "低功耗硬件方案(EVT)",
+        "phaseId": "p2",
+        "note": "主控+传感器+充电",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y0252afjp",
+        "title": "嵌入式固件框架",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y0295z426",
+        "title": "配套 App 原型",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02d2v7iu",
+        "title": "EVT 样板制作",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02ogf02h",
+        "title": "心率/血氧传感器验证",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02bczukd",
+        "title": "天线(LDS)调试",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02mouxhy",
+        "title": "可靠性测试(1.5m 跌落 / IP68)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w5y02sc8nra",
+        "title": "DVT 整机验证",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y02tgkmm4",
+        "title": "续航与功耗测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y02p1eljk",
+        "title": "认证(CE/FCC/蓝牙 BQB)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 14,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y02yvrtbi",
+        "title": "双色注塑模具(T0/T1)",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 20,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y02n5rc46",
+        "title": "PVT 试产与良率提升",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y02tn51kw",
+        "title": "包装与说明书",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y02i0faev",
+        "title": "渠道备货",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w5y024wugl6",
+        "title": "上市后 OTA 迭代",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false
+      }
+    ],
+    "startDate": "2026-07-31",
+    "type": "B端",
+    "level": "B",
+    "engineers": {
+      "hardware": "test1",
+      "structure": "test1",
+      "project": "test1"
+    },
+    "productType": "MST",
+    "cert": "非认证"
+  },
+  {
+    "id": "id_mt0w62ohc4yvgl",
+    "name": "智能摄像头",
+    "templateId": "tpl_camera",
+    "icon": "C",
+    "color": "#10b981",
+    "createdAt": "2026-08-20T02:18:48.977Z",
+    "phases": [
+      {
+        "id": "p1",
+        "name": "需求立项",
+        "color": "#7F77DD"
+      },
+      {
+        "id": "p2",
+        "name": "设计开发",
+        "color": "#378ADD"
+      },
+      {
+        "id": "p3",
+        "name": "打样试制",
+        "color": "#1D9E75"
+      },
+      {
+        "id": "p4",
+        "name": "测试验证",
+        "color": "#EF9F27"
+      },
+      {
+        "id": "p5",
+        "name": "量产导入",
+        "color": "#639922"
+      },
+      {
+        "id": "p6",
+        "name": "上市运营",
+        "color": "#D4537E"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt0w62oh55hi3e",
+        "title": "场景调研(家用/看护)",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-10",
+        "dueDate": "2026-08-18"
+      },
+      {
+        "id": "id_mt0w62oh6atpbk",
+        "title": "产品定义与立项",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-22"
+      },
+      {
+        "id": "id_mt0w62ohzjtpau",
+        "title": "ID 设计",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 9,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-31"
+      },
+      {
+        "id": "id_mt0w62ohu32w69",
+        "title": "防水/云台结构",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 11,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-31",
+        "dueDate": "2026-09-11"
+      },
+      {
+        "id": "id_mt0w62ohqrdai3",
+        "title": "硬件(SoC+IMX 传感器+IR)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-09-11",
+        "dueDate": "2026-09-26"
+      },
+      {
+        "id": "id_mt0w62oh0p5e8z",
+        "title": "NPU 算法集成",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-09-26",
+        "dueDate": "2026-10-08"
+      },
+      {
+        "id": "id_mt0w62oh2mg26o",
+        "title": "实时流 App",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-20"
+      },
+      {
+        "id": "id_mt0w62ohwx60l8",
+        "title": "EVT 样板",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-20",
+        "dueDate": "2026-10-28"
+      },
+      {
+        "id": "id_mt0w62ohukd29a",
+        "title": "图像调优(宽动态/降噪)",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-28",
+        "dueDate": "2026-11-05"
+      },
+      {
+        "id": "id_mt0w62ohsuz0p0",
+        "title": "云台步进电机标定",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-05",
+        "dueDate": "2026-11-10"
+      },
+      {
+        "id": "id_mt0w62ohb3nk21",
+        "title": "画质与夜视测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-10",
+        "dueDate": "2026-11-17"
+      },
+      {
+        "id": "id_mt0w62ohmszup6",
+        "title": "网络稳定性",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-17",
+        "dueDate": "2026-11-22"
+      },
+      {
+        "id": "id_mt0w62ohzfotxh",
+        "title": "隐私合规(本地加密)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-22",
+        "dueDate": "2026-11-28"
+      },
+      {
+        "id": "id_mt0w62oh2vzg9a",
+        "title": "认证",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-28",
+        "dueDate": "2026-12-10"
+      },
+      {
+        "id": "id_mt0w62ohsf4acn",
+        "title": "模具开发",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 18,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-10",
+        "dueDate": "2026-12-28"
+      },
+      {
+        "id": "id_mt0w62oh260v0h",
+        "title": "PVT 试产",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-28",
+        "dueDate": "2027-01-07"
+      },
+      {
+        "id": "id_mt0w62ohm5yv2z",
+        "title": "产线镜头校准",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-07",
+        "dueDate": "2027-01-12"
+      },
+      {
+        "id": "id_mt0w62ohwjafzz",
+        "title": "云平台对接",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-12",
+        "dueDate": "2027-01-20"
+      },
+      {
+        "id": "id_mt0w62ohzpkhnp",
+        "title": "隐私说明",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-20",
+        "dueDate": "2027-01-23"
+      },
+      {
+        "id": "id_mt0w62oh0jcj3n",
+        "title": "渠道",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-23",
+        "dueDate": "2027-01-29"
+      }
+    ],
+    "baseline": [
+      {
+        "id": "id_mt0w62oh55hi3e",
+        "title": "场景调研(家用/看护)",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w62oh6atpbk",
+        "title": "产品定义与立项",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w62ohzjtpau",
+        "title": "ID 设计",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 9,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohu32w69",
+        "title": "防水/云台结构",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 11,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohqrdai3",
+        "title": "硬件(SoC+IMX 传感器+IR)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62oh0p5e8z",
+        "title": "NPU 算法集成",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62oh2mg26o",
+        "title": "实时流 App",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohwx60l8",
+        "title": "EVT 样板",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohukd29a",
+        "title": "图像调优(宽动态/降噪)",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohsuz0p0",
+        "title": "云台步进电机标定",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohb3nk21",
+        "title": "画质与夜视测试",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohmszup6",
+        "title": "网络稳定性",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohzfotxh",
+        "title": "隐私合规(本地加密)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62oh2vzg9a",
+        "title": "认证",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohsf4acn",
+        "title": "模具开发",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 18,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62oh260v0h",
+        "title": "PVT 试产",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohm5yv2z",
+        "title": "产线镜头校准",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohwjafzz",
+        "title": "云平台对接",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62ohzpkhnp",
+        "title": "隐私说明",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w62oh0jcj3n",
+        "title": "渠道",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false
+      }
+    ],
+    "startDate": "2026-08-10",
+    "type": "预研",
+    "level": "C",
+    "productType": "PD+HUB",
+    "cert": "FCC",
+    "engineers": {
+      "hardware": "test2",
+      "structure": "test2",
+      "project": "test2"
+    }
+  },
+  {
+    "id": "id_mt0w648x67btyk",
+    "name": "智能音箱",
+    "templateId": "tpl_speaker",
+    "icon": "S",
+    "color": "#ec4899",
+    "createdAt": "2026-08-20T02:18:51.009Z",
+    "phases": [
+      {
+        "id": "p1",
+        "name": "需求立项",
+        "color": "#7F77DD"
+      },
+      {
+        "id": "p2",
+        "name": "设计开发",
+        "color": "#378ADD"
+      },
+      {
+        "id": "p3",
+        "name": "打样试制",
+        "color": "#1D9E75"
+      },
+      {
+        "id": "p4",
+        "name": "测试验证",
+        "color": "#EF9F27"
+      },
+      {
+        "id": "p5",
+        "name": "量产导入",
+        "color": "#639922"
+      },
+      {
+        "id": "p6",
+        "name": "上市运营",
+        "color": "#D4537E"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt0w648xrvpbnn",
+        "title": "语音场景调研",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 9,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-07-27",
+        "dueDate": "2026-08-04"
+      },
+      {
+        "id": "id_mt0w648xg3lgl7",
+        "title": "产品定义与立项",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-04",
+        "dueDate": "2026-08-08"
+      },
+      {
+        "id": "id_mt0w648x3068g1",
+        "title": "ID(织物网罩)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 9,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-08",
+        "dueDate": "2026-08-17"
+      },
+      {
+        "id": "id_mt0w648xsisdf5",
+        "title": "声学腔体结构",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-17",
+        "dueDate": "2026-08-29"
+      },
+      {
+        "id": "id_mt0w648x7dqetb",
+        "title": "硬件(主控/功放/双麦阵列)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-29",
+        "dueDate": "2026-09-13"
+      },
+      {
+        "id": "id_mt0w648xikueyr",
+        "title": "远场语音算法",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 14,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-09-13",
+        "dueDate": "2026-09-27"
+      },
+      {
+        "id": "id_mt0w648xnkqaty",
+        "title": "App/语音技能",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-09-27",
+        "dueDate": "2026-10-07"
+      },
+      {
+        "id": "id_mt0w648x4s13v3",
+        "title": "EVT 样板",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-15"
+      },
+      {
+        "id": "id_mt0w648xexkuku",
+        "title": "麦克风阵列一致性",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-15",
+        "dueDate": "2026-10-21"
+      },
+      {
+        "id": "id_mt0w648x6v6fsy",
+        "title": "功放底噪优化",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-21",
+        "dueDate": "2026-10-26"
+      },
+      {
+        "id": "id_mt0w648x2t8bmo",
+        "title": "声学测试(频响/失真)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-10-26",
+        "dueDate": "2026-11-03"
+      },
+      {
+        "id": "id_mt0w648xr6qp8b",
+        "title": "唤醒率/误唤醒",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-11-03",
+        "dueDate": "2026-11-09"
+      },
+      {
+        "id": "id_mt0w648x9sk5nx",
+        "title": "无线认证",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-11-09",
+        "dueDate": "2026-11-21"
+      },
+      {
+        "id": "id_mt0w648xckna7w",
+        "title": "安规",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-11-21",
+        "dueDate": "2026-11-26"
+      },
+      {
+        "id": "id_mt0w648xlzhuup",
+        "title": "网罩注塑模具",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 16,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-11-26",
+        "dueDate": "2026-12-12"
+      },
+      {
+        "id": "id_mt0w648xoara52",
+        "title": "PVT 试产",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-12-12",
+        "dueDate": "2026-12-22"
+      },
+      {
+        "id": "id_mt0w648xt2obr5",
+        "title": "声学校准产线",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-12-22",
+        "dueDate": "2026-12-27"
+      },
+      {
+        "id": "id_mt0w648x1iikyw",
+        "title": "内容生态接入",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-12-27",
+        "dueDate": "2027-01-04"
+      },
+      {
+        "id": "id_mt0w648xwa55d3",
+        "title": "渠道",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2027-01-04",
+        "dueDate": "2027-01-10"
+      },
+      {
+        "id": "id_mt0w648xcsvzu2",
+        "title": "OTA",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": true,
+        "startDate": "2027-01-10",
+        "dueDate": "2027-01-15"
+      }
+    ],
+    "baseline": [
+      {
+        "id": "id_mt0w648xrvpbnn",
+        "title": "语音场景调研",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648xg3lgl7",
+        "title": "产品定义与立项",
+        "phaseId": "p1",
+        "note": "",
+        "estimateDays": 4,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648x3068g1",
+        "title": "ID(织物网罩)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 9,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648xsisdf5",
+        "title": "声学腔体结构",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648x7dqetb",
+        "title": "硬件(主控/功放/双麦阵列)",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 15,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648xikueyr",
+        "title": "远场语音算法",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 14,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648xnkqaty",
+        "title": "App/语音技能",
+        "phaseId": "p2",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648x4s13v3",
+        "title": "EVT 样板",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648xexkuku",
+        "title": "麦克风阵列一致性",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true
+      },
+      {
+        "id": "id_mt0w648x6v6fsy",
+        "title": "功放底噪优化",
+        "phaseId": "p3",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648x2t8bmo",
+        "title": "声学测试(频响/失真)",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xr6qp8b",
+        "title": "唤醒率/误唤醒",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648x9sk5nx",
+        "title": "无线认证",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 12,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xckna7w",
+        "title": "安规",
+        "phaseId": "p4",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xlzhuup",
+        "title": "网罩注塑模具",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 16,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xoara52",
+        "title": "PVT 试产",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 10,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xt2obr5",
+        "title": "声学校准产线",
+        "phaseId": "p5",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648x1iikyw",
+        "title": "内容生态接入",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 8,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xwa55d3",
+        "title": "渠道",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false
+      },
+      {
+        "id": "id_mt0w648xcsvzu2",
+        "title": "OTA",
+        "phaseId": "p6",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false
+      }
+    ],
+    "startDate": "2026-07-27",
+    "type": "迭代",
+    "level": "D",
+    "productType": "TB5",
+    "cert": "RoHS",
+    "engineers": {
+      "hardware": "test3",
+      "structure": "test3",
+      "project": "test3"
+    },
+    "status": "archived",
+    "completedAt": "2026-08-20"
+  },
+  {
+    "name": "UC6601A",
+    "phases": [
+      {
+        "id": "p_0",
+        "name": "设计阶段",
+        "color": "#8b5cf6"
+      },
+      {
+        "id": "p_1",
+        "name": "验证阶段",
+        "color": "#0a84ff"
+      },
+      {
+        "id": "p_2",
+        "name": "试产阶段",
+        "color": "#30d158"
+      },
+      {
+        "id": "p_3",
+        "name": "量产阶段",
+        "color": "#ff9f0a"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt17p05rbs1up0",
+        "title": "立项",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-19"
+      },
+      {
+        "id": "id_mt17p05r5klvx3",
+        "title": "原理图",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-19",
+        "dueDate": "2026-08-21"
+      },
+      {
+        "id": "id_mt17p05r7qfwnq",
+        "title": "板框",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-21",
+        "dueDate": "2026-08-23"
+      },
+      {
+        "id": "id_mt17p05ra7707h",
+        "title": "layout",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-23",
+        "dueDate": "2026-08-29"
+      },
+      {
+        "id": "id_mt17p05rwi0nyv",
+        "title": "PCB申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-29",
+        "dueDate": "2026-08-30"
+      },
+      {
+        "id": "id_mt17p05ryft9xw",
+        "title": "SMT申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-30",
+        "dueDate": "2026-08-31"
+      },
+      {
+        "id": "id_mt17p05ru22amz",
+        "title": "投模+询价",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": true,
+        "startDate": "2026-08-31",
+        "dueDate": "2026-09-03"
+      },
+      {
+        "id": "id_mt17p05r85dh1w",
+        "title": "PCB",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-03",
+        "dueDate": "2026-09-10"
+      },
+      {
+        "id": "id_mt17p05rpcld8d",
+        "title": "PCBA",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-10",
+        "dueDate": "2026-09-13"
+      },
+      {
+        "id": "id_mt17p05rdssr66",
+        "title": "调试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-13",
+        "dueDate": "2026-09-15"
+      },
+      {
+        "id": "id_mt17p05r97os5n",
+        "title": "兼容性测试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-15",
+        "dueDate": "2026-09-22"
+      },
+      {
+        "id": "id_mt17p05r7c55iv",
+        "title": "SR模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 13,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-22",
+        "dueDate": "2026-10-05"
+      },
+      {
+        "id": "id_mt17p05r5g33ot",
+        "title": "铝壳模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 18,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-23"
+      },
+      {
+        "id": "id_mt17p05r3ch2ay",
+        "title": "塑胶模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 26,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-23",
+        "dueDate": "2026-11-18"
+      },
+      {
+        "id": "id_mt17p05rteu8if",
+        "title": "可靠性测试/T1",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-18",
+        "dueDate": "2026-11-25"
+      },
+      {
+        "id": "id_mt17p05r1ztvyb",
+        "title": "测试报告输出",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-25",
+        "dueDate": "2026-11-26"
+      },
+      {
+        "id": "id_mt17p05ro21fel",
+        "title": "试产资料",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-26",
+        "dueDate": "2026-11-27"
+      },
+      {
+        "id": "id_mt17p05rsukulo",
+        "title": "DFM",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-27",
+        "dueDate": "2026-11-28"
+      },
+      {
+        "id": "id_mt17p05rnqi7tf",
+        "title": "试产发布",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-28",
+        "dueDate": "2026-11-29"
+      },
+      {
+        "id": "id_mt17p05re8a97z",
+        "title": "试产齐料",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 20,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-29",
+        "dueDate": "2026-12-19"
+      },
+      {
+        "id": "id_mt17p05r4xc3ej",
+        "title": "上线/总结/闭环",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-19",
+        "dueDate": "2026-12-26"
+      },
+      {
+        "id": "id_mt17p05rd8x4qv",
+        "title": "量产订单订料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-26",
+        "dueDate": "2026-12-27"
+      },
+      {
+        "id": "id_mt17p05rcr2b9a",
+        "title": "量产齐料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 22,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-27",
+        "dueDate": "2027-01-18"
+      },
+      {
+        "id": "id_mt17p05rz7r3wr",
+        "title": "量产上线/出货",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-18",
+        "dueDate": "2027-01-24"
+      }
+    ],
+    "icon": "◆",
+    "color": "#0a84ff",
+    "startDate": "2026-08-18",
+    "id": "id_mt17p05r3g20jl",
+    "createdAt": "2026-08-20T07:41:27.951Z",
+    "type": "B端",
+    "level": "A",
+    "productType": "TB5",
+    "cert": "非认证",
+    "status": "active",
+    "completedAt": null,
+    "engineers": {
+      "hardware": "test4",
+      "structure": "test4",
+      "project": "test4"
+    },
+    "baseline": [
+      {
+        "id": "id_mt17p05rbs1up0",
+        "title": "立项",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-18"
+      },
+      {
+        "id": "id_mt17p05r5klvx3",
+        "title": "原理图",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-19"
+      },
+      {
+        "id": "id_mt17p05r7qfwnq",
+        "title": "板框",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-19"
+      },
+      {
+        "id": "id_mt17p05ra7707h",
+        "title": "layout",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-20",
+        "dueDate": "2026-08-26"
+      },
+      {
+        "id": "id_mt17p05rwi0nyv",
+        "title": "PCB申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-27",
+        "dueDate": "2026-08-27"
+      },
+      {
+        "id": "id_mt17p05ryft9xw",
+        "title": "SMT申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-28",
+        "dueDate": "2026-08-28"
+      },
+      {
+        "id": "id_mt17p05ru22amz",
+        "title": "投模+询价",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-29",
+        "dueDate": "2026-09-01"
+      },
+      {
+        "id": "id_mt17p05r85dh1w",
+        "title": "PCB",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-28",
+        "dueDate": "2026-09-04"
+      },
+      {
+        "id": "id_mt17p05rpcld8d",
+        "title": "PCBA",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-05",
+        "dueDate": "2026-09-08"
+      },
+      {
+        "id": "id_mt17p05rdssr66",
+        "title": "调试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-09",
+        "dueDate": "2026-09-10"
+      },
+      {
+        "id": "id_mt17p05r97os5n",
+        "title": "兼容性测试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-11",
+        "dueDate": "2026-09-18"
+      },
+      {
+        "id": "id_mt17p05r7c55iv",
+        "title": "SR模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 13,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-02",
+        "dueDate": "2026-09-14"
+      },
+      {
+        "id": "id_mt17p05r5g33ot",
+        "title": "铝壳模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 18,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-02",
+        "dueDate": "2026-09-19"
+      },
+      {
+        "id": "id_mt17p05r3ch2ay",
+        "title": "塑胶模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 26,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-02",
+        "dueDate": "2026-09-27"
+      },
+      {
+        "id": "id_mt17p05rteu8if",
+        "title": "可靠性测试/T1",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-28",
+        "dueDate": "2026-10-05"
+      },
+      {
+        "id": "id_mt17p05r1ztvyb",
+        "title": "测试报告输出",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-06",
+        "dueDate": "2026-10-06"
+      },
+      {
+        "id": "id_mt17p05ro21fel",
+        "title": "试产资料",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-07"
+      },
+      {
+        "id": "id_mt17p05rsukulo",
+        "title": "DFM",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-08"
+      },
+      {
+        "id": "id_mt17p05rnqi7tf",
+        "title": "试产发布",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-08"
+      },
+      {
+        "id": "id_mt17p05re8a97z",
+        "title": "试产齐料",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 20,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-09",
+        "dueDate": "2026-11-05"
+      },
+      {
+        "id": "id_mt17p05r4xc3ej",
+        "title": "上线/总结/闭环",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-06",
+        "dueDate": "2026-11-16"
+      },
+      {
+        "id": "id_mt17p05rd8x4qv",
+        "title": "量产订单订料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-17",
+        "dueDate": "2026-11-17"
+      },
+      {
+        "id": "id_mt17p05rcr2b9a",
+        "title": "量产齐料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 22,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-18",
+        "dueDate": "2026-12-12"
+      },
+      {
+        "id": "id_mt17p05rz7r3wr",
+        "title": "量产上线/出货",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-13",
+        "dueDate": "2026-12-21"
+      }
+    ]
+  },
+  {
+    "name": "迭代项目计划-测试-2026-08-18开始",
+    "phases": [
+      {
+        "id": "p_0",
+        "name": "设计阶段",
+        "color": "#8b5cf6"
+      },
+      {
+        "id": "p_1",
+        "name": "验证阶段",
+        "color": "#0a84ff"
+      },
+      {
+        "id": "p_2",
+        "name": "试产阶段",
+        "color": "#30d158"
+      },
+      {
+        "id": "p_3",
+        "name": "量产阶段",
+        "color": "#ff9f0a"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt19ugl9ryvke4",
+        "title": "立项",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-27",
+        "excelRow": 8,
+        "dueF": "=WORKDAY.INTL(D8-1,F8,11)",
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D8"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F8"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9y7g8fz",
+        "title": "原理图",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-22",
+        "excelRow": 9,
+        "startF": "D8",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D8"
+            }
+          ]
+        },
+        "dueF": "WORK=DAY.INTL(D8-1,F8,11)",
+        "dueRule": null
+      },
+      {
+        "id": "id_mt19ugl91rohq7",
+        "title": "板框",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-22",
+        "excelRow": 10,
+        "startF": "D8",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D8"
+            }
+          ]
+        },
+        "dueF": "WORKDAY.INTL(D10-1,F10,11)",
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D10"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F10"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl96hp3d5",
+        "title": "layout",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-23",
+        "dueDate": "2026-08-26",
+        "excelRow": 11,
+        "startF": "E9+1",
+        "dueF": "WORKDAY.INTL(D11-1,F11,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E9"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D11"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F11"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9qviiys",
+        "title": "PCB申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-26",
+        "dueDate": "2026-08-27",
+        "excelRow": 12,
+        "startF": "E11",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E11"
+            }
+          ]
+        },
+        "dueF": "=WORKDAY.INTL(D12-1,F12,11)",
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D12"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F12"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9x3x05j",
+        "title": "SMT申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-28",
+        "dueDate": "2026-08-28",
+        "excelRow": 13,
+        "startF": "E12+1",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E12"
+          },
+          "days": 1
+        },
+        "dueF": "WORKDAY.INTL(D13-1,F13,11)",
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D13"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F13"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9tdv6te",
+        "title": "PCB",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-28",
+        "dueDate": "2026-09-04",
+        "excelRow": 15,
+        "startF": "E12+1",
+        "dueF": "WORKDAY.INTL(D15-1,F15,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E12"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D15"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F15"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl98k0h1c",
+        "title": "PCBA",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-04",
+        "dueDate": "2026-09-07",
+        "excelRow": 16,
+        "startF": "E15",
+        "dueF": "WORKDAY.INTL(D16-1,F16,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E15"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D16"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F16"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9asr0z1",
+        "title": "调试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-08",
+        "dueDate": "2026-09-08",
+        "excelRow": 17,
+        "startF": "E16+1",
+        "dueF": "WORKDAY.INTL(D17-1,F17,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E16"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D17"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F17"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9c08xgi",
+        "title": "兼容性测试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-09",
+        "dueDate": "2026-09-15",
+        "excelRow": 18,
+        "startF": "E17+1",
+        "dueF": "WORKDAY.INTL(D18-1,F18,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E17"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D18"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F18"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl96bed1c",
+        "title": "可靠性测试/T1",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-09",
+        "dueDate": "2026-09-15",
+        "excelRow": 19,
+        "startF": "D18",
+        "dueF": "WORKDAY.INTL(D19-1,F19,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D18"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D19"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F19"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9xsvdn5",
+        "title": "测试报告输出",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-16",
+        "dueDate": "2026-09-16",
+        "excelRow": 20,
+        "startF": "E19+1",
+        "dueF": "WORKDAY.INTL(D20-1,F20,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E19"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D20"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F20"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9u41eku",
+        "title": "试产资料",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-17",
+        "dueDate": "2026-09-17",
+        "excelRow": 21,
+        "startF": "E20+1",
+        "dueF": "WORKDAY.INTL(D21-1,F21,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E20"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D21"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F21"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9jemgxo",
+        "title": "DFM",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-17",
+        "dueDate": "2026-09-17",
+        "excelRow": 22,
+        "startF": "E21",
+        "dueF": "WORKDAY.INTL(D22-1,F22,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E21"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D22"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F22"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9jk4t7v",
+        "title": "试产发布",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-17",
+        "dueDate": "2026-09-17",
+        "excelRow": 24,
+        "startF": "E22",
+        "dueF": "WORKDAY.INTL(D24-1,F24,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E22"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D24"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F24"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl91n8rsz",
+        "title": "试产齐料",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 17,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-18",
+        "dueDate": "2026-10-07",
+        "excelRow": 25,
+        "startF": "E24+1",
+        "dueF": "WORKDAY.INTL(D25-1,F25,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E24"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D25"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F25"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl92n43jm",
+        "title": "上线/总结/闭环",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-14",
+        "excelRow": 26,
+        "startF": "E25+1",
+        "dueF": "WORKDAY.INTL(D26-1,F26,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E25"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D26"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F26"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      },
+      {
+        "id": "id_mt19ugl9t50j54",
+        "title": "量产订单订料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-15",
+        "dueDate": "2026-10-15",
+        "excelRow": 28,
+        "startF": "E26+1",
+        "dueF": "WORKDAY.INTL(D28-1,F28,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E26"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D28"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F28"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9lhrm3a",
+        "title": "量产齐料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 22,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-16",
+        "dueDate": "2026-11-10",
+        "excelRow": 29,
+        "startF": "E28+1",
+        "dueF": "WORKDAY.INTL(D29-1,F29,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E28"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D29"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F29"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl97qox1q",
+        "title": "量产上线/出货",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-11",
+        "dueDate": "2026-11-18",
+        "excelRow": 30,
+        "startF": "E29+1",
+        "dueF": "WORKDAY.INTL(D30-1,F30,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E29"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D30"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F30"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      }
+    ],
+    "icon": "◆",
+    "color": "#0a84ff",
+    "startDate": "2026-08-22",
+    "startCell": "B3",
+    "id": "id_mt19ugl9sc5vey",
+    "createdAt": "2026-08-20T08:41:41.757Z",
+    "type": "C端",
+    "level": "B",
+    "productType": "U4",
+    "cert": "FCC",
+    "status": "active",
+    "completedAt": null,
+    "engineers": {
+      "hardware": "test5",
+      "structure": "test5",
+      "project": "test5"
+    },
+    "baseline": [
+      {
+        "id": "id_mt19ugl9ryvke4",
+        "title": "立项",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-18",
+        "excelRow": 8,
+        "startF": "B3",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "B3"
+            }
+          ]
+        }
+      },
+      {
+        "id": "id_mt19ugl9y7g8fz",
+        "title": "原理图",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-18",
+        "excelRow": 9,
+        "startF": "D8",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D8"
+            }
+          ]
+        }
+      },
+      {
+        "id": "id_mt19ugl91rohq7",
+        "title": "板框",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-18",
+        "excelRow": 10,
+        "startF": "D8",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D8"
+            }
+          ]
+        }
+      },
+      {
+        "id": "id_mt19ugl96hp3d5",
+        "title": "layout",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-19",
+        "dueDate": "2026-08-21",
+        "excelRow": 11,
+        "startF": "E9+1",
+        "dueF": "WORKDAY.INTL(D11-1,F11,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E9"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D11"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F11"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9qviiys",
+        "title": "PCB申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-21",
+        "dueDate": "2026-08-21",
+        "excelRow": 12,
+        "startF": "E11",
+        "dueF": "WORKDAY.INTL(D12-1,F12,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E11"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D12"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F12"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9x3x05j",
+        "title": "SMT申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-22",
+        "excelRow": 13,
+        "startF": "E12+1",
+        "dueF": "WORKDAY.INTL(D13-1,F13,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E12"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D13"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F13"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9tdv6te",
+        "title": "PCB",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-29",
+        "excelRow": 15,
+        "startF": "E12+1",
+        "dueF": "WORKDAY.INTL(D15-1,F15,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E12"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D15"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F15"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl98k0h1c",
+        "title": "PCBA",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-30",
+        "dueDate": "2026-09-02",
+        "excelRow": 16,
+        "startF": "E15+1",
+        "dueF": "WORKDAY.INTL(D16-1,F16,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E15"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D16"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F16"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9asr0z1",
+        "title": "调试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-03",
+        "dueDate": "2026-09-03",
+        "excelRow": 17,
+        "startF": "E16+1",
+        "dueF": "WORKDAY.INTL(D17-1,F17,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E16"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D17"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F17"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9c08xgi",
+        "title": "兼容性测试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-04",
+        "dueDate": "2026-09-10",
+        "excelRow": 18,
+        "startF": "E17+1",
+        "dueF": "WORKDAY.INTL(D18-1,F18,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E17"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D18"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F18"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl96bed1c",
+        "title": "可靠性测试/T1",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-04",
+        "dueDate": "2026-09-10",
+        "excelRow": 19,
+        "startF": "D18",
+        "dueF": "WORKDAY.INTL(D19-1,F19,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D18"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D19"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F19"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9xsvdn5",
+        "title": "测试报告输出",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-11",
+        "dueDate": "2026-09-11",
+        "excelRow": 20,
+        "startF": "E19+1",
+        "dueF": "WORKDAY.INTL(D20-1,F20,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E19"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D20"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F20"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9u41eku",
+        "title": "试产资料",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-12",
+        "dueDate": "2026-09-12",
+        "excelRow": 21,
+        "startF": "E20+1",
+        "dueF": "WORKDAY.INTL(D21-1,F21,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E20"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D21"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F21"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9jemgxo",
+        "title": "DFM",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-12",
+        "dueDate": "2026-09-12",
+        "excelRow": 22,
+        "startF": "E21",
+        "dueF": "WORKDAY.INTL(D22-1,F22,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E21"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D22"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F22"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9jk4t7v",
+        "title": "试产发布",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-12",
+        "dueDate": "2026-09-12",
+        "excelRow": 24,
+        "startF": "E22",
+        "dueF": "WORKDAY.INTL(D24-1,F24,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E22"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D24"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F24"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl91n8rsz",
+        "title": "试产齐料",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 17,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-13",
+        "dueDate": "2026-10-02",
+        "excelRow": 25,
+        "startF": "E24+1",
+        "dueF": "WORKDAY.INTL(D25-1,F25,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E24"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D25"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F25"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl92n43jm",
+        "title": "上线/总结/闭环",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 5,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-03",
+        "dueDate": "2026-10-09",
+        "excelRow": 26,
+        "startF": "E25+1",
+        "dueF": "WORKDAY.INTL(D26-1,F26,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E25"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D26"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F26"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      },
+      {
+        "id": "id_mt19ugl9t50j54",
+        "title": "量产订单订料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-10",
+        "dueDate": "2026-10-10",
+        "excelRow": 28,
+        "startF": "E26+1",
+        "dueF": "WORKDAY.INTL(D28-1,F28,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E26"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D28"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F28"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl9lhrm3a",
+        "title": "量产齐料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 22,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-11",
+        "dueDate": "2026-11-05",
+        "excelRow": 29,
+        "startF": "E28+1",
+        "dueF": "WORKDAY.INTL(D29-1,F29,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E28"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D29"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F29"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt19ugl97qox1q",
+        "title": "量产上线/出货",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-06",
+        "dueDate": "2026-11-13",
+        "excelRow": 30,
+        "startF": "E29+1",
+        "dueF": "WORKDAY.INTL(D30-1,F30,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E29"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D30"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F30"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "UC6603A",
+    "phases": [
+      {
+        "id": "p_0",
+        "name": "设计阶段",
+        "color": "#8b5cf6"
+      },
+      {
+        "id": "p_1",
+        "name": "验证阶段",
+        "color": "#0a84ff"
+      },
+      {
+        "id": "p_2",
+        "name": "试产阶段",
+        "color": "#30d158"
+      },
+      {
+        "id": "p_3",
+        "name": "量产阶段",
+        "color": "#ff9f0a"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "id_mt1b63n7y7exso",
+        "title": "立项",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-19",
+        "dueDate": "2026-08-20",
+        "excelRow": 8
+      },
+      {
+        "id": "id_mt1b63n7x2jpo2",
+        "title": "原理图",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-20",
+        "dueDate": "2026-08-22",
+        "excelRow": 9
+      },
+      {
+        "id": "id_mt1b63n7nu21l1",
+        "title": "板框",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-22",
+        "dueDate": "2026-08-24",
+        "excelRow": 10
+      },
+      {
+        "id": "id_mt1b63n7ffxigg",
+        "title": "layout",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-24",
+        "dueDate": "2026-08-30",
+        "excelRow": 11
+      },
+      {
+        "id": "id_mt1b63n7ufe9zt",
+        "title": "PCB申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-30",
+        "dueDate": "2026-08-31",
+        "excelRow": 12
+      },
+      {
+        "id": "id_mt1b63n75v8np4",
+        "title": "SMT申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-31",
+        "dueDate": "2026-09-01",
+        "excelRow": 13
+      },
+      {
+        "id": "id_mt1b63n7pspad6",
+        "title": "投模+询价",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-01",
+        "dueDate": "2026-09-04",
+        "excelRow": 14
+      },
+      {
+        "id": "id_mt1b63n7n8wjrt",
+        "title": "PCB",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-04",
+        "dueDate": "2026-09-11",
+        "excelRow": 16
+      },
+      {
+        "id": "id_mt1b63n7juc134",
+        "title": "PCBA",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-11",
+        "dueDate": "2026-09-14",
+        "excelRow": 17
+      },
+      {
+        "id": "id_mt1b63n7a2plvf",
+        "title": "调试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-14",
+        "dueDate": "2026-09-16",
+        "excelRow": 18
+      },
+      {
+        "id": "id_mt1b63n736rzcf",
+        "title": "兼容性测试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-16",
+        "dueDate": "2026-09-23",
+        "excelRow": 19
+      },
+      {
+        "id": "id_mt1b63n7jj8lps",
+        "title": "SR模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 13,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-23",
+        "dueDate": "2026-10-06",
+        "excelRow": 20
+      },
+      {
+        "id": "id_mt1b63n7ukxi45",
+        "title": "铝壳模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 18,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-06",
+        "dueDate": "2026-10-24",
+        "excelRow": 21
+      },
+      {
+        "id": "id_mt1b63n7s2so84",
+        "title": "塑胶模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 26,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-24",
+        "dueDate": "2026-11-19",
+        "excelRow": 22
+      },
+      {
+        "id": "id_mt1b63n7zfpbws",
+        "title": "可靠性测试/T1",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-19",
+        "dueDate": "2026-11-26",
+        "excelRow": 23
+      },
+      {
+        "id": "id_mt1b63n7jg0hz0",
+        "title": "测试报告输出",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-26",
+        "dueDate": "2026-11-27",
+        "excelRow": 24
+      },
+      {
+        "id": "id_mt1b63n7lmort8",
+        "title": "试产资料",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-27",
+        "dueDate": "2026-11-28",
+        "excelRow": 25
+      },
+      {
+        "id": "id_mt1b63n7gkqqr7",
+        "title": "DFM",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-28",
+        "dueDate": "2026-11-29",
+        "excelRow": 26
+      },
+      {
+        "id": "id_mt1b63n7r2aqld",
+        "title": "试产发布",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-29",
+        "dueDate": "2026-11-30",
+        "excelRow": 28
+      },
+      {
+        "id": "id_mt1b63n7mmg7is",
+        "title": "试产齐料",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 20,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-30",
+        "dueDate": "2026-12-20",
+        "excelRow": 29
+      },
+      {
+        "id": "id_mt1b63n7brcduq",
+        "title": "上线/总结/闭环",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-20",
+        "dueDate": "2026-12-27",
+        "excelRow": 30
+      },
+      {
+        "id": "id_mt1b63n72kfdvo",
+        "title": "量产订单订料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-27",
+        "dueDate": "2026-12-28",
+        "excelRow": 32
+      },
+      {
+        "id": "id_mt1b63n7jigpyy",
+        "title": "量产齐料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 22,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-28",
+        "dueDate": "2027-01-19",
+        "excelRow": 33
+      },
+      {
+        "id": "id_mt1b63n7dr10zp",
+        "title": "量产上线/出货",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2027-01-19",
+        "dueDate": "2027-01-25",
+        "excelRow": 34
+      }
+    ],
+    "icon": "◆",
+    "color": "#0a84ff",
+    "startDate": "2026-08-19",
+    "startCell": "B3",
+    "id": "id_mt1b63n734ruhq",
+    "createdAt": "2026-08-20T09:18:44.467Z",
+    "type": "C端",
+    "level": "B",
+    "productType": "基础hub",
+    "cert": "FCC",
+    "status": "active",
+    "completedAt": null,
+    "engineers": {
+      "hardware": "test6",
+      "structure": "test6",
+      "project": "test6"
+    },
+    "baseline": [
+      {
+        "id": "id_mt1b63n7y7exso",
+        "title": "立项",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-18",
+        "excelRow": 8,
+        "startF": "B3",
+        "dueF": "WORKDAY.INTL(D8-1,F8,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "B3"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D8"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F8"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7x2jpo2",
+        "title": "原理图",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-19",
+        "excelRow": 9,
+        "startF": "D8",
+        "dueF": "WORKDAY.INTL(D9-1,F9,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D8"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D9"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F9"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7nu21l1",
+        "title": "板框",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-18",
+        "dueDate": "2026-08-19",
+        "excelRow": 10,
+        "startF": "D8",
+        "dueF": "WORKDAY.INTL(D10-1,F10,11)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D8"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D10"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F10"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7ffxigg",
+        "title": "layout",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-20",
+        "dueDate": "2026-08-26",
+        "excelRow": 11,
+        "startF": "E9+1",
+        "dueF": "WORKDAY.INTL(D11-1,F11,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E9"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D11"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F11"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7ufe9zt",
+        "title": "PCB申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-27",
+        "dueDate": "2026-08-27",
+        "excelRow": 12,
+        "startF": "E11+1",
+        "dueF": "WORKDAY.INTL(D12-1,F12,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E11"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D12"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F12"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n75v8np4",
+        "title": "SMT申请",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-28",
+        "dueDate": "2026-08-28",
+        "excelRow": 13,
+        "startF": "E12+1",
+        "dueF": "WORKDAY.INTL(D13-1,F13,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E12"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D13"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F13"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7pspad6",
+        "title": "投模+询价",
+        "phaseId": "p_0",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-29",
+        "dueDate": "2026-09-01",
+        "excelRow": 14,
+        "startF": "E13+1",
+        "dueF": "WORKDAY.INTL(D14-1,F14,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E13"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D14"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F14"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7n8wjrt",
+        "title": "PCB",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-08-28",
+        "dueDate": "2026-09-04",
+        "excelRow": 16,
+        "startF": "E12+1",
+        "dueF": "WORKDAY.INTL(D16-1,F16,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E12"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D16"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F16"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7juc134",
+        "title": "PCBA",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 3,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-05",
+        "dueDate": "2026-09-08",
+        "excelRow": 17,
+        "startF": "E16+1",
+        "dueF": "WORKDAY.INTL(D17-1,F17,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E16"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D17"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F17"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7a2plvf",
+        "title": "调试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 2,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-09",
+        "dueDate": "2026-09-10",
+        "excelRow": 18,
+        "startF": "E17+1",
+        "dueF": "WORKDAY.INTL(D18-1,F18,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E17"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D18"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F18"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n736rzcf",
+        "title": "兼容性测试",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-11",
+        "dueDate": "2026-09-18",
+        "excelRow": 19,
+        "startF": "E18+1",
+        "dueF": "WORKDAY.INTL(D19-1,F19,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E18"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D19"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F19"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7jj8lps",
+        "title": "SR模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 13,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-02",
+        "dueDate": "2026-09-14",
+        "excelRow": 20,
+        "startF": "E14+1",
+        "dueF": "D20+F20-1",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E14"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D20"
+            },
+            {
+              "t": "ref",
+              "ref": "F20",
+              "neg": false
+            },
+            {
+              "t": "n",
+              "v": -1
+            }
+          ]
+        }
+      },
+      {
+        "id": "id_mt1b63n7ukxi45",
+        "title": "铝壳模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 18,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-02",
+        "dueDate": "2026-09-19",
+        "excelRow": 21,
+        "startF": "E14+1",
+        "dueF": "D21+F21-1",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E14"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D21"
+            },
+            {
+              "t": "ref",
+              "ref": "F21",
+              "neg": false
+            },
+            {
+              "t": "n",
+              "v": -1
+            }
+          ]
+        }
+      },
+      {
+        "id": "id_mt1b63n7s2so84",
+        "title": "塑胶模具T0",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 26,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-02",
+        "dueDate": "2026-09-27",
+        "excelRow": 22,
+        "startF": "E14+1",
+        "dueF": "D22+F22-1",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E14"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "D22"
+            },
+            {
+              "t": "ref",
+              "ref": "F22",
+              "neg": false
+            },
+            {
+              "t": "n",
+              "v": -1
+            }
+          ]
+        }
+      },
+      {
+        "id": "id_mt1b63n7zfpbws",
+        "title": "可靠性测试/T1",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-09-28",
+        "dueDate": "2026-10-05",
+        "excelRow": 23,
+        "startF": "E22+1",
+        "dueF": "WORKDAY.INTL(D23-1,F23,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E22"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D23"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F23"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7jg0hz0",
+        "title": "测试报告输出",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-06",
+        "dueDate": "2026-10-06",
+        "excelRow": 24,
+        "startF": "E23+1",
+        "dueF": "WORKDAY.INTL(D24-1,F24,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E23"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D24"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F24"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7lmort8",
+        "title": "试产资料",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-07",
+        "excelRow": 25,
+        "startF": "E24+1",
+        "dueF": "WORKDAY.INTL(D25-1,F25,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E24"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D25"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F25"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7gkqqr7",
+        "title": "DFM",
+        "phaseId": "p_1",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-08",
+        "excelRow": 26,
+        "startF": "E25+1",
+        "dueF": "WORKDAY.INTL(D26-1,F26,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E25"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D26"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F26"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7r2aqld",
+        "title": "试产发布",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-08",
+        "excelRow": 28,
+        "startF": "E26",
+        "dueF": "WORKDAY.INTL(D28-1,F28,1)",
+        "startRule": {
+          "t": "arith",
+          "parts": [
+            {
+              "t": "ref",
+              "ref": "E26"
+            }
+          ]
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D28"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F28"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      },
+      {
+        "id": "id_mt1b63n7mmg7is",
+        "title": "试产齐料",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 20,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-10-09",
+        "dueDate": "2026-11-05",
+        "excelRow": 29,
+        "startF": "E28+1",
+        "dueF": "WORKDAY.INTL(D29-1,F29,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E28"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D29"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F29"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      },
+      {
+        "id": "id_mt1b63n7brcduq",
+        "title": "上线/总结/闭环",
+        "phaseId": "p_2",
+        "note": "",
+        "estimateDays": 7,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-06",
+        "dueDate": "2026-11-16",
+        "excelRow": 30,
+        "startF": "E29+1",
+        "dueF": "WORKDAY.INTL(D30-1,F30,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E29"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D30"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F30"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      },
+      {
+        "id": "id_mt1b63n72kfdvo",
+        "title": "量产订单订料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 1,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-17",
+        "dueDate": "2026-11-17",
+        "excelRow": 32,
+        "startF": "E30+1",
+        "dueF": "WORKDAY.INTL(D32-1,F32,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E30"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D32"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F32"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7jigpyy",
+        "title": "量产齐料",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 22,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-11-18",
+        "dueDate": "2026-12-12",
+        "excelRow": 33,
+        "startF": "E32+1",
+        "dueF": "WORKDAY.INTL(D33-1,F33,11)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E32"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D33"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F33"
+              }
+            ]
+          },
+          "weekend": 11
+        }
+      },
+      {
+        "id": "id_mt1b63n7dr10zp",
+        "title": "量产上线/出货",
+        "phaseId": "p_3",
+        "note": "",
+        "estimateDays": 6,
+        "assignee": "",
+        "done": false,
+        "startDate": "2026-12-13",
+        "dueDate": "2026-12-21",
+        "excelRow": 34,
+        "startF": "E33+1",
+        "dueF": "WORKDAY.INTL(D34-1,F34,1)",
+        "startRule": {
+          "t": "off",
+          "base": {
+            "t": "ref",
+            "ref": "E33"
+          },
+          "days": 1
+        },
+        "dueRule": {
+          "t": "wd",
+          "base": {
+            "t": "off",
+            "base": {
+              "t": "ref",
+              "ref": "D34"
+            },
+            "days": -1
+          },
+          "days": {
+            "t": "arith",
+            "parts": [
+              {
+                "t": "ref",
+                "ref": "F34"
+              }
+            ]
+          },
+          "weekend": 1
+        }
+      }
+    ]
+  }
+]

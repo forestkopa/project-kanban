@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多项目管理看板</title>
+<link rel="stylesheet" href="/style.css?v=20260820-r50">
+</head>
+<body>
+<div id="roBanner" class="hidden">🔒 只读模式：当前仅可查看，修改已锁定</div>
+<aside id="sidebar">
+  <div class="brand"><img id="brandLogo" class="logo" src="/wb-logo.png" alt="WorkBuddy" title="点击更换看板图标"><span id="appName" title="点击编辑看板名称">项目看板</span></div>
+  <button id="newProjectBtn" class="btn primary">+ 新建项目</button>
+  <div id="projList" class="proj-list"></div>
+  <div class="side-foot">管理多个智能硬件产品项目</div>
+</aside>
+<main id="main">
+  <header id="topbar">
+    <div id="projTitle"></div>
+    <div id="projMeta"></div>
+    <div class="top-actions">
+      <button id="addTaskBtn" class="btn">+ 任务</button>
+      <button id="archiveBtn" class="btn" title="项目完成后归档">📦 完成归档</button>
+      <button id="delProjectBtn" class="btn ghost">删除项目</button>
+      <div class="export-wrap">
+        <button id="exportBtn" class="btn" title="导出计划表">⬆ 导出 ▾</button>
+        <div id="exportMenu" class="export-menu">
+          <button data-x="initial"><span class="em-ico">📄</span>初版计划</button>
+          <button data-x="latest"><span class="em-ico">📄</span>最新计划</button>
+          <button data-x="diff"><span class="em-ico">📊</span>差异对比</button>
+        </div>
+      </div>
+      <button id="themeToggle" class="btn" title="切换浅色 / 深色">🌙 深色</button>
+      <button id="roBtn" class="btn" title="只读模式开关（分享前开启，防止他人修改）">🔒 只读</button>
+    </div>
+  </header>
+  <div id="viewbar">
+    <div class="seg">
+      <button class="tab active" data-view="board">看板</button>
+      <button class="tab" data-view="gantt">甘特图</button>
+      <button class="tab" data-view="calendar">日历</button>
+      <button class="tab" data-view="panorama">全景</button>
+      <button class="tab" data-view="daily">日报</button>
+      <button class="tab" data-view="weekly">周报</button>
+      <button class="tab" data-view="monthly">月度计划</button>
+    </div>
+    <div id="viewActions" class="view-actions"></div>
+  </div>
+  <section id="stats"></section>
+  <section id="board" class="board"></section>
+  <section id="gantt" class="view hidden"></section>
+  <section id="calendar" class="view hidden"></section>
+  <section id="panorama" class="view hidden"></section>
+  <section id="report" class="view hidden"></section>
+  <section id="monthly" class="view hidden"></section>
+</main>
+
+<!-- 新建项目：双入口 -->
+<div id="newProjectModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><h3>新建项目</h3><button class="x" data-close>×</button></div>
+    <div class="np-options">
+      <button class="np-opt" id="npFromTpl">
+        <div class="np-ico">📋</div>
+        <div class="np-t">从模版导入</div>
+        <div class="np-s">用内置智能硬件产品模板快速搭建</div>
+      </button>
+      <button class="np-opt" id="npFromXlsx">
+        <div class="np-ico">📥</div>
+        <div class="np-t">从 xlsx 导入</div>
+        <div class="np-s">导入已有计划表 / 项目文件（.xlsx / .json）</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 模版选择 -->
+<div id="tplModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><h3>选择产品模板</h3><button class="x" data-close>×</button></div>
+    <input id="projName" class="inp" placeholder="项目名称（默认用模板名）">
+    <div id="tplGrid" class="tpl-grid"></div>
+  </div>
+</div>
+
+<!-- 项目信息：工程师 + 类型 -->
+<div id="projInfoModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="piTitle">项目信息</h3><button class="x" data-close>×</button></div>
+    <div class="pi-grid">
+      <input id="piName" class="inp" placeholder="项目名称">
+      <input id="piHardware" class="inp" placeholder="硬件工程师">
+      <input id="piStructure" class="inp" placeholder="结构工程师">
+      <input id="piProject" class="inp" placeholder="项目工程师">
+      <input id="piCert" class="inp" placeholder="认证标签（必填，如 3C / CE / FCC / RoHS）">
+      <div class="pi-sub">项目类型（用颜色区分）</div>
+      <div class="type-opts" id="typeOpts">
+        <div class="type-opt" data-type="C端" style="--c:#0A84FF"><span class="sw"></span>C端</div>
+        <div class="type-opt" data-type="B端" style="--c:#30D158"><span class="sw"></span>B端</div>
+        <div class="type-opt" data-type="预研" style="--c:#FF9F0A"><span class="sw"></span>预研</div>
+        <div class="type-opt" data-type="迭代" style="--c:#BF5AF2"><span class="sw"></span>迭代</div>
+      </div>
+      <div class="pi-sub">产品类型</div>
+      <div class="type-opts c3" id="productTypeOpts">
+        <div class="type-opt" data-ptype="AI" style="--c:#10a37f"><span class="sw"></span>AI</div>
+        <div class="type-opt" data-ptype="CC线" style="--c:#06b6d4"><span class="sw"></span>CC线</div>
+        <div class="type-opt" data-ptype="DOCK" style="--c:#0ea5e9"><span class="sw"></span>DOCK</div>
+        <div class="type-opt" data-ptype="MI" style="--c:#a3e635"><span class="sw"></span>MI</div>
+        <div class="type-opt" data-ptype="MST" style="--c:#eab308"><span class="sw"></span>MST</div>
+        <div class="type-opt" data-ptype="PD+HUB" style="--c:#f97316"><span class="sw"></span>PD+HUB</div>
+        <div class="type-opt" data-ptype="SSD HUB" style="--c:#64748b"><span class="sw"></span>SSD HUB</div>
+        <div class="type-opt" data-ptype="TB5" style="--c:#6366f1"><span class="sw"></span>TB5</div>
+        <div class="type-opt" data-ptype="U4" style="--c:#a855f7"><span class="sw"></span>U4</div>
+        <div class="type-opt" data-ptype="WiFi dongle" style="--c:#14b8a6"><span class="sw"></span>WiFi dongle</div>
+        <div class="type-opt" data-ptype="基础hub" style="--c:#94a3b8"><span class="sw"></span>基础hub</div>
+      </div>
+      <div class="pi-sub">项目等级（S 最高 → F 最低）</div>
+      <div class="level-opts" id="levelOpts">
+        <div class="level-opt" data-level="S" style="--c:#E0241B">S</div>
+        <div class="level-opt" data-level="A" style="--c:#FF9F0A">A</div>
+        <div class="level-opt" data-level="B" style="--c:#30D158">B</div>
+        <div class="level-opt" data-level="C" style="--c:#0A84FF">C</div>
+        <div class="level-opt" data-level="D" style="--c:#BF5AF2">D</div>
+        <div class="level-opt" data-level="E" style="--c:#64D2FF">E</div>
+        <div class="level-opt" data-level="F" style="--c:#8E8E93">F</div>
+      </div>
+      <button id="piConfirm" class="btn primary">确认创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 更换看板图标（上传 + 裁剪） -->
+<div id="brandModal" class="modal hidden">
+  <div class="modal-box" style="width:min(420px,92vw)">
+    <div class="modal-head"><h3>更换看板图标</h3><button class="x" data-close>×</button></div>
+    <input type="file" id="brandFile" accept="image/*" style="display:none">
+    <div class="brand-hint">拖拽移动图片 · 滑块缩放 · 方框内即为图标内容</div>
+    <div id="brandCropBox"><canvas id="brandCropCanvas" width="220" height="220"></canvas></div>
+    <div class="brand-controls">
+      <span class="pi-sub" style="margin:0">缩放</span>
+      <input type="range" id="brandZoom" min="1" max="4" step="0.01" value="1">
+      <button class="btn" id="brandPick">选择图片</button>
+    </div>
+    <div class="brand-actions">
+      <button class="btn" id="brandCancel">取消</button>
+      <button class="btn primary" id="brandSave" disabled>保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入计划表：选用映射模版 -->
+<div id="importModal" class="modal hidden">
+  <div class="modal-box" style="width:min(440px,92vw)">
+    <div class="modal-head"><h3>导入计划表</h3><button class="x" data-close>×</button></div>
+    <div class="pi-sub">选用映射模版</div>
+    <select id="mappingSelect" class="inp"></select>
+    <div class="pi-sub" style="margin-top:10px;color:var(--text-3);font-weight:400">映射模版定义 xlsx 各列与看板字段的对应关系；导入完成后可保存为命名模版，下次直接选用。</div>
+    <div class="import-actions" style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn primary" id="importPick">选择文件</button>
+      <button class="btn" id="importCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 保存映射模版（要求填写命名） -->
+<div id="saveMapModal" class="modal hidden">
+  <div class="modal-box" style="width:min(400px,92vw)">
+    <div class="modal-head"><h3>保存映射模版</h3><button class="x" id="mapX">×</button></div>
+    <div class="pi-sub">本次导入的字段映射已自动识别，命名后保存，下次导入可直接选用。</div>
+    <input id="mapName" class="inp" placeholder="模版命名（必填，如 HUB 甘特模板）">
+    <div class="import-actions" style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn" id="mapSkip">暂不保存</button>
+      <button class="btn primary" id="mapSave">保存模版</button>
+    </div>
+  </div>
+</div>
+
+<!-- 任务 -->
+<div id="taskModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="taskModalTitle">新建任务</h3><button class="x" data-close>×</button></div>
+    <input id="taskTitle" class="inp" placeholder="任务标题">
+    <textarea id="taskNote" class="inp" placeholder="备注（可选）"></textarea>
+    <div class="inp-row">
+      <input type="date" id="taskStart" class="inp" title="开始日期">
+      <input type="date" id="taskDue" class="inp" title="截止日期">
+    </div>
+    <select id="taskPhase" class="inp"></select>
+    <div class="inp-row">
+      <input id="taskAssignee" class="inp" placeholder="负责人（可选）">
+      <input id="taskEst" type="number" class="inp" placeholder="工期(天)" min="0">
+    </div>
+    <button id="taskSave" class="btn primary">保存</button>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept=".json,.xlsx" style="display:none">
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js?v=20260820-r50"></script>
+<script>
+(function(){
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  function apply(t){
+    root.setAttribute('data-theme', t);
+    btn.textContent = (t === 'light') ? '🌙 深色' : '☀️ 浅色';
+    try{ localStorage.setItem('kb-theme', t); }catch(e){}
+  }
+  var saved = 'light';
+  try{ saved = localStorage.getItem('kb-theme') || 'light'; }catch(e){}
+  apply(saved);
+  btn.addEventListener('click', function(){
+    apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+node_modules/
+*.tmp
+data/readonly.flag
+data/auth.token
