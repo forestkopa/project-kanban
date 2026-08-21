@@ -91,8 +91,8 @@
     <div class="modal-head"><h3>选择产品模板</h3><button class="x" data-close>×</button></div>
     <input id="projName" class="inp" placeholder="项目名称（默认用模板名）">
     <div class="tpl-bar">
-      <button class="btn" id="tplExportBtn" title="导出全部模板为 JSON，可分享给他人">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg> 导出模板</button>
+      <button class="btn" id="tplExportBtn" title="导出参考模版 Excel（由内置模版生成，含日期公式，填写后可从 xlsx 导入）">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg> 导出参考模版</button>
       <button class="btn" id="tplImportBtn" title="导入他人分享的模板 JSON（模板共创）">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V8"/><path d="M8 14l4-4 4 4"/><path d="M4 4h16"/></svg> 导入模板</button>
       <span class="pi-sub" style="margin:0">模板共创：导出分享 / 导入社区模板</span>
@@ -166,29 +166,19 @@
   </div>
 </div>
 
-<!-- 导入计划表：选用映射模版 -->
+<!-- 导入计划表：下载参考模版 + 选择文件 -->
 <div id="importModal" class="modal hidden">
   <div class="modal-box" style="width:min(440px,92vw)">
     <div class="modal-head"><h3>导入计划表</h3><button class="x" data-close>×</button></div>
-    <div class="pi-sub">选用映射模版</div>
-    <select id="mappingSelect" class="inp"></select>
-    <div class="pi-sub" style="margin-top:10px;color:var(--text-3);font-weight:400">映射模版定义 xlsx 各列与看板字段的对应关系；导入完成后可保存为命名模版，下次直接选用。</div>
+    <div class="pi-sub">① 下载参考模版（由内置模版生成，开始/截止含公式 → 导入后甘特级联）</div>
+    <div class="tpl-bar" style="margin-bottom:4px">
+      <select id="refTplSelect" class="inp"></select>
+      <button class="btn" id="refTplDownload">下载参考模版</button>
+    </div>
+    <div class="pi-sub" style="margin-top:6px;color:var(--text-3);font-weight:400">② 在 Excel/WPS 中填写任务与日期，再选择文件导入（.xlsx / .json）。参考模版的开始/截止单元格带公式，导入后甘特图自动建立前后级联。</div>
     <div class="import-actions" style="display:flex;gap:10px;margin-top:16px">
       <button class="btn primary" id="importPick">选择文件</button>
       <button class="btn" id="importCancel">取消</button>
-    </div>
-  </div>
-</div>
-
-<!-- 保存映射模版（要求填写命名） -->
-<div id="saveMapModal" class="modal hidden">
-  <div class="modal-box" style="width:min(400px,92vw)">
-    <div class="modal-head"><h3>保存映射模版</h3><button class="x" id="mapX">×</button></div>
-    <div class="pi-sub">本次导入的字段映射已自动识别，命名后保存，下次导入可直接选用。</div>
-    <input id="mapName" class="inp" placeholder="模版命名（必填，如 HUB 甘特模板）">
-    <div class="import-actions" style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn" id="mapSkip">暂不保存</button>
-      <button class="btn primary" id="mapSave">保存模版</button>
     </div>
   </div>
 </div>

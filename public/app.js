@@ -13,7 +13,7 @@ const ICON = {
   box: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg>',
   tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>'
 };
-let state = { projects: [], templates: [], mappings: [], currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
+let state = { projects: [], templates: [], currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -67,7 +67,6 @@ async function loadAll() {
   try {
     state.templates = await api('/templates');
     state.projects = await api('/projects');
-    try { state.mappings = await api('/mappings'); } catch (e) {}
     try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
@@ -597,62 +596,33 @@ $('#importFile').onchange = async e => {
     let data;
     if (kind === 'json') data = btoa(unescape(encodeURIComponent(await file.text())));
     else data = bufToBase64(await file.arrayBuffer());
-    const mappingId = kind === 'xlsx' ? $('#mappingSelect').value : '';
-    if (kind === 'xlsx' && mappingId) { try { localStorage.setItem('kb-last-mapping', mappingId); } catch (err) {} }
-    const np = await api('/projects/import', { method: 'POST', body: JSON.stringify({ filename: file.name, kind, data, mappingId }) });
+    const np = await api('/projects/import', { method: 'POST', body: JSON.stringify({ filename: file.name, kind, data }) });
     state.projects.push(np); state.currentId = np.id;
     pending = { mode: 'import', projId: np.id };
     render();
     $('#importModal').classList.add('hidden');
-    const base = file.name.replace(/\.[^.]+$/, '');
-    if (kind === 'xlsx') openSaveMap(np.mapping, base + ' 映射', () => openProjInfo(np.name));
-    else openProjInfo(np.name);
+    openProjInfo(np.name);
   } catch (err) { toast('导入失败: ' + err.message); }
   e.target.value = '';
 };
 
-function refreshMappingSelect() {
-  const sel = $('#mappingSelect'); if (!sel) return;
-  sel.innerHTML = '<option value="">自动识别（默认）</option>';
-  (state.mappings || []).forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o); });
-  let last = ''; try { last = localStorage.getItem('kb-last-mapping') || ''; } catch (e) {}
-  let pick = '';
-  if (last && (state.mappings || []).some(m => m.id === last)) pick = last;
-  else { const d = (state.mappings || []).find(m => m.default); if (d) pick = d.id; }
-  if (pick) sel.value = pick;
+/* ---- 参考模版：由内置模版生成 Excel（开始/截止带公式 → 甘特级联） ---- */
+function populateRefTplSelect() {
+  const sel = $('#refTplSelect'); if (!sel) return;
+  sel.innerHTML = '';
+  (state.templates || []).forEach(t => {
+    const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o);
+  });
 }
-function toMappingFields(eff) {
-  const one = v => v ? [String(v)] : [];
-  return {
-    task: one(eff && eff.task), taskFallback: one(eff && eff.taskFallback), phase: one(eff && eff.phase),
-    groupPhase: !!(eff && eff.groupPhase), who: one(eff && eff.who), start: one(eff && eff.start),
-    due: one(eff && eff.due), days: one(eff && eff.days), status: one(eff && eff.status), note: one(eff && eff.note),
-    skip: '插入新行|提示|说明|汇总|合计'
-  };
-}
-let pendingImportDone = null, pendingMapping = null;
-function openSaveMap(eff, suggestName, onDone) {
-  pendingMapping = eff; pendingImportDone = onDone;
-  $('#mapName').value = suggestName || '';
-  $('#saveMapModal').classList.remove('hidden'); $('#mapName').focus();
-}
-function closeSaveMap(proceed) {
-  $('#saveMapModal').classList.add('hidden');
-  if (proceed && pendingImportDone) { const f = pendingImportDone; pendingImportDone = null; pendingMapping = null; f(); }
-}
-$('#mapSave').onclick = async () => {
-  const name = $('#mapName').value.trim();
-  if (!name) { toast('请填写模版命名'); return; }
-  try {
-    const item = await api('/mappings', { method: 'POST', body: JSON.stringify({ name, fields: toMappingFields(pendingMapping) }) });
-    state.mappings.push(item); refreshMappingSelect();
-    try { localStorage.setItem('kb-last-mapping', item.id); } catch (e) {}
-    toast('已保存映射模版：' + name);
-  } catch (e) { toast(e.message); return; }
-  closeSaveMap(true);
+$('#refTplDownload').onclick = () => {
+  const sel = $('#refTplSelect');
+  const t = (state.templates || []).find(x => x.id === sel.value) || (state.templates || [])[0];
+  if (!t) { toast('暂无内置模版'); return; }
+  const a = document.createElement('a');
+  a.href = `/api/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('已下载参考模版：' + t.name + '（开始/截止含公式，填写后导入即可级联）');
 };
-$('#mapSkip').onclick = () => closeSaveMap(true);
-$('#mapX').onclick = () => closeSaveMap(true);
 
 /* ---------- 事件 ---------- */
 $$('.tab').forEach(b => b.onclick = () => { state.view = b.dataset.view; render(); });
@@ -668,7 +638,7 @@ $('#roBtn').onclick = async () => {
   } catch (e) { toast(e.message); }
 };
 $('#npFromTpl').onclick = () => { $('#newProjectModal').classList.add('hidden'); openTplModal(); };
-$('#npFromXlsx').onclick = () => { $('#newProjectModal').classList.add('hidden'); refreshMappingSelect(); $('#importModal').classList.remove('hidden'); };
+$('#npFromXlsx').onclick = () => { $('#newProjectModal').classList.add('hidden'); populateRefTplSelect(); $('#importModal').classList.remove('hidden'); };
 $('#importPick').onclick = () => $('#importFile').click();
 $('#importCancel').onclick = () => $('#importModal').classList.add('hidden');
 $('#addTaskBtn').onclick = () => { if (!proj()) { toast('请先创建项目'); return; } openTaskModal(proj(), null); };
@@ -784,15 +754,14 @@ async function aiSummarize() {
 $('#aiSummaryClose').onclick = () => $('#aiSummaryModal').classList.add('hidden');
 $('#aiSummaryCopy').onclick = () => { const ta = $('#aiSummaryText'); ta.select(); try { document.execCommand('copy'); } catch (e) {} toast('已复制'); };
 
-/* ---- 模板共创：导出 / 导入 ---- */
-$('#tplExportBtn').onclick = async () => {
-  try {
-    const data = await api('/templates');
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'kanban-templates.json'; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toast('已导出 ' + data.length + ' 个模板');
-  } catch (e) { toast(e.message); }
+/* ---- 模板共创：导出参考模版（Excel）/ 导入社区模板 ---- */
+$('#tplExportBtn').onclick = () => {
+  const t = (state.templates || [])[0];
+  if (!t) { toast('暂无内置模版'); return; }
+  const a = document.createElement('a');
+  a.href = `/api/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('已导出参考模版：' + t.name + '（Excel，含日期公式，填写后可从 xlsx 导入）');
 };
 $('#tplImportBtn').onclick = () => $('#tplImportFile').click();
 $('#tplImportFile').onchange = async (e) => {

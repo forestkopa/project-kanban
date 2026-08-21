@@ -14,7 +14,6 @@ const DATA = path.join(ROOT, 'data');
 const PROJECTS_FILE = path.join(DATA, DEMO_MODE ? 'projects.demo.json' : 'projects.json');
 const TEMPLATES_FILE = path.join(ROOT, 'templates.json');
 const RO_FLAG = path.join(DATA, 'readonly.flag');
-const MAPPINGS_FILE = path.join(DATA, 'mappings.json');
 const AI_FILE = path.join(DATA, 'ai.json');
 
 function loadJSON(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } }
@@ -120,6 +119,52 @@ function buildDiffXlsx(proj) {
   XLSX.utils.book_append_sheet(wb, ws, '差异对比');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
+/* ---------- 参考模版：由内置模版生成甘特方言 Excel（开始/截止带公式 → 导入后级联） ---------- */
+function workdayAdd(baseStr, n) {
+  const wk = [0, 6]; // weekend=1：周六日休息
+  let dt = new Date(baseStr + 'T00:00:00');
+  const step = n >= 0 ? 1 : -1;
+  let cnt = Math.abs(n);
+  while (cnt > 0) { dt.setDate(dt.getDate() + step); if (!wk.includes(dt.getDay())) cnt--; }
+  return isoDate(dt);
+}
+function buildTemplateXlsx(tpl) {
+  const phases = tpl.phases || [];
+  const tasks = tpl.tasks || [];
+  const phaseName = {}; phases.forEach(p => phaseName[p.id] = p.name || p.id);
+  const startDate = isoDate(new Date());
+  const rows = [['项目开始', startDate], ['任务', '内容', '负责人', '开始', '截止', '天数', '状态', '备注']];
+  let seq = 0;
+  phases.forEach(ph => {
+    const phTasks = tasks.filter(t => t.phaseId === ph.id);
+    rows.push([ph.name || ph.id, '', '', '', '', '', '', '']); // 分组行：任务列=阶段名，内容列空
+    phTasks.forEach(t => {
+      seq++;
+      rows.push([seq, t.title || ('任务' + seq), t.assignee || '', '', '', Math.max(1, Number(t.estimateDays) || 1), '', t.note || '']);
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 6 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 9 }, { wch: 24 }];
+  // 公式链：数据从 excel 第 3 行开始；跳过分组行，记录上一个任务行实现跨阶段级联
+  const serial = s => Math.round((new Date(s + 'T00:00:00').getTime() / 86400000) + 25569);
+  let prevTaskRow = null, cur = startDate;
+  for (let r = 2; r < rows.length; r++) {
+    if (!rows[r][1]) continue; // 内容列为空 → 分组行，跳过
+    const R = r + 1;
+    const days = Math.max(1, Number(rows[r][5]) || 1);
+    const s = prevTaskRow === null ? startDate : workdayAdd(cur, 1);
+    const due = workdayAdd(s, days - 1);
+    cur = due;
+    const startF = prevTaskRow === null ? '=WORKDAY.INTL($B$1,0)' : '=WORKDAY.INTL(E' + prevTaskRow + ',1)';
+    const dueF = '=WORKDAY.INTL(D' + R + ',F' + R + '-1)';
+    ws['D' + R] = { t: 'n', f: startF, v: serial(s), z: 'yyyy-mm-dd' };
+    ws['E' + R] = { t: 'n', f: dueF, v: serial(due), z: 'yyyy-mm-dd' };
+    prevTaskRow = R;
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '参考模版');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
 /* ---------- 公式级联：导入解析 + 依赖重算 ---------- */
 function colName(i) { let s = '', n = i + 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
 function parseTerm(s) {
@@ -166,7 +211,7 @@ function evalRule(proj, rule, depth) {
   if (!rule || depth > 20) return null;
   if (rule.t === 'lit') return (typeof rule.v === 'number') ? normDate(rule.v) : String(rule.v);
   if (rule.t === 'ref') return resolveRef(proj, rule.ref);
-  if (rule.t === 'off') { const b = evalRule(proj, rule.base, depth + 1); if (!b) return null; return isoDate(addDays(new Date(b), rule.days)); }
+  if (rule.t === 'off') { const b = evalRule(proj, rule.base, depth + 1); if (b == null) return null; if (typeof b === 'number') return b + rule.days; return isoDate(addDays(new Date(b), rule.days)); }
   if (rule.t === 'arith') {
     let date = null, total = 0;
     for (const p of rule.parts) {
@@ -292,7 +337,6 @@ function parseXlsxProject(buf, mapping) {
 if (!fs.existsSync(DATA)) fs.mkdirSync(DATA, { recursive: true });
 if (!fs.existsSync(PROJECTS_FILE)) saveJSON(PROJECTS_FILE, []);
 if (!fs.existsSync(TEMPLATES_FILE)) saveJSON(TEMPLATES_FILE, []);
-if (!fs.existsSync(MAPPINGS_FILE)) saveJSON(MAPPINGS_FILE, []);
 
 // 为已有项目补齐「初版计划」快照（以当前任务为基线）
 (() => {
@@ -437,23 +481,21 @@ const server = http.createServer(async (req, res) => {
       return send(res, 403, { error: '只读模式，禁止修改' });
     }
     if (p === '/api/templates' && req.method === 'GET') return send(res, 200, loadJSON(TEMPLATES_FILE, []));
-    // 映射模版管理
-    if (p === '/api/mappings' && req.method === 'GET') return send(res, 200, loadJSON(MAPPINGS_FILE, []));
-    if (p === '/api/mappings' && req.method === 'POST') {
-      const body = await readBody(req);
-      const name = body && body.name ? String(body.name).trim() : '';
-      if (!name) return send(res, 400, { error: '请输入模版命名' });
-      const ms = loadJSON(MAPPINGS_FILE, []);
-      const item = { id: uid(), name, fields: body.fields || {}, createdAt: new Date().toISOString() };
-      if (body.default) { ms.forEach(x => delete x.default); item.default = true; }
-      ms.push(item); saveJSON(MAPPINGS_FILE, ms);
-      return send(res, 201, item);
-    }
-    const mm = p.match(/^\/api\/mappings\/([^/]+)$/);
-    if (mm && req.method === 'DELETE') {
-      const ms = loadJSON(MAPPINGS_FILE, []).filter(x => x.id !== mm[1]);
-      saveJSON(MAPPINGS_FILE, ms);
-      return send(res, 200, { ok: true });
+    // 下载参考模版（内置模版生成的甘特方言 Excel，开始/截止带公式 → 导入后甘特级联）
+    if (p === '/api/templates/reference-xlsx' && req.method === 'GET') {
+      const tpls = loadJSON(TEMPLATES_FILE, []);
+      const id = url.searchParams.get('tplId');
+      const tpl = (id && tpls.find(t => t.id === id)) || tpls[0];
+      if (!tpl) return send(res, 404, { error: '暂无内置模版' });
+      const buf = buildTemplateXlsx(tpl);
+      const date = isoDate(new Date()).replace(/-/g, '');
+      const ascii = `kanban_reference_${date}.xlsx`;
+      const utf8 = `${tpl.name}_参考模版_${date}.xlsx`;
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`
+      });
+      return res.end(buf);
     }
 
     // ---- AI 助手（OpenAI 兼容） ----
@@ -555,7 +597,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/projects/import' && req.method === 'POST') {
       const body = await readBody(req);
       if (!body || !body.data) return send(res, 400, { error: '缺少文件数据' });
-      let np, effMapping = null;
+      let np;
       try {
         const buf = Buffer.from(body.data, 'base64');
         if (body.kind === 'json') {
@@ -563,14 +605,7 @@ const server = http.createServer(async (req, res) => {
           if (!np || !np.tasks) throw new Error('不是有效的项目文件');
           np.name = np.name || (body.filename || '导入项目').replace(/\.[^.]+$/, '');
         } else {
-          let mapping = null;
-          if (body.mappingId) {
-            const ms = loadJSON(MAPPINGS_FILE, []);
-            const m = ms.find(x => x.id === body.mappingId);
-            if (m) mapping = m.fields;
-          }
-          const parsed = parseXlsxProject(buf, mapping);
-          effMapping = parsed.mapping;
+          const parsed = parseXlsxProject(buf);
           np = { name: (body.filename || '导入项目').replace(/\.[^.]+$/, ''), phases: parsed.phases, tasks: parsed.tasks, icon: '◆', color: '#0a84ff', startDate: null, startCell: parsed.startCell || null };
         }
       } catch (e) { return send(res, 400, { error: '解析失败: ' + e.message }); }
@@ -591,7 +626,7 @@ const server = http.createServer(async (req, res) => {
       np.baseline = np.tasks.map(t => ({ ...t }));
       const projects = loadJSON(PROJECTS_FILE, []);
       projects.push(np); saveJSON(PROJECTS_FILE, projects);
-      return send(res, 201, Object.assign({}, np, { mapping: effMapping }));
+      return send(res, 201, np);
     }
 
     // 保存看板图标（上传 + 裁剪后的图片）

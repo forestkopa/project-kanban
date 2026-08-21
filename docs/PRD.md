@@ -83,7 +83,7 @@
 ### 3.6 导入导出
 | 编号 | 需求 | 说明 | 优先级 |
 |---|---|---|---|
-| FR-50 | xlsx 导入 | 支持映射模板（默认「hub项目映射模版」）、HUB 甘特方言、Excel 序列号日期 | P1 |
+| FR-50 | xlsx 导入 | 内置模版生成「参考模版」Excel（开始/截止含公式）供下载填写；支持 HUB 甘特方言（分组行→阶段、内容→任务）、标准计划表自动识别、Excel 序列号日期；导入后公式自动级联 | P1 |
 | FR-51 | xlsx 导出 | 初版计划 / 差异对比 / 最新计划三种导出 | P1 |
 
 ---
@@ -164,9 +164,7 @@
 | POST | `/api/projects/import` | 是 | xlsx 导入（base64） |
 | GET | `/api/projects/:id/export?type=initial\|diff\|latest` | 否 | 导出 xlsx |
 | GET | `/api/templates` | 否 | 模板列表 |
-| GET | `/api/mappings` | 否 | 导入映射模板 |
-| POST | `/api/mappings` | 是 | 新增映射模板 |
-| DELETE | `/api/mappings/:id` | 是 | 删除映射模板 |
+| GET | `/api/templates/reference-xlsx?tplId=` | 否 | 下载参考模版 Excel（含日期公式） |
 | GET/POST | `/api/readonly` | POST 是 | 只读状态查询/切换 |
 | POST | `/api/brand-logo` | 是 | 上传品牌图标 |
 | GET | `/brand-logo.png` | 否 | 读取品牌图标 |
