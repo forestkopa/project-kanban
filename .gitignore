@@ -4,3 +4,4 @@ data/readonly.flag
 data/auth.token
 data/tunnel-url.txt
 data/tunnel.log
+data/options.json

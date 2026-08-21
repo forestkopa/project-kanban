@@ -13,6 +13,7 @@ const DATA = path.join(ROOT, 'data');
 // 演示模式：加载脱敏数据集 projects.demo.json（真实 projects.json 不受影响），且免令牌鉴权
 const PROJECTS_FILE = path.join(DATA, DEMO_MODE ? 'projects.demo.json' : 'projects.json');
 const TEMPLATES_FILE = path.join(ROOT, 'templates.json');
+const OPTIONS_FILE = path.join(DATA, 'options.json');
 const RO_FLAG = path.join(DATA, 'readonly.flag');
 const AI_FILE = path.join(DATA, 'ai.json');
 
@@ -44,6 +45,15 @@ function gitAutoCommit(file) {
 function uid() { return 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function isoDate(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+/* ---------- 可配置选项（项目类型/产品类型/等级/认证/工程师），默认值 + 可新增 ---------- */
+const DEFAULT_OPTIONS = {
+  types: { 'C端': '#0A84FF', 'B端': '#30D158', '预研': '#FF9F0A', '迭代': '#BF5AF2' },
+  productTypes: { 'AI': '#10a37f', 'CC线': '#06b6d4', 'DOCK': '#0ea5e9', 'MI': '#a3e635', 'MST': '#eab308', 'PD+HUB': '#f97316', 'SSD HUB': '#64748b', 'TB5': '#6366f1', 'U4': '#a855f7', 'WiFi dongle': '#14b8a6', '基础hub': '#94a3b8' },
+  levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' },
+  certs: ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'],
+  engineers: ['张工', '李工', '王工', '赵工', '陈工', '刘工']
+};
+function loadOptions() { return Object.assign({}, DEFAULT_OPTIONS, loadJSON(OPTIONS_FILE, {})); }
 function scheduleTasks(phases, tasks, startStr) {
   let cursor = new Date(startStr);
   for (const ph of phases) {
@@ -337,6 +347,7 @@ function parseXlsxProject(buf, mapping) {
 if (!fs.existsSync(DATA)) fs.mkdirSync(DATA, { recursive: true });
 if (!fs.existsSync(PROJECTS_FILE)) saveJSON(PROJECTS_FILE, []);
 if (!fs.existsSync(TEMPLATES_FILE)) saveJSON(TEMPLATES_FILE, []);
+if (!fs.existsSync(OPTIONS_FILE)) saveJSON(OPTIONS_FILE, DEFAULT_OPTIONS);
 
 // 为已有项目补齐「初版计划」快照（以当前任务为基线）
 (() => {
@@ -481,6 +492,30 @@ const server = http.createServer(async (req, res) => {
       return send(res, 403, { error: '只读模式，禁止修改' });
     }
     if (p === '/api/templates' && req.method === 'GET') return send(res, 200, loadJSON(TEMPLATES_FILE, []));
+    // 可配置选项：项目类型 / 产品类型 / 等级 / 认证 / 工程师
+    if (p === '/api/options' && req.method === 'GET') return send(res, 200, loadOptions());
+    if (p === '/api/options' && req.method === 'POST') {
+      const body = await readBody(req);
+      if (!body || typeof body !== 'object') return send(res, 400, { error: '参数无效' });
+      const o = loadOptions();
+      ['types', 'productTypes', 'levels'].forEach(k => { if (body[k] && typeof body[k] === 'object') o[k] = body[k]; });
+      ['certs', 'engineers'].forEach(k => { if (Array.isArray(body[k])) o[k] = body[k]; });
+      saveJSON(OPTIONS_FILE, o);
+      return send(res, 200, o);
+    }
+    // 修改模版（改名）
+    const tplPut = p.match(/^\/api\/templates\/([^/]+)$/);
+    if (tplPut && req.method === 'PUT') {
+      const body = await readBody(req);
+      const cur = loadJSON(TEMPLATES_FILE, []);
+      const t = cur.find(x => x.id === tplPut[1]);
+      if (!t) return send(res, 404, { error: '模版不存在' });
+      const name = body && body.name ? String(body.name).trim() : '';
+      if (!name) return send(res, 400, { error: '请输入模版名称' });
+      t.name = name;
+      saveJSON(TEMPLATES_FILE, cur);
+      return send(res, 200, t);
+    }
     // 删除模版（模板共创：内置/导入的模板均可删）
     const tplDel = p.match(/^\/api\/templates\/([^/]+)$/);
     if (tplDel && req.method === 'DELETE') {

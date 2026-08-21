@@ -1,11 +1,17 @@
 const API = '/api';
-const TYPE_COLORS = { 'C端': '#0A84FF', 'B端': '#30D158', '预研': '#FF9F0A', '迭代': '#BF5AF2' };
-const PRODUCT_TYPE_COLORS = {
+const DEFAULT_TYPES = { 'C端': '#0A84FF', 'B端': '#30D158', '预研': '#FF9F0A', '迭代': '#BF5AF2' };
+const DEFAULT_PRODUCT_TYPES = {
   'AI': '#10a37f', 'CC线': '#06b6d4', 'DOCK': '#0ea5e9', 'MI': '#a3e635', 'MST': '#eab308',
   'PD+HUB': '#f97316', 'SSD HUB': '#64748b', 'TB5': '#6366f1', 'U4': '#a855f7',
   'WiFi dongle': '#14b8a6', '基础hub': '#94a3b8'
 };
-const LEVEL_COLORS = { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' };
+const DEFAULT_LEVELS = { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' };
+const TYPE_COLORS = () => (state.options && state.options.types) || DEFAULT_TYPES;
+const PRODUCT_TYPE_COLORS = () => (state.options && state.options.productTypes) || DEFAULT_PRODUCT_TYPES;
+const LEVEL_COLORS = () => (state.options && state.options.levels) || DEFAULT_LEVELS;
+function typeColor(n) { const o = TYPE_COLORS(); return (n && o[n]) || '#888'; }
+function productTypeColor(n) { const o = PRODUCT_TYPE_COLORS(); return (n && o[n]) || '#8E8E93'; }
+function levelColor(n) { const o = LEVEL_COLORS(); return (n && o[n]) || '#8E8E93'; }
 const ICON = {
   edit: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   del: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>',
@@ -13,7 +19,7 @@ const ICON = {
   box: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg>',
   tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>'
 };
-let state = { projects: [], templates: [], currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
+let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -67,6 +73,7 @@ async function loadAll() {
   try {
     state.templates = await api('/templates');
     state.projects = await api('/projects');
+    try { state.options = await api('/options'); } catch (e) { state.options = null; }
     try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
@@ -92,9 +99,9 @@ function render() {
     applyReadOnly();
     return;
   }
-  const c = TYPE_COLORS[p.type] || '#888';
-  const lc = LEVEL_COLORS[p.level] || '#8E8E93';
-  const ptc = PRODUCT_TYPE_COLORS[p.productType] || '#8E8E93';
+  const c = typeColor(p.type);
+  const lc = levelColor(p.level);
+  const ptc = productTypeColor(p.productType);
   $('#projTitle').innerHTML = `<span class="pdot" style="background:${p.color}"></span> ${esc(p.name)} <span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}`;
   const isArch = (p.status || 'active') === 'archived';
   $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">' + ICON.box + ' 已归档</span>' : ''}`;
@@ -122,9 +129,9 @@ function projCard(p, dim) {
   el.className = 'proj' + (p.id === state.currentId ? ' active' : '') + (dim ? ' archived' : '');
   el.onclick = () => { state.currentId = p.id; render(); };
   const pc = progress(p);
-  const c = TYPE_COLORS[p.type] || '#888';
-  const lc = LEVEL_COLORS[p.level] || '#8E8E93';
-  const ptc = PRODUCT_TYPE_COLORS[p.productType] || '#8E8E93';
+  const c = typeColor(p.type);
+  const lc = levelColor(p.level);
+  const ptc = productTypeColor(p.productType);
   el.innerHTML = `<div class="proj-top"><span class="dot" style="background:${p.color}"></span><span class="pname">${esc(p.name)}</span><span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}</div>
     <div class="bar"><div class="bar-fill" style="width:${pc}%;background:${p.color}"></div></div>
     <div class="pmeta">${pc}% · ${p.tasks.filter(t => t.done).length}/${p.tasks.length}${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${dim ? ' · ' + ICON.box + '已归档' : ''}</div>
@@ -464,16 +471,58 @@ function openTplModal() {
     const c = document.createElement('div'); c.className = 'tpl-card'; c.style.borderColor = t.color;
     c.innerHTML = `<div class="tpl-ico" style="background:${t.color}">${esc(t.icon || '◆')}</div>
       <button class="tpl-del" title="删除模板「${esc(t.name)}」">${ICON.del}</button>
+      <button class="tpl-edit" title="修改模板名称「${esc(t.name)}」">${ICON.edit}</button>
       <div class="tpl-name">${esc(t.name)}</div>
       <div class="tpl-phases">${(t.phases || []).map(p => `<span style="background:${p.color}">${esc(p.name)}</span>`).join('')}</div>`;
     c.onclick = () => { const sug = $('#projName').value.trim() || t.name; pending = { mode: 'tpl', tplId: t.id }; $('#tplModal').classList.add('hidden'); openProjInfo(sug); };
     const del = c.querySelector('.tpl-del');
     if (del) del.onclick = e => { e.stopPropagation(); deleteTemplate(t.id); };
+    const edit = c.querySelector('.tpl-edit');
+    if (edit) edit.onclick = e => { e.stopPropagation(); renameTemplate(t); };
     grid.appendChild(c);
   });
   $('#tplModal').classList.remove('hidden');
 }
+/* ---- 项目信息选项：动态渲染（可配置，可新增） ---- */
+function renderPiOptions() {
+  const types = TYPE_COLORS(), pts = PRODUCT_TYPE_COLORS(), lvs = LEVEL_COLORS();
+  const opts = state.options || {};
+  const certs = opts.certs || ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'];
+  const engineers = opts.engineers || ['张工', '李工', '王工', '赵工', '陈工', '刘工'];
+  $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}</div>`).join('');
+  $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}</div>`).join('');
+  $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}</div>`).join('');
+  $('#dlCerts').innerHTML = certs.map(c => `<option value="${esc(c)}">`).join('');
+  $('#dlEngineers').innerHTML = engineers.map(e => `<option value="${esc(e)}">`).join('');
+  // 绑定选择
+  $$('#typeOpts .type-opt').forEach(o => o.onclick = () => { $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+  $$('#productTypeOpts .type-opt').forEach(o => o.onclick = () => { $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+  $$('#levelOpts .level-opt').forEach(o => o.onclick = () => { $$('#levelOpts .level-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
+}
+async function saveOptions(next) {
+  try { state.options = await api('/options', { method: 'POST', body: JSON.stringify(next) }); renderPiOptions(); toast('选项已更新'); }
+  catch (e) { toast('保存失败：' + e.message); }
+}
+function promptAddOption(label, pickColor) {
+  const name = prompt(`新增${label}（输入名称）`);
+  if (!name || !name.trim()) return;
+  const n = name.trim();
+  const o = Object.assign({ types: {}, productTypes: {}, levels: {}, certs: [], engineers: [] }, state.options || {});
+  const colors = ['#0A84FF', '#30D158', '#FF9F0A', '#BF5AF2', '#FF453A', '#64D2FF', '#FFD60A', '#8B5CF6', '#FF9F0A', '#00C7BE'];
+  if (pickColor === 'type') { o.types = Object.assign({}, o.types, { [n]: pickColor ? colors[Object.keys(o.types).length % colors.length] : '#0A84FF' }); }
+  else if (pickColor === 'level') { o.levels = Object.assign({}, o.levels, { [n]: colors[Object.keys(o.levels).length % colors.length] }); }
+  else if (pickColor === 'product') { o.productTypes = Object.assign({}, o.productTypes, { [n]: colors[Object.keys(o.productTypes).length % colors.length] }); }
+  else if (pickColor === 'cert') { if (!o.certs.includes(n)) o.certs.push(n); }
+  else if (pickColor === 'engineer') { if (!o.engineers.includes(n)) o.engineers.push(n); }
+  saveOptions(o);
+}
+$('#addTypeBtn').onclick = () => promptAddOption('项目类型', 'type');
+$('#addProductTypeBtn').onclick = () => promptAddOption('产品类型', 'product');
+$('#addLevelBtn').onclick = () => promptAddOption('项目等级', 'level');
+$('#addCertBtn').onclick = () => promptAddOption('认证标签', 'cert');
+$('#addEngineerBtn').onclick = () => promptAddOption('工程师', 'engineer');
 function openProjInfo(name, existing) {
+  renderPiOptions();
   $('#piName').value = existing ? existing.name : (name || '');
   const eng = existing && existing.engineers ? existing.engineers : {};
   $('#piHardware').value = eng.hardware && eng.hardware !== '—' ? eng.hardware : '';
@@ -488,18 +537,6 @@ function openProjInfo(name, existing) {
   $('#piConfirm').textContent = existing ? '保存修改' : '确认创建';
   $('#projInfoModal').classList.remove('hidden'); $('#piName').focus();
 }
-$$('#typeOpts .type-opt').forEach(o => o.onclick = () => {
-  $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active'));
-  o.classList.add('active');
-});
-$$('#productTypeOpts .type-opt').forEach(o => o.onclick = () => {
-  $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active'));
-  o.classList.add('active');
-});
-$$('#levelOpts .level-opt').forEach(o => o.onclick = () => {
-  $$('#levelOpts .level-opt').forEach(x => x.classList.remove('active'));
-  o.classList.add('active');
-});
 $('#piConfirm').onclick = async () => {
   const name = $('#piName').value.trim();
   const typeEl = $('#typeOpts .type-opt.active');
@@ -791,6 +828,19 @@ async function deleteTemplate(id) {
     openTplModal();
   } catch (err) { toast('删除失败：' + err.message); }
 }
+async function renameTemplate(t) {
+  const name = prompt('修改模板名称：', t.name);
+  if (name === null) return;
+  const n = name.trim();
+  if (!n || n === t.name) return;
+  try {
+    const up = await api('/templates/' + t.id, { method: 'PUT', body: JSON.stringify({ name: n }) });
+    t.name = up.name;
+    state.templates = await api('/templates');
+    toast('已修改模板名称：' + up.name);
+    openTplModal();
+  } catch (err) { toast('修改失败：' + err.message); }
+}
 
 /* =========================================================
    全景视图（聚合所有项目）
@@ -895,15 +945,14 @@ function renderPipe() {
 function renderDonut() {
   const total = state.projects.length;
   const counts = {}; state.projects.forEach(p => counts[p.type] = (counts[p.type] || 0) + 1);
-  const segs = Object.keys(TYPE_COLORS).filter(t => counts[t]).map(t => ({ label: t, value: counts[t] || 0, color: TYPE_COLORS[t] }));
+  const segs = Object.keys(TYPE_COLORS()).filter(t => counts[t]).map(t => ({ label: t, value: counts[t] || 0, color: typeColor(t) }));
   $('#donutBox').innerHTML = donutSVG(segs.length ? segs : [{ label: '—', value: 1, color: '#bbb' }]);
   $('#typeLegend').innerHTML = segs.map(s => `<div class="legend-row"><i style="background:${s.color}"></i><span class="lname">${s.label}</span><span class="lval">${s.value} 个 · ${Math.round(s.value / total * 100)}%</span></div>`).join('') || '<div class="empty">暂无数据</div>';
 }
 function renderLevelDonut() {
   const total = state.projects.length;
   const counts = {}; state.projects.forEach(p => counts[p.level || 'B'] = (counts[p.level || 'B'] || 0) + 1);
-  const order = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
-  const segs = order.filter(l => counts[l]).map(l => ({ label: l + '级', value: counts[l], color: LEVEL_COLORS[l] || '#8E8E93' }));
+  const segs = Object.keys(LEVEL_COLORS()).filter(l => counts[l]).map(l => ({ label: l + '级', value: counts[l], color: levelColor(l) }));
   $('#levelDonutBox').innerHTML = donutSVG(segs.length ? segs : [{ label: '—', value: 1, color: '#bbb' }]);
   $('#levelLegend').innerHTML = segs.map(s => `<div class="legend-row"><i style="background:${s.color}"></i><span class="lname">${s.label}</span><span class="lval">${s.value} 个 · ${Math.round(s.value / total * 100)}%</span></div>`).join('') || '<div class="empty">暂无数据</div>';
 }
@@ -935,17 +984,17 @@ function renderArchive() {
     return { p, days };
   });
   const avg = valid ? Math.round(totalDays / valid) : null;
-  const order = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
+  const order = Object.keys(LEVEL_COLORS());
   const maxC = Math.max(1, ...Object.values(lvCounts));
   const bars = order.map(lv => {
     const v = lvCounts[lv] || 0;
-    const color = LEVEL_COLORS[lv] || '#8E8E93';
+    const color = levelColor(lv);
     return `<div class="pipe-row"><div class="pipe-name" style="width:34px">${lv} 级</div>
       <div class="pipe-track"><div class="pipe-fill" style="width:${Math.round(v / maxC * 100)}%;background:${color}"></div></div>
       <div class="pipe-num">${v}</div></div>`;
   }).join('');
   const listHtml = items.map(({ p, days }) => {
-    const lc = LEVEL_COLORS[p.level] || '#8E8E93';
+    const lc = levelColor(p.level);
     return `<div class="arch-item"><span class="level-pill" style="background:${lc}">${p.level || 'B'}</span><span class="an">${esc(p.name)}</span><span class="ad">${p.completedAt || '—'}${days !== null ? ' · ' + days + '天' : ''}</span></div>`;
   }).join('');
   box.innerHTML = `<div class="arch-wrap">
@@ -961,7 +1010,7 @@ function renderHealth() {
   const order = { '风险': 0, '关注': 1, '正常': 2 };
   const list = state.projects.filter(p => (p.status || 'active') !== 'archived').sort((a, b) => order[projStats(a).status] - order[projStats(b).status]);
   list.forEach(p => {
-    const s = projStats(p); const c = TYPE_COLORS[p.type] || '#888';
+    const s = projStats(p); const c = typeColor(p.type);
     const row = document.createElement('div'); row.className = 'hrow';
     row.innerHTML = `<div class="hname"><span class="hdot" style="background:${p.color}"></span><span class="hn">${esc(p.name)}</span><span class="hp" style="background:${c}">${p.type || ''}</span></div>
       <div class="hphase"><span class="hphase-tag" style="background:${s.phaseColor}22;color:${s.phaseColor}">${esc(s.phaseName)}</span></div>

@@ -101,47 +101,30 @@
   </div>
 </div>
 
-<!-- 项目信息：工程师 + 类型 -->
+<!-- 项目信息：工程师 + 类型（选项可配置，可新增） -->
 <div id="projInfoModal" class="modal hidden">
   <div class="modal-box">
     <div class="modal-head"><h3 id="piTitle">项目信息</h3><button class="x" data-close>×</button></div>
     <div class="pi-grid">
       <input id="piName" class="inp" placeholder="项目名称">
-      <input id="piHardware" class="inp" placeholder="硬件工程师">
-      <input id="piStructure" class="inp" placeholder="结构工程师">
-      <input id="piProject" class="inp" placeholder="项目工程师">
-      <input id="piCert" class="inp" placeholder="认证标签（必填，如 3C / CE / FCC / RoHS）">
-      <div class="pi-sub">项目类型（用颜色区分）</div>
-      <div class="type-opts" id="typeOpts">
-        <div class="type-opt" data-type="C端" style="--c:#0A84FF"><span class="sw"></span>C端</div>
-        <div class="type-opt" data-type="B端" style="--c:#30D158"><span class="sw"></span>B端</div>
-        <div class="type-opt" data-type="预研" style="--c:#FF9F0A"><span class="sw"></span>预研</div>
-        <div class="type-opt" data-type="迭代" style="--c:#BF5AF2"><span class="sw"></span>迭代</div>
+      <div class="pi-grid3">
+        <input id="piHardware" class="inp" list="dlEngineers" placeholder="硬件工程师" autocomplete="off">
+        <input id="piStructure" class="inp" list="dlEngineers" placeholder="结构工程师" autocomplete="off">
+        <input id="piProject" class="inp" list="dlEngineers" placeholder="项目工程师" autocomplete="off">
       </div>
-      <div class="pi-sub">产品类型</div>
-      <div class="type-opts c3" id="productTypeOpts">
-        <div class="type-opt" data-ptype="AI" style="--c:#10a37f"><span class="sw"></span>AI</div>
-        <div class="type-opt" data-ptype="CC线" style="--c:#06b6d4"><span class="sw"></span>CC线</div>
-        <div class="type-opt" data-ptype="DOCK" style="--c:#0ea5e9"><span class="sw"></span>DOCK</div>
-        <div class="type-opt" data-ptype="MI" style="--c:#a3e635"><span class="sw"></span>MI</div>
-        <div class="type-opt" data-ptype="MST" style="--c:#eab308"><span class="sw"></span>MST</div>
-        <div class="type-opt" data-ptype="PD+HUB" style="--c:#f97316"><span class="sw"></span>PD+HUB</div>
-        <div class="type-opt" data-ptype="SSD HUB" style="--c:#64748b"><span class="sw"></span>SSD HUB</div>
-        <div class="type-opt" data-ptype="TB5" style="--c:#6366f1"><span class="sw"></span>TB5</div>
-        <div class="type-opt" data-ptype="U4" style="--c:#a855f7"><span class="sw"></span>U4</div>
-        <div class="type-opt" data-ptype="WiFi dongle" style="--c:#14b8a6"><span class="sw"></span>WiFi dongle</div>
-        <div class="type-opt" data-ptype="基础hub" style="--c:#94a3b8"><span class="sw"></span>基础hub</div>
+      <div class="pi-grid3">
+        <input id="piCert" class="inp" list="dlCerts" placeholder="认证标签（如 3C / CE / FCC / RoHS）" autocomplete="off">
+        <button class="btn opt-add" id="addEngineerBtn" title="把当前工程师名加入可选项">+ 新增工程师</button>
+        <button class="btn opt-add" id="addCertBtn" title="把当前认证标签加入可选项">+ 新增认证</button>
       </div>
-      <div class="pi-sub">项目等级（S 最高 → F 最低）</div>
-      <div class="level-opts" id="levelOpts">
-        <div class="level-opt" data-level="S" style="--c:#E0241B">S</div>
-        <div class="level-opt" data-level="A" style="--c:#FF9F0A">A</div>
-        <div class="level-opt" data-level="B" style="--c:#30D158">B</div>
-        <div class="level-opt" data-level="C" style="--c:#0A84FF">C</div>
-        <div class="level-opt" data-level="D" style="--c:#BF5AF2">D</div>
-        <div class="level-opt" data-level="E" style="--c:#64D2FF">E</div>
-        <div class="level-opt" data-level="F" style="--c:#8E8E93">F</div>
-      </div>
+      <datalist id="dlEngineers"></datalist>
+      <datalist id="dlCerts"></datalist>
+      <div class="pi-sub opt-head">项目类型（用颜色区分）<button class="btn opt-add" id="addTypeBtn">+ 新增类型</button></div>
+      <div class="type-opts" id="typeOpts"></div>
+      <div class="pi-sub opt-head">产品类型<button class="btn opt-add" id="addProductTypeBtn">+ 新增产品类型</button></div>
+      <div class="type-opts c3" id="productTypeOpts"></div>
+      <div class="pi-sub opt-head">项目等级（S 最高 → F 最低）<button class="btn opt-add" id="addLevelBtn">+ 新增等级</button></div>
+      <div class="level-opts" id="levelOpts"></div>
       <button id="piConfirm" class="btn primary">确认创建</button>
     </div>
   </div>
