@@ -5,3 +5,5 @@ data/auth.token
 data/tunnel-url.txt
 data/tunnel.log
 data/options.json
+data/ai.json
+public/brand-logo.png
