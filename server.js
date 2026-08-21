@@ -481,6 +481,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 403, { error: '只读模式，禁止修改' });
     }
     if (p === '/api/templates' && req.method === 'GET') return send(res, 200, loadJSON(TEMPLATES_FILE, []));
+    // 删除模版（模板共创：内置/导入的模板均可删）
+    const tplDel = p.match(/^\/api\/templates\/([^/]+)$/);
+    if (tplDel && req.method === 'DELETE') {
+      const cur = loadJSON(TEMPLATES_FILE, []);
+      const next = cur.filter(t => t.id !== tplDel[1]);
+      if (next.length === cur.length) return send(res, 404, { error: '模版不存在' });
+      saveJSON(TEMPLATES_FILE, next);
+      return send(res, 200, { ok: true });
+    }
     // 下载参考模版（内置模版生成的甘特方言 Excel，开始/截止带公式 → 导入后甘特级联）
     if (p === '/api/templates/reference-xlsx' && req.method === 'GET') {
       const tpls = loadJSON(TEMPLATES_FILE, []);
@@ -558,34 +567,24 @@ const server = http.createServer(async (req, res) => {
       catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
     }
 
-    // ---- 模板共创：导入参考模版 Excel / 社区模板 JSON ----
+    // ---- 模板共创：导入参考模版 Excel 新建模板 ----
     if (p === '/api/templates/import' && req.method === 'POST') {
       const body = await readBody(req);
+      if (body.kind !== 'xlsx' || !body.data) return send(res, 400, { error: '仅支持 .xlsx 参考模版导入' });
       const cur = loadJSON(TEMPLATES_FILE, []);
-      let added = 0;
-      let importedTemplates = [];
-      if (body.kind === 'xlsx' && body.data) {
-        try {
-          const buf = Buffer.from(body.data, 'base64');
-          const parsed = parseXlsxProject(buf);
-          const name = String(body.filename || '导入模板').replace(/\.[^.]+$/, '');
-          const tpl = {
-            id: uid(), name, color: PHASE_COLORS[0], icon: '◆',
-            phases: (parsed.phases || []).map((p, i) => ({ id: p.id, name: p.name || ('阶段' + (i + 1)), color: PHASE_COLORS[i % PHASE_COLORS.length] })),
-            tasks: (parsed.tasks || []).map(t => ({ title: t.title, phaseId: t.phaseId, note: t.note || '', estimateDays: t.estimateDays || 0, assignee: t.assignee || '' }))
-          };
-          cur.push(tpl); added = 1; importedTemplates.push(tpl);
-        } catch (e) { return send(res, 400, { error: '解析参考模版失败: ' + e.message }); }
-      } else {
-        let arr = body.templates;
-        if (!Array.isArray(arr)) { try { arr = JSON.parse(String(body.data || '[]')); } catch (e) { arr = []; } }
-        if (!Array.isArray(arr) || !arr.length) return send(res, 400, { error: '无模板数据' });
-        arr.forEach(t => {
-          if (t && t.name && Array.isArray(t.tasks) && !cur.some(x => x.id === t.id)) { cur.push(t); added++; importedTemplates.push(t); }
-        });
-      }
-      if (added) saveJSON(TEMPLATES_FILE, cur);
-      return send(res, 200, { added, templates: importedTemplates });
+      try {
+        const buf = Buffer.from(body.data, 'base64');
+        const parsed = parseXlsxProject(buf);
+        const name = String(body.filename || '导入模板').replace(/\.[^.]+$/, '');
+        const tpl = {
+          id: uid(), name, color: PHASE_COLORS[0], icon: '◆',
+          phases: (parsed.phases || []).map((p, i) => ({ id: p.id, name: p.name || ('阶段' + (i + 1)), color: PHASE_COLORS[i % PHASE_COLORS.length] })),
+          tasks: (parsed.tasks || []).map(t => ({ title: t.title, phaseId: t.phaseId, note: t.note || '', estimateDays: t.estimateDays || 0, assignee: t.assignee || '' }))
+        };
+        cur.push(tpl);
+        saveJSON(TEMPLATES_FILE, cur);
+        return send(res, 200, { added: 1, templates: [tpl] });
+      } catch (e) { return send(res, 400, { error: '解析参考模版失败: ' + e.message }); }
     }
 
     // 导出计划表（初版 / 最新），文件名区分

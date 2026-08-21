@@ -463,9 +463,12 @@ function openTplModal() {
   state.templates.forEach(t => {
     const c = document.createElement('div'); c.className = 'tpl-card'; c.style.borderColor = t.color;
     c.innerHTML = `<div class="tpl-ico" style="background:${t.color}">${esc(t.icon || '◆')}</div>
+      <button class="tpl-del" title="删除模板「${esc(t.name)}」">${ICON.del}</button>
       <div class="tpl-name">${esc(t.name)}</div>
       <div class="tpl-phases">${(t.phases || []).map(p => `<span style="background:${p.color}">${esc(p.name)}</span>`).join('')}</div>`;
     c.onclick = () => { const sug = $('#projName').value.trim() || t.name; pending = { mode: 'tpl', tplId: t.id }; $('#tplModal').classList.add('hidden'); openProjInfo(sug); };
+    const del = c.querySelector('.tpl-del');
+    if (del) del.onclick = e => { e.stopPropagation(); deleteTemplate(t.id); };
     grid.appendChild(c);
   });
   $('#tplModal').classList.remove('hidden');
@@ -767,23 +770,27 @@ $('#tplImportBtn').onclick = () => $('#tplImportFile').click();
 $('#tplImportFile').onchange = async (e) => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   try {
-    let r;
-    if (/\.xlsx?$/i.test(f.name)) {
-      // 导入参考模版 Excel：取文件名作模板名，阶段作展示字段
-      const data = bufToBase64(await f.arrayBuffer());
-      r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ kind: 'xlsx', filename: f.name, data }) });
-      toast('已导入参考模版：' + (r.templates || []).map(t => t.name).join('、') || f.name);
-    } else {
-      const list = JSON.parse(await f.text());
-      const arr = Array.isArray(list) ? list : (list.templates || []);
-      r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ templates: arr }) });
-      toast('已导入 ' + r.added + ' 个新模板');
-    }
+    if (!/\.xlsx?$/i.test(f.name)) { toast('仅支持 .xlsx 参考模版'); return; }
+    const data = bufToBase64(await f.arrayBuffer());
+    const r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ kind: 'xlsx', filename: f.name, data }) });
+    const names = (r.templates || []).map(t => t.name).join('、');
+    toast('已创建模板：' + (names || f.name));
     state.templates = await api('/templates');
     openTplModal();
   } catch (err) { toast('导入失败：' + err.message); }
   finally { e.target.value = ''; }
 };
+async function deleteTemplate(id) {
+  const t = (state.templates || []).find(x => x.id === id);
+  if (!t) return;
+  if (!confirm('删除模板「' + t.name + '」？已有项目不受影响。')) return;
+  try {
+    await api('/templates/' + id, { method: 'DELETE' });
+    state.templates = await api('/templates');
+    toast('已删除模板：' + t.name);
+    openTplModal();
+  } catch (err) { toast('删除失败：' + err.message); }
+}
 
 /* =========================================================
    全景视图（聚合所有项目）
