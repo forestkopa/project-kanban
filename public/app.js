@@ -767,11 +767,19 @@ $('#tplImportBtn').onclick = () => $('#tplImportFile').click();
 $('#tplImportFile').onchange = async (e) => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   try {
-    const list = JSON.parse(await f.text());
-    const arr = Array.isArray(list) ? list : (list.templates || []);
-    const r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ templates: arr }) });
+    let r;
+    if (/\.xlsx?$/i.test(f.name)) {
+      // 导入参考模版 Excel：取文件名作模板名，阶段作展示字段
+      const data = bufToBase64(await f.arrayBuffer());
+      r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ kind: 'xlsx', filename: f.name, data }) });
+      toast('已导入参考模版：' + (r.templates || []).map(t => t.name).join('、') || f.name);
+    } else {
+      const list = JSON.parse(await f.text());
+      const arr = Array.isArray(list) ? list : (list.templates || []);
+      r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ templates: arr }) });
+      toast('已导入 ' + r.added + ' 个新模板');
+    }
     state.templates = await api('/templates');
-    toast('已导入 ' + r.added + ' 个新模板');
     openTplModal();
   } catch (err) { toast('导入失败：' + err.message); }
   finally { e.target.value = ''; }

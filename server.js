@@ -558,19 +558,34 @@ const server = http.createServer(async (req, res) => {
       catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
     }
 
-    // ---- 模板共创：导入社区模板 ----
+    // ---- 模板共创：导入参考模版 Excel / 社区模板 JSON ----
     if (p === '/api/templates/import' && req.method === 'POST') {
       const body = await readBody(req);
-      let arr = body.templates;
-      if (!Array.isArray(arr)) { try { arr = JSON.parse(String(body.data || '[]')); } catch (e) { arr = []; } }
-      if (!Array.isArray(arr) || !arr.length) return send(res, 400, { error: '无模板数据' });
       const cur = loadJSON(TEMPLATES_FILE, []);
       let added = 0;
-      arr.forEach(t => {
-        if (t && t.name && Array.isArray(t.tasks) && !cur.some(x => x.id === t.id)) { cur.push(t); added++; }
-      });
+      let importedTemplates = [];
+      if (body.kind === 'xlsx' && body.data) {
+        try {
+          const buf = Buffer.from(body.data, 'base64');
+          const parsed = parseXlsxProject(buf);
+          const name = String(body.filename || '导入模板').replace(/\.[^.]+$/, '');
+          const tpl = {
+            id: uid(), name, color: PHASE_COLORS[0], icon: '◆',
+            phases: (parsed.phases || []).map((p, i) => ({ id: p.id, name: p.name || ('阶段' + (i + 1)), color: PHASE_COLORS[i % PHASE_COLORS.length] })),
+            tasks: (parsed.tasks || []).map(t => ({ title: t.title, phaseId: t.phaseId, note: t.note || '', estimateDays: t.estimateDays || 0, assignee: t.assignee || '' }))
+          };
+          cur.push(tpl); added = 1; importedTemplates.push(tpl);
+        } catch (e) { return send(res, 400, { error: '解析参考模版失败: ' + e.message }); }
+      } else {
+        let arr = body.templates;
+        if (!Array.isArray(arr)) { try { arr = JSON.parse(String(body.data || '[]')); } catch (e) { arr = []; } }
+        if (!Array.isArray(arr) || !arr.length) return send(res, 400, { error: '无模板数据' });
+        arr.forEach(t => {
+          if (t && t.name && Array.isArray(t.tasks) && !cur.some(x => x.id === t.id)) { cur.push(t); added++; importedTemplates.push(t); }
+        });
+      }
       if (added) saveJSON(TEMPLATES_FILE, cur);
-      return send(res, 200, { added });
+      return send(res, 200, { added, templates: importedTemplates });
     }
 
     // 导出计划表（初版 / 最新），文件名区分

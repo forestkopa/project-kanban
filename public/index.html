@@ -93,9 +93,9 @@
     <div class="tpl-bar">
       <button class="btn" id="tplExportBtn" title="导出参考模版 Excel（由内置模版生成，含日期公式，填写后可从 xlsx 导入）">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg> 导出参考模版</button>
-      <button class="btn" id="tplImportBtn" title="导入他人分享的模板 JSON（模板共创）">
+      <button class="btn" id="tplImportBtn" title="导入参考模版 Excel（取文件名作模板名、阶段作展示字段），也支持他人分享的模板 JSON">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V8"/><path d="M8 14l4-4 4 4"/><path d="M4 4h16"/></svg> 导入模板</button>
-      <span class="pi-sub" style="margin:0">模板共创：导出分享 / 导入社区模板</span>
+      <span class="pi-sub" style="margin:0">导入参考模版 Excel / 社区模板 JSON</span>
     </div>
     <div id="tplGrid" class="tpl-grid"></div>
   </div>
@@ -203,7 +203,7 @@
 </div>
 
 <input type="file" id="importFile" accept=".json,.xlsx" style="display:none">
-<input type="file" id="tplImportFile" accept=".json,application/json" style="display:none">
+<input type="file" id="tplImportFile" accept=".xlsx,.json,application/json" style="display:none">
 <div id="toast" class="toast hidden"></div>
 
 <!-- AI 助手：描述生成任务 -->
