@@ -98,7 +98,9 @@ body {
 
 /* ---------- board（并行单行；列保持尺寸；阶段多出时横向滑动条） ---------- */
 .board { flex: 1; display: flex; flex-wrap: nowrap; gap: 16px; align-items: flex-start; padding: 18px 26px 26px; overflow-y: auto; overflow-x: auto; }
-.col { flex: 0 0 264px; width: 264px; min-width: 264px; max-width: 264px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; max-height: 100%; overflow: hidden; }
+/* 列宽固定为「6 列正好占满看板」的尺寸：(内容宽 - 5×16px gap) / 6。
+   少于 6 个阶段时列宽不变、右侧留白不铺满；恰好 6 个阶段一屏放满；超过 6 个阶段横向滚动（列宽保持） */
+.col { flex: 0 0 calc((100% - 80px) / 6); width: calc((100% - 80px) / 6); min-width: 0; max-width: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; max-height: 100%; overflow: hidden; }
 .col-head { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border-top: 3px solid var(--border-strong); border-radius: var(--radius) var(--radius) 0 0; font-size: 13.5px; font-weight: 600; }
 .col-count { background: var(--bg-2); color: var(--text-2); font-size: 11px; border-radius: 20px; padding: 2px 10px; font-weight: 600; }
 .col-body { padding: 13px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; }
@@ -193,7 +195,7 @@ textarea.inp { resize: vertical; min-height: 64px; }
 .opt-pal-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
 .opt-swatch { width: 100%; aspect-ratio: 1; border: 1px solid rgba(0,0,0,.08); cursor: pointer; padding: 0; border-radius: 1px; }
 .opt-swatch:hover { transform: scale(1.15); box-shadow: 0 0 0 1px var(--accent); z-index: 1; position: relative; }
-/* 看板：列宽固定为 6 阶段的标准尺寸(264px)，少于 6 阶段不铺满(右侧留白)；超过 6 阶段横向滚动(.board overflow-x:auto) */
+/* 看板：列宽固定为 6 列占满的尺寸(见 .col calc)，少于 6 阶段不铺满(右侧留白)；超过 6 阶段横向滚动 */
 .tpl-ico { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 19px; margin-bottom: 11px; }
 .tpl-name { font-size: 15px; font-weight: 700; }
 .tpl-cat { font-size: 11.5px; color: var(--text-3); margin: 3px 0 7px; }
