@@ -128,6 +128,40 @@ function buildDiffXlsx(proj) {
   XLSX.utils.book_append_sheet(wb, ws, '差异对比');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+/* 周报待办清单导出：生成带样式的 HTML 表格（.xls 扩展名），Excel/WPS 打开保留颜色/边框/合并/列宽 */
+function buildTodoXls(projects, monIso, sunIso) {
+  const fmt = s => s ? s.slice(5).replace('-', '/') : '';
+  const groups = [];
+  (projects || []).forEach(p => {
+    const list = (p.tasks || []).filter(t => {
+      if (t.done) return false;
+      return (!t.startDate || t.startDate <= sunIso) && (!t.dueDate || t.dueDate >= monIso);
+    }).map(t => ({ ...t, overdue: !!t.dueDate && t.dueDate < monIso }));
+    if (list.length) groups.push({ p, list });
+  });
+  groups.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
+  const title = '项目周报 · 待办清单（' + fmt(monIso) + ' — ' + fmt(sunIso) + '）';
+  const th = c => `<th style="background:#0A84FF;color:#fff;font-weight:bold;border:1px solid #7FB0E8;padding:7px 10px;text-align:center">${c}</th>`;
+  let rows = `<tr><td colspan="7" style="background:#0A84FF;color:#fff;font-size:15pt;font-weight:bold;text-align:center;border:1px solid #0A84FF;padding:10px">${title}</td></tr>`;
+  rows += `<tr>${th('项目')}${th('任务')}${th('里程碑')}${th('工期(天)')}${th('开始日期')}${th('截止日期')}${th('状态')}</tr>`;
+  groups.forEach(({ p, list }, gi) => {
+    const pColor = p.color || '#0A84FF';
+    list.forEach((t, ti) => {
+      const bg = gi % 2 === 0 ? '#FFFFFF' : '#F5F8FF';
+      rows += `<tr style="background:${bg}">`;
+      if (ti === 0) rows += `<td rowspan="${list.length}" style="border:1px solid #C9D6E8;padding:7px 10px;font-weight:bold;border-left:4px solid ${pColor}">${escHtml(p.name)}</td>`;
+      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px">${escHtml(t.title)}${t.isMilestone ? ' <span style="color:#D48806">⚑</span>' : ''}</td>`;
+      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${t.isMilestone ? '<span style="color:#D48806">⚑</span>' : ''}</td>`;
+      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${t.estimateDays || ''}</td>`;
+      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${fmt(t.startDate)}</td>`;
+      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${fmt(t.dueDate)}</td>`;
+      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${t.overdue ? '<span style="color:#E0241B;font-weight:bold">⚠ 逾期</span>' : '<span style="color:#1F8A5B">本周待办</span>'}</td>`;
+      rows += '</tr>';
+    });
+  });
+  return '<html><head><meta charset="utf-8"></head><body><table cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:\'Microsoft YaHei\',sans-serif;font-size:10.5pt">' + rows + '</table></body></html>';
+}
 /* ---------- 参考模版：由内置模版生成甘特方言 Excel（开始/截止带公式 → 导入后级联） ---------- */
 function workdayAdd(baseStr, n) {
   const wk = [0, 6]; // weekend=1：周六日休息
@@ -635,6 +669,22 @@ const server = http.createServer(async (req, res) => {
         saveJSON(TEMPLATES_FILE, cur);
         return send(res, 200, { added: 1, templates: [tpl] });
       } catch (e) { return send(res, 400, { error: '解析参考模版失败: ' + e.message }); }
+    }
+
+    // 周报待办清单导出（HTML 表格 → .xls，格式美观，Excel/WPS 直接打开）
+    if (p === '/api/reports/todo-export' && req.method === 'POST') {
+      const body = await readBody(req);
+      if (!Array.isArray(body.projects)) return send(res, 400, { error: '缺少项目数据' });
+      const monIso = body.mon || isoDate(new Date()), sunIso = body.sun || monIso;
+      const html = buildTodoXls(body.projects, monIso, sunIso);
+      const date = isoDate(new Date()).replace(/-/g, '');
+      const ascii = 'weekly_todo_' + date + '.xls';
+      const utf8 = '周报待办清单_' + date + '.xls';
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.ms-excel; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`
+      });
+      return res.end('\ufeff' + html);
     }
 
     // 导出计划表（初版 / 最新），文件名区分

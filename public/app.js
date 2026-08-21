@@ -17,7 +17,8 @@ const ICON = {
   del: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>',
   spark: '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2l1.9 5.3L19 9l-5.1 1.7L12 16l-1.9-5.3L5 9l5.1-1.7z"/><circle cx="18.6" cy="17.4" r="1.5"/><circle cx="5.4" cy="15.8" r="1.1"/></svg>',
   box: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg>',
-  tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>'
+  tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>',
+  download: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg>'
 };
 let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
@@ -1386,7 +1387,7 @@ function buildWeekly(wrap) {
         </div>
       </div>
       <div class="ptile span2" style="padding:20px 22px">
-        <h4>待完成项目清单 <span class="ted">本周内未完成的任务 · 按项目分组 · 逾期优先</span></h4>
+        <h4 class="tile-head"><span>待完成项目清单 <em class="ted">本周内未完成的任务 · 按项目分组 · 逾期优先</em></span><button class="btn" id="todoExportBtn" title="导出本周待办清单为 Excel">${ICON.download} 导出 Excel</button></h4>
         <div class="todo-list">
           <div class="todo-kpis"><span>涉及项目 <b>${todoRows.length}</b></span><span>本周待完成 <b>${todoTotal}</b></span><span class="todo-warn">已逾期 <b>${todoOverdue}</b></span></div>
           ${todoHtml}
@@ -1396,7 +1397,26 @@ function buildWeekly(wrap) {
   $('#wpPrev').onclick = () => { const x = new Date(state.weekDate); x.setDate(x.getDate() - 7); state.weekDate = x; renderReport(); };
   $('#wpNext').onclick = () => { const x = new Date(state.weekDate); x.setDate(x.getDate() + 7); state.weekDate = x; renderReport(); };
   $('#wpThis').onclick = () => { state.weekDate = new Date(); renderReport(); };
+  const eb = $('#todoExportBtn'); if (eb) eb.onclick = downloadTodoExcel;
   buildPhaseSwim($('#swimBox'), 'weekly');
+}
+async function downloadTodoExcel() {
+  const { mon, days } = weekRange(state.weekDate);
+  const projs = reportProjects('weekly');
+  if (!projs.length) { toast('本周没有可导出的项目'); return; }
+  try {
+    const r = await fetch('/api/reports/todo-export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projects: projs, mon: isoDate(mon), sun: isoDate(days[6]) })
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status); }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '周报待办清单.xls';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (err) { toast('导出失败：' + err.message); }
 }
 
 /* ---------- 月度计划：本月内「试产发布」的项目 + 勾选纳入计划 ---------- */

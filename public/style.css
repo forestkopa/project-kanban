@@ -318,6 +318,8 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .ptile.span2 { flex-basis: 100%; }
 .ptile h4 { margin: 0 0 16px; font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
 .ptile h4 .ted { font-size: 12px; color: var(--text-3); font-weight: 500; }
+.ptile h4.tile-head { justify-content: space-between; flex-wrap: wrap; }
+.ptile h4.tile-head .ted { margin-right: auto; }
 .tile-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; border-right: 2px solid var(--border-strong); border-bottom: 2px solid var(--border-strong); border-bottom-right-radius: 8px; opacity: .3; transition: opacity .15s; }
 .ptile:hover .tile-resize { opacity: .75; }
 
