@@ -51,7 +51,7 @@ const DEFAULT_OPTIONS = {
   productTypes: { 'AI': '#10a37f', 'CC线': '#06b6d4', 'DOCK': '#0ea5e9', 'MI': '#a3e635', 'MST': '#eab308', 'PD+HUB': '#f97316', 'SSD HUB': '#64748b', 'TB5': '#6366f1', 'U4': '#a855f7', 'WiFi dongle': '#14b8a6', '基础hub': '#94a3b8' },
   levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' },
   certs: ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'],
-  engineers: ['张工', '李工', '王工', '赵工', '陈工', '刘工']
+  engineers: ['硬件工程师', '结构工程师', '项目工程师', '测试工程师', '张工', '李工', '王工', '赵工', '陈工', '刘工']
 };
 function loadOptions() { return Object.assign({}, DEFAULT_OPTIONS, loadJSON(OPTIONS_FILE, {})); }
 function scheduleTasks(phases, tasks, startStr) {

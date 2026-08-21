@@ -107,26 +107,14 @@
     <div class="modal-head"><h3 id="piTitle">项目信息</h3><button class="x" data-close>×</button></div>
     <div class="pi-grid">
       <input id="piName" class="inp" placeholder="项目名称">
-      <div class="pi-field">
-        <label>硬件工程师</label>
-        <input id="piHardware" class="inp" placeholder="填写或从右侧选择" autocomplete="off">
-        <select id="selHardware" class="inp pi-sel"><option value="">选择…</option></select>
+      <div class="pi-field-grid">
+        <div class="pi-field"><label>硬件工程师</label><input id="piHardware" class="inp" list="dlEngineers" placeholder="可手输或下拉选择" autocomplete="off"></div>
+        <div class="pi-field"><label>结构工程师</label><input id="piStructure" class="inp" list="dlEngineers" placeholder="可手输或下拉选择" autocomplete="off"></div>
+        <div class="pi-field"><label>项目工程师</label><input id="piProject" class="inp" list="dlEngineers" placeholder="可手输或下拉选择" autocomplete="off"></div>
+        <div class="pi-field"><label>认证标签</label><input id="piCert" class="inp" list="dlCerts" placeholder="可手输或下拉选择" autocomplete="off"></div>
       </div>
-      <div class="pi-field">
-        <label>结构工程师</label>
-        <input id="piStructure" class="inp" placeholder="填写或从右侧选择" autocomplete="off">
-        <select id="selStructure" class="inp pi-sel"><option value="">选择…</option></select>
-      </div>
-      <div class="pi-field">
-        <label>项目工程师</label>
-        <input id="piProject" class="inp" placeholder="填写或从右侧选择" autocomplete="off">
-        <select id="selProject" class="inp pi-sel"><option value="">选择…</option></select>
-      </div>
-      <div class="pi-field">
-        <label>认证标签</label>
-        <input id="piCert" class="inp" placeholder="填写或从右侧选择" autocomplete="off">
-        <select id="selCert" class="inp pi-sel"><option value="">选择…</option></select>
-      </div>
+      <datalist id="dlEngineers"></datalist>
+      <datalist id="dlCerts"></datalist>
       <div class="opt-chips-row">
         <div class="opt-chips-box"><span class="oc-label">工程师</span><div class="opt-chips" id="chipsEngineers"></div></div>
         <div class="opt-chips-box"><span class="oc-label">认证</span><div class="opt-chips" id="chipsCerts"></div></div>
@@ -144,10 +132,16 @@
 
 <!-- 选项编辑：新增 / 修改（名称 + 颜色） -->
 <div id="optModal" class="modal hidden">
-  <div class="modal-box" style="width:min(380px,92vw)">
+  <div class="modal-box" style="width:min(420px,92vw)">
     <div class="modal-head"><h3 id="optTitle">新增选项</h3><button class="x" id="optX">×</button></div>
     <input id="optName" class="inp" placeholder="选项名称">
-    <div class="opt-color-row"><span class="oc-label">颜色</span><input type="color" id="optColor" value="#0A84FF"></div>
+    <div class="opt-color-row">
+      <span class="oc-label">颜色</span>
+      <input type="color" id="optColor" value="#0A84FF" class="opt-color-input" title="自定义颜色">
+      <span class="opt-color-prev" id="optColorPrev" style="background:#0A84FF"></span>
+      <span class="opt-color-hex" id="optColorHex">#0A84FF</span>
+    </div>
+    <div class="opt-palette" id="optPalette"></div>
     <div class="import-actions" style="display:flex;gap:10px;margin-top:16px">
       <button class="btn" id="optCancel">取消</button>
       <button class="btn primary" id="optSave">保存</button>

@@ -153,11 +153,11 @@ textarea.inp { resize: vertical; min-height: 64px; }
 .pi-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .opt-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
 .opt-add { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
-/* 工程师 / 认证字段行：输入框 + 独立下拉 */
-.pi-field { display: flex; align-items: center; gap: 8px; }
-.pi-field label { flex: 0 0 84px; font-size: 12.5px; color: var(--text-2); }
+/* 工程师 / 认证字段网格：每行两个字段（label + input + datalist 一体，可输入可下拉） */
+.pi-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 4px; }
+.pi-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pi-field label { flex: 0 0 70px; font-size: 12.5px; color: var(--text-2); }
 .pi-field .inp { flex: 1; min-width: 0; }
-.pi-field .pi-sel { flex: 0 0 130px; padding: 8px 8px; }
 /* 选项 chips（工程师 / 认证选项池） */
 .opt-chips-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
 .opt-chips-box { display: flex; align-items: flex-start; gap: 8px; }
@@ -175,9 +175,15 @@ textarea.inp { resize: vertical; min-height: 64px; }
 .opt-act-del:hover { color: var(--danger); border-color: var(--danger); }
 .opt-act-edit { right: 27px; }
 .opt-act-del { right: 5px; }
-/* 选项编辑弹窗：颜色选择行 */
+/* 选项编辑弹窗：颜色输入 + WPS 风格色板 */
 .opt-color-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.opt-color-row input[type=color] { width: 56px; height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); cursor: pointer; padding: 2px; }
+.opt-color-input { width: 40px; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer; padding: 2px; }
+.opt-color-prev { width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 4px; }
+.opt-color-hex { font-family: Consolas, Monaco, monospace; font-size: 12px; color: var(--text-2); }
+.opt-palette { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.opt-pal-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+.opt-swatch { width: 100%; aspect-ratio: 1; border: 1px solid rgba(0,0,0,.08); cursor: pointer; padding: 0; border-radius: 1px; }
+.opt-swatch:hover { transform: scale(1.15); box-shadow: 0 0 0 1px var(--accent); z-index: 1; position: relative; }
 /* 看板：阶段数 <=6 固定列宽不拉伸；>6 横向滚动（.board 已有 overflow-x:auto） */
 .tpl-ico { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 19px; margin-bottom: 11px; }
 .tpl-name { font-size: 15px; font-weight: 700; }

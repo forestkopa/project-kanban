@@ -77,7 +77,6 @@ async function loadAll() {
     try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
-  refreshMappingSelect();
   render();
 }
 
@@ -485,21 +484,34 @@ function openTplModal() {
 }
 /* ---- 项目信息选项：动态渲染（可新增 / 编辑 / 删除，可配置颜色） ---- */
 let optMode = { kind: 'type', editName: null }; // kind: type|product|level|engineer|cert
+// WPS 风格主题色板：5 行 10 列
+const COLOR_PALETTE = [
+  ['#FFFFFF','#F2F2F2','#D9D9D9','#BFBFBF','#A6A6A6','#808080','#595959','#3F3F3F','#1F1F1F','#000000'],
+  ['#FCE4D6','#F8CBAD','#FFE699','#FFF2CC','#DDEBF7','#BDD7EE','#C5E0B4','#E2EFDA','#EDEDED','#D9D9D9'],
+  ['#E06666','#F6B26B','#FFD966','#93C47D','#76A5AF','#6FA8DC','#6D9EEB','#8E7CC3','#C27BA0','#CCCCCC'],
+  ['#C00000','#E06666','#F4B183','#FFD966','#A9D18E','#A5C8E1','#9DC3E6','#B4A7D6','#C27BA0','#7F7F7F'],
+  ['#A61C00','#CC4125','#B45F06','#BF8F00','#38761D','#134F5C','#0B5394','#351C75','#741B47','#595959']
+];
+function renderOptPalette() {
+  $('#optPalette').innerHTML = COLOR_PALETTE.map((row, ri) => `<div class="opt-pal-row">${row.map(c => `<button class="opt-swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`).join('');
+  $('#optPalette').onclick = e => { const b = e.target.closest('.opt-swatch'); if (!b) return; setOptColor(b.dataset.color); };
+}
+function setOptColor(c) {
+  $('#optColor').value = c;
+  const p = $('#optColorPrev'), h = $('#optColorHex'); if (p) p.style.background = c; if (h) h.textContent = c;
+}
 function renderPiOptions() {
   const types = TYPE_COLORS(), pts = PRODUCT_TYPE_COLORS(), lvs = LEVEL_COLORS();
   const opts = state.options || {};
   const certs = opts.certs || ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'];
-  const engineers = opts.engineers || ['张工', '李工', '王工', '赵工', '陈工', '刘工'];
-  const optActs = (key, name, color) => `<button class="opt-act opt-act-edit" data-opt-edit="${key}|${esc(name)}" title="编辑">${ICON.edit}</button><button class="opt-act opt-act-del" data-opt-del="${key}|${esc(name)}" title="删除">${ICON.del}</button>`;
-  $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}${optActs('type', t, types[t])}</div>`).join('');
-  $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}${optActs('product', t, pts[t])}</div>`).join('');
-  $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}${optActs('level', l, lvs[l])}</div>`).join('');
-  // 工程师 / 认证：字段输入框保留 + 独立下拉选择 + 选项 chips（可删除）
-  const fillSel = (selId, list, cur) => { const sel = $(selId); if (!sel) return; sel.innerHTML = '<option value="">选择…</option>' + list.map(e => `<option value="${esc(e)}"${e === cur ? ' selected' : ''}>${esc(e)}</option>`).join(''); };
-  fillSel('#selHardware', engineers, $('#piHardware').value);
-  fillSel('#selStructure', engineers, $('#piStructure').value);
-  fillSel('#selProject', engineers, $('#piProject').value);
-  fillSel('#selCert', certs, $('#piCert').value);
+  const engineers = opts.engineers || ['硬件工程师', '结构工程师', '项目工程师', '测试工程师', '张工', '李工', '王工', '赵工', '陈工', '刘工'];
+  const optActs = (key, name) => `<button class="opt-act opt-act-edit" data-opt-edit="${key}|${esc(name)}" title="编辑">${ICON.edit}</button><button class="opt-act opt-act-del" data-opt-del="${key}|${esc(name)}" title="删除">${ICON.del}</button>`;
+  $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}${optActs('type', t)}</div>`).join('');
+  $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}${optActs('product', t)}</div>`).join('');
+  $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}${optActs('level', l)}</div>`).join('');
+  // 工程师 / 认证：可输入可下拉选（datalist 合并）+ 选项 chips 可删除
+  $('#dlEngineers').innerHTML = engineers.map(e => `<option value="${esc(e)}">`).join('');
+  $('#dlCerts').innerHTML = certs.map(c => `<option value="${esc(c)}">`).join('');
   const chips = (list, key) => list.map(e => `<span class="opt-chip">${esc(e)}<button data-opt-del="${key}|${esc(e)}" title="删除">×</button></span>`).join('') + `<button class="btn opt-add" data-opt-add="${key}">+ 新增</button>`;
   $('#chipsEngineers').innerHTML = chips(engineers, 'engineer');
   $('#chipsCerts').innerHTML = chips(certs, 'cert');
@@ -507,14 +519,7 @@ function renderPiOptions() {
   $$('#typeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
   $$('#productTypeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
   $$('#levelOpts .level-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#levelOpts .level-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
-  // 绑定：编辑 / 删除 / 新增（事件委托，避免重复绑定）
   bindOptActs();
-  // 绑定：工程师 / 认证独立下拉 → 填入输入框
-  const bindFill = (selId, inputId) => { const sel = $(selId), inp = $(inputId); if (sel && inp) sel.onchange = () => { if (sel.value) inp.value = sel.value; }; };
-  bindFill('#selHardware', '#piHardware');
-  bindFill('#selStructure', '#piStructure');
-  bindFill('#selProject', '#piProject');
-  bindFill('#selCert', '#piCert');
 }
 function bindOptActs() {
   $$('[data-opt-edit]').forEach(b => b.onclick = (e) => { e.stopPropagation(); const [kind, name] = b.dataset.optEdit.split('|'); openOptModal(kind, name); });
@@ -528,19 +533,21 @@ async function saveOptions(next) {
 function openOptModal(kind, editName) {
   optMode = { kind, editName };
   const map = { type: '项目类型', product: '产品类型', level: '项目等级', cert: '认证标签', engineer: '工程师' };
-  $('#optTitle').textContent = (editName ? '编辑' : '新增') + map[kind] || '选项';
+  $('#optTitle').textContent = (editName ? '编辑' : '新增') + (map[kind] || '选项');
   $('#optName').value = editName || '';
-  const colorRow = $('#optColor').parentElement;
   const o = state.options || {};
+  let curColor = '#0A84FF';
   if (editName) {
     const pool = kind === 'type' ? (o.types || {}) : kind === 'product' ? (o.productTypes || {}) : kind === 'level' ? (o.levels || {}) : {};
-    $('#optColor').value = pool[editName] || '#0A84FF';
-  } else {
-    $('#optColor').value = '#0A84FF';
+    curColor = pool[editName] || '#0A84FF';
   }
-  colorRow.style.display = (kind === 'type' || kind === 'product' || kind === 'level') ? '' : 'none';
+  const colorRow = $('.opt-color-row');
+  if (colorRow) colorRow.style.display = (kind === 'type' || kind === 'product' || kind === 'level') ? '' : 'none';
+  setOptColor(curColor);
+  renderOptPalette();
   $('#optModal').classList.remove('hidden'); $('#optName').focus();
 }
+$('#optColor').oninput = () => setOptColor($('#optColor').value);
 $('#optSave').onclick = async () => {
   const n = $('#optName').value.trim();
   if (!n) { toast('请输入名称'); return; }
