@@ -174,8 +174,6 @@ function renderBoard(p) {
     <div class="stat"><div class="stat-num">${p.tasks.filter(t => t.done).length}</div><div class="stat-lbl">已完成</div></div>
     <div class="stat"><div class="stat-num">${p.tasks.filter(t => !t.done).length}</div><div class="stat-lbl">进行中</div></div>`;
   const board = $('#board'); board.innerHTML = '';
-  // ≤6 阶段：列宽自适应均分占满（无需横向滚动条）；>6 阶段：固定 264px + 横向滚动
-  board.classList.toggle('cols-fit', p.phases.length <= 6);
   p.phases.forEach(ph => {
     const col = document.createElement('div'); col.className = 'col';
     const tasks = p.tasks.filter(t => t.phaseId === ph.id);
