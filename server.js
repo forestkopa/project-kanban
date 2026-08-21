@@ -45,13 +45,11 @@ function gitAutoCommit(file) {
 function uid() { return 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function isoDate(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
-/* ---------- 可配置选项（项目类型/产品类型/等级/认证/工程师），默认值 + 可新增 ---------- */
+/* ---------- 可配置选项（项目类型/产品类型/等级），默认值 + 可新增；工程师/认证为手填字段 ---------- */
 const DEFAULT_OPTIONS = {
   types: { 'C端': '#0A84FF', 'B端': '#30D158', '预研': '#FF9F0A', '迭代': '#BF5AF2' },
   productTypes: { 'AI': '#10a37f', 'CC线': '#06b6d4', 'DOCK': '#0ea5e9', 'MI': '#a3e635', 'MST': '#eab308', 'PD+HUB': '#f97316', 'SSD HUB': '#64748b', 'TB5': '#6366f1', 'U4': '#a855f7', 'WiFi dongle': '#14b8a6', '基础hub': '#94a3b8' },
-  levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' },
-  certs: ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'],
-  engineers: ['硬件工程师', '结构工程师', '项目工程师', '测试工程师', '张工', '李工', '王工', '赵工', '陈工', '刘工']
+  levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' }
 };
 function loadOptions() { return Object.assign({}, DEFAULT_OPTIONS, loadJSON(OPTIONS_FILE, {})); }
 function scheduleTasks(phases, tasks, startStr) {

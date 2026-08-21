@@ -502,19 +502,10 @@ function setOptColor(c) {
 }
 function renderPiOptions() {
   const types = TYPE_COLORS(), pts = PRODUCT_TYPE_COLORS(), lvs = LEVEL_COLORS();
-  const opts = state.options || {};
-  const certs = opts.certs || ['3C', 'CE', 'FCC', 'RoHS', 'CCC', 'SRRC', 'GB'];
-  const engineers = opts.engineers || ['硬件工程师', '结构工程师', '项目工程师', '测试工程师', '张工', '李工', '王工', '赵工', '陈工', '刘工'];
   const optActs = (key, name) => `<button class="opt-act opt-act-edit" data-opt-edit="${key}|${esc(name)}" title="编辑">${ICON.edit}</button><button class="opt-act opt-act-del" data-opt-del="${key}|${esc(name)}" title="删除">${ICON.del}</button>`;
   $('#typeOpts').innerHTML = Object.keys(types).map(t => `<div class="type-opt" data-type="${esc(t)}" style="--c:${types[t]}"><span class="sw"></span>${esc(t)}${optActs('type', t)}</div>`).join('');
   $('#productTypeOpts').innerHTML = Object.keys(pts).map(t => `<div class="type-opt" data-ptype="${esc(t)}" style="--c:${pts[t]}"><span class="sw"></span>${esc(t)}${optActs('product', t)}</div>`).join('');
   $('#levelOpts').innerHTML = Object.keys(lvs).map(l => `<div class="level-opt" data-level="${esc(l)}" style="--c:${lvs[l]}">${esc(l)}${optActs('level', l)}</div>`).join('');
-  // 工程师 / 认证：可输入可下拉选（datalist 合并）+ 选项 chips 可删除
-  $('#dlEngineers').innerHTML = engineers.map(e => `<option value="${esc(e)}">`).join('');
-  $('#dlCerts').innerHTML = certs.map(c => `<option value="${esc(c)}">`).join('');
-  const chips = (list, key) => list.map(e => `<span class="opt-chip">${esc(e)}<button data-opt-del="${key}|${esc(e)}" title="删除">×</button></span>`).join('') + `<button class="btn opt-add" data-opt-add="${key}">+ 新增</button>`;
-  $('#chipsEngineers').innerHTML = chips(engineers, 'engineer');
-  $('#chipsCerts').innerHTML = chips(certs, 'cert');
   // 绑定：选项点击选中
   $$('#typeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#typeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });
   $$('#productTypeOpts .type-opt').forEach(o => o.onclick = (ev) => { if (ev.target.closest('.opt-act')) return; $$('#productTypeOpts .type-opt').forEach(x => x.classList.remove('active')); o.classList.add('active'); });

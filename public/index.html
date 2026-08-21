@@ -108,16 +108,10 @@
     <div class="pi-grid">
       <input id="piName" class="inp" placeholder="项目名称">
       <div class="pi-field-grid">
-        <div class="pi-field"><label>硬件工程师</label><input id="piHardware" class="inp" list="dlEngineers" placeholder="可手输或下拉选择" autocomplete="off"></div>
-        <div class="pi-field"><label>结构工程师</label><input id="piStructure" class="inp" list="dlEngineers" placeholder="可手输或下拉选择" autocomplete="off"></div>
-        <div class="pi-field"><label>项目工程师</label><input id="piProject" class="inp" list="dlEngineers" placeholder="可手输或下拉选择" autocomplete="off"></div>
-        <div class="pi-field"><label>认证标签</label><input id="piCert" class="inp" list="dlCerts" placeholder="可手输或下拉选择" autocomplete="off"></div>
-      </div>
-      <datalist id="dlEngineers"></datalist>
-      <datalist id="dlCerts"></datalist>
-      <div class="opt-chips-row">
-        <div class="opt-chips-box"><span class="oc-label">工程师</span><div class="opt-chips" id="chipsEngineers"></div></div>
-        <div class="opt-chips-box"><span class="oc-label">认证</span><div class="opt-chips" id="chipsCerts"></div></div>
+        <div class="pi-field"><label>硬件工程师</label><input id="piHardware" class="inp" placeholder="手填工程师姓名" autocomplete="off"></div>
+        <div class="pi-field"><label>结构工程师</label><input id="piStructure" class="inp" placeholder="手填工程师姓名" autocomplete="off"></div>
+        <div class="pi-field"><label>项目工程师</label><input id="piProject" class="inp" placeholder="手填工程师姓名" autocomplete="off"></div>
+        <div class="pi-field"><label>认证标签</label><input id="piCert" class="inp" placeholder="手填认证标签（如 3C / CE / FCC）" autocomplete="off"></div>
       </div>
       <div class="pi-sub opt-head">项目类型（用颜色区分）<button class="btn opt-add" id="addTypeBtn">+ 新增类型</button></div>
       <div class="type-opts" id="typeOpts"></div>
