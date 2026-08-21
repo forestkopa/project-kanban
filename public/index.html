@@ -16,24 +16,34 @@
 </aside>
 <main id="main">
   <header id="topbar">
+    <button id="menuBtn" class="btn icon-btn" aria-label="打开菜单" title="菜单（移动端）">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
     <div id="projTitle"></div>
     <div id="projMeta"></div>
     <div class="top-actions">
       <button id="addTaskBtn" class="btn">+ 任务</button>
-      <button id="archiveBtn" class="btn" title="项目完成后归档">📦 完成归档</button>
+      <button id="archiveBtn" class="btn" title="项目完成后归档">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg> 完成归档</button>
       <button id="delProjectBtn" class="btn ghost">删除项目</button>
       <div class="export-wrap">
-        <button id="exportBtn" class="btn" title="导出计划表">⬆ 导出 ▾</button>
+        <button id="exportBtn" class="btn" title="导出计划表">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 20h16"/></svg> 导出 ▾</button>
         <div id="exportMenu" class="export-menu">
           <button data-x="initial"><span class="em-ico">📄</span>初版计划</button>
           <button data-x="latest"><span class="em-ico">📄</span>最新计划</button>
           <button data-x="diff"><span class="em-ico">📊</span>差异对比</button>
         </div>
       </div>
-      <button id="themeToggle" class="btn" title="切换浅色 / 深色">🌙 深色</button>
-      <button id="roBtn" class="btn" title="只读模式开关（分享前开启，防止他人修改）">🔒 只读</button>
+      <button id="aiBtn" class="btn primary" title="AI 助手：描述需求自动生成任务清单">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2l1.9 5.3L19 9l-5.1 1.7L12 16l-1.9-5.3L5 9l5.1-1.7z"/><circle cx="18.6" cy="17.4" r="1.5"/><circle cx="5.4" cy="15.8" r="1.1"/></svg> AI 助手</button>
+      <button id="themeToggle" class="btn" title="切换浅色 / 深色">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6 6 0 0021 12.8z"/></svg></button>
+      <button id="roBtn" class="btn" title="只读模式开关（分享前开启，防止他人修改）">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> 只读</button>
     </div>
   </header>
+  <div id="scrim" class="hidden"></div>
   <div id="viewbar">
     <div class="seg">
       <button class="tab active" data-view="board">看板</button>
@@ -79,6 +89,13 @@
   <div class="modal-box">
     <div class="modal-head"><h3>选择产品模板</h3><button class="x" data-close>×</button></div>
     <input id="projName" class="inp" placeholder="项目名称（默认用模板名）">
+    <div class="tpl-bar">
+      <button class="btn" id="tplExportBtn" title="导出全部模板为 JSON，可分享给他人">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg> 导出模板</button>
+      <button class="btn" id="tplImportBtn" title="导入他人分享的模板 JSON（模板共创）">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V8"/><path d="M8 14l4-4 4 4"/><path d="M4 4h16"/></svg> 导入模板</button>
+      <span class="pi-sub" style="margin:0">模板共创：导出分享 / 导入社区模板</span>
+    </div>
     <div id="tplGrid" class="tpl-grid"></div>
   </div>
 </div>
@@ -195,16 +212,65 @@
 </div>
 
 <input type="file" id="importFile" accept=".json,.xlsx" style="display:none">
+<input type="file" id="tplImportFile" accept=".json,application/json" style="display:none">
 <div id="toast" class="toast hidden"></div>
+
+<!-- AI 助手：描述生成任务 -->
+<div id="aiModal" class="modal hidden">
+  <div class="modal-box" style="width:min(580px,94vw)">
+    <div class="modal-head"><h3>AI 助手 · 智能生成项目</h3><button class="x" data-close>×</button></div>
+    <div class="pi-sub">用一句话描述你的项目 / 产品，AI 自动拆解任务清单（阶段 + 工期 + 负责人建议）。</div>
+    <textarea id="aiDesc" class="inp" style="min-height:88px" placeholder="例：做一个智能门锁项目，含指纹/NFC 开锁、防技术开启、10 万次寿命测试，下周三启动"></textarea>
+    <div class="ai-actions">
+      <button class="btn primary" id="aiGenBtn">生成任务清单</button>
+      <button class="btn" id="aiSettingsOpen">AI 设置</button>
+      <span id="aiGenNote" class="pi-sub" style="margin:0"></span>
+    </div>
+    <div id="aiPreview" class="ai-preview"></div>
+    <div class="ai-actions" id="aiCreateRow" style="display:none;margin-top:14px">
+      <input id="aiProjName" class="inp" style="margin:0;flex:1" placeholder="项目名称">
+      <button class="btn primary" id="aiCreateBtn">创建项目</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 设置 -->
+<div id="aiSettingsModal" class="modal hidden">
+  <div class="modal-box" style="width:min(480px,94vw)">
+    <div class="modal-head"><h3>AI 设置</h3><button class="x" data-close>×</button></div>
+    <div class="pi-sub">兼容 OpenAI / 任意 OpenAI 格式接口（本地 Ollama、Azure、第三方代理均可）。Key 仅保存在本机 data/ai.json，不会上传。</div>
+    <input id="aiBase" class="inp" placeholder="Base URL（如 https://api.openai.com/v1）">
+    <input id="aiModel" class="inp" placeholder="模型名（如 gpt-4o-mini）">
+    <input id="aiKey" class="inp" type="password" placeholder="API Key（留空则使用模板规则兜底）">
+    <button class="btn primary" id="aiSaveBtn">保存设置</button>
+    <div id="aiSettingsMsg" class="pi-sub" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- AI 项目总结 -->
+<div id="aiSummaryModal" class="modal hidden">
+  <div class="modal-box" style="width:min(580px,94vw)">
+    <div class="modal-head"><h3>AI 项目总结</h3><button class="x" data-close>×</button></div>
+    <div class="pi-sub">由大模型基于项目数据生成（需配置 AI Key）。</div>
+    <textarea id="aiSummaryText" class="inp" style="min-height:170px" readonly></textarea>
+    <div class="ai-actions">
+      <button class="btn" id="aiSummaryCopy">复制</button>
+      <button class="btn primary" id="aiSummaryClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script src="/app.js?v=20260820-r51"></script>
 <script>
 (function(){
   var root = document.documentElement;
   var btn = document.getElementById('themeToggle');
   if(!btn) return;
+  var MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6 6 0 0021 12.8z"/></svg>';
+  var SUN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19 12a7 7 0 00-7-7"/></svg>';
   function apply(t){
     root.setAttribute('data-theme', t);
-    btn.textContent = (t === 'light') ? '🌙 深色' : '☀️ 浅色';
+    btn.innerHTML = (t === 'light') ? MOON + ' 深色' : SUN + ' 浅色';
     try{ localStorage.setItem('kb-theme', t); }catch(e){}
   }
   var saved = 'light';

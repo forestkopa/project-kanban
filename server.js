@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
@@ -14,6 +15,7 @@ const PROJECTS_FILE = path.join(DATA, DEMO_MODE ? 'projects.demo.json' : 'projec
 const TEMPLATES_FILE = path.join(ROOT, 'templates.json');
 const RO_FLAG = path.join(DATA, 'readonly.flag');
 const MAPPINGS_FILE = path.join(DATA, 'mappings.json');
+const AI_FILE = path.join(DATA, 'ai.json');
 
 function loadJSON(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } }
 // 写队列：所有落盘串行化，杜绝并发覆盖；原子写：临时文件→rename，崩溃不损坏原文件
@@ -302,10 +304,60 @@ if (!fs.existsSync(MAPPINGS_FILE)) saveJSON(MAPPINGS_FILE, []);
   } catch (e) { /* ignore */ }
 })();
 
+// 首次运行（非演示模式）若项目为空，自动播种一个示例项目，避免评委/用户看到空白首屏
+(() => {
+  if (DEMO_MODE) return;
+  try {
+    const ps = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf8'));
+    if (Array.isArray(ps) && ps.length === 0) {
+      const tpls = JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8'));
+      const tpl = (tpls.find(t => /音箱|语音|speaker/i.test(t.name)) || tpls[0]);
+      if (tpl) {
+        const seed = createFromTemplate(tpl, tpl.name + '（示例）', { type: 'C端', level: 'B', productType: 'AI', cert: 'CCC', engineers: { hardware: '张工', structure: '李工', project: '王工' } });
+        ps.push(seed);
+        fs.writeFileSync(PROJECTS_FILE, JSON.stringify(ps, null, 2));
+        console.log('[种子] 已生成示例项目：' + seed.name + '（' + seed.tasks.length + ' 个任务）');
+      }
+    }
+  } catch (e) { /* 不影响启动 */ }
+})();
+
+/* ---------- AI 助手：OpenAI 兼容接口（Node 原生 https，无额外依赖） ---------- */
+function loadAI() { return Object.assign({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', api_key: '' }, loadJSON(AI_FILE, {})); }
+function saveAI(cfg) { try { fs.writeFileSync(AI_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {} return cfg; }
+function aiConfigured(cfg) { return !!(cfg && cfg.api_key); }
+function chatCompletions(cfg, messages, temperature) {
+  return new Promise((resolve, reject) => {
+    const base = String(cfg.base_url || 'https://api.openai.com/v1').replace(/\/+$/, '');
+    let url; try { url = new URL(base + '/chat/completions'); } catch (e) { return reject(new Error('base_url 无效')); }
+    const payload = JSON.stringify({ model: cfg.model || 'gpt-4o-mini', messages, temperature: (typeof temperature === 'number' ? temperature : 0.7), stream: false });
+    const data = Buffer.from(payload);
+    const isHttps = url.protocol === 'https:';
+    const lib = isHttps ? https : require('http');
+    const options = {
+      hostname: url.hostname, port: url.port || (isHttps ? 443 : 80), path: url.pathname + url.search, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, 'Authorization': 'Bearer ' + (cfg.api_key || '') }, timeout: 60000
+    };
+    const req = lib.request(options, resp => {
+      let buf = ''; resp.on('data', d => buf += d);
+      resp.on('end', () => {
+        try {
+          const j = JSON.parse(buf);
+          const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+          if (t) resolve(t); else reject(new Error('AI 未返回内容: ' + (buf || '').slice(0, 160)));
+        } catch (e) { reject(new Error('解析 AI 响应失败: ' + (buf || '').slice(0, 160))); }
+      });
+    });
+    req.on('error', e => reject(e));
+    req.on('timeout', () => req.destroy(new Error('AI 请求超时')));
+    req.write(data); req.end();
+  });
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon'
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png'
 };
 function send(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); }
 const BODY_LIMIT = 10 * 1024 * 1024; // 请求体上限 10MB
@@ -404,6 +456,81 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // ---- AI 助手（OpenAI 兼容） ----
+    if (p === '/api/ai/config') {
+      if (req.method === 'GET') { const c = loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c) }); }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const c = loadAI();
+        if (body.base_url !== undefined) c.base_url = String(body.base_url).trim() || 'https://api.openai.com/v1';
+        if (body.model !== undefined) c.model = String(body.model).trim() || 'gpt-4o-mini';
+        if (body.api_key !== undefined) c.api_key = String(body.api_key);
+        saveAI(c);
+        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c) });
+      }
+      return send(res, 405, { error: '方法不允许' });
+    }
+    if (p === '/api/ai/chat' && req.method === 'POST') {
+      const body = await readBody(req);
+      const c = loadAI();
+      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      if (!messages.length) return send(res, 400, { error: 'messages 为空' });
+      try { const text = await chatCompletions(c, messages, body.temperature); return send(res, 200, { text }); }
+      catch (e) { return send(res, 502, { error: 'AI 调用失败: ' + e.message }); }
+    }
+    if (p === '/api/ai/generate-tasks' && req.method === 'POST') {
+      const body = await readBody(req);
+      const desc = String(body.description || '').trim();
+      if (!desc) return send(res, 400, { error: '请描述项目' });
+      const c = loadAI();
+      if (!aiConfigured(c)) {
+        // 离线兜底：基于内置模板的规则建议（非 LLM，界面会明确标注）
+        const tpls = loadJSON(TEMPLATES_FILE, []);
+        const tpl = tpls.find(t => /音箱|语音|speaker/i.test(t.name)) || tpls[0];
+        const nameMap = {}; (tpl ? tpl.phases || [] : []).forEach(ph => nameMap[ph.id] = ph.name);
+        const tasks = (tpl ? tpl.tasks : []).map(t => ({ title: t.title, phase: nameMap[t.phaseId] || '', estimateDays: t.estimateDays || 3, assignee: t.assignee || '' }));
+        return send(res, 200, { source: 'template', tasks, note: '未配置 AI：已用内置模板智能建议（规则生成，非大模型）' });
+      }
+      const sys = '你是智能硬件 NPI 项目经理。根据用户描述，仅输出一个 JSON 数组（不要任何解释文字、不要 markdown 代码块），每项结构：{title:任务名, phase:所属阶段(只能从"需求立项/设计开发/打样试制/测试验证/量产导入/上市运营"中选), estimateDays:工期天数(数字), assignee:建议负责角色}。';
+      try {
+        const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: desc }], 0.6);
+        const m = text.match(/\[[\s\S]*\]/);
+        const tasks = m ? JSON.parse(m[0]) : [];
+        if (!Array.isArray(tasks) || !tasks.length) return send(res, 502, { error: 'AI 未返回有效任务清单' });
+        return send(res, 200, { source: 'ai', tasks });
+      } catch (e) { return send(res, 502, { error: 'AI 生成失败: ' + e.message }); }
+    }
+    if (p === '/api/ai/summarize' && req.method === 'POST') {
+      const body = await readBody(req);
+      const proj = body.project;
+      if (!proj || !proj.tasks) return send(res, 400, { error: '缺少项目数据' });
+      const c = loadAI();
+      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
+      const total = (proj.tasks || []).length, done = (proj.tasks || []).filter(t => t.done).length;
+      const overdue = (proj.tasks || []).filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
+      const phaseStat = (proj.phases || []).map(ph => { const ts = (proj.tasks || []).filter(t => t.phaseId === ph.id); return ph.name + '：' + ts.filter(t => t.done).length + '/' + ts.length + ' 完成'; }).join('；');
+      const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文写一段 120 字以内的项目周报/总结，突出进度、风险与下一步。';
+      const user = `项目：${proj.name}\n整体进度：${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）\n逾期节点：${overdue}\n各阶段：${phaseStat}`;
+      try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
+      catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
+    }
+
+    // ---- 模板共创：导入社区模板 ----
+    if (p === '/api/templates/import' && req.method === 'POST') {
+      const body = await readBody(req);
+      let arr = body.templates;
+      if (!Array.isArray(arr)) { try { arr = JSON.parse(String(body.data || '[]')); } catch (e) { arr = []; } }
+      if (!Array.isArray(arr) || !arr.length) return send(res, 400, { error: '无模板数据' });
+      const cur = loadJSON(TEMPLATES_FILE, []);
+      let added = 0;
+      arr.forEach(t => {
+        if (t && t.name && Array.isArray(t.tasks) && !cur.some(x => x.id === t.id)) { cur.push(t); added++; }
+      });
+      if (added) saveJSON(TEMPLATES_FILE, cur);
+      return send(res, 200, { added });
+    }
+
     // 导出计划表（初版 / 最新），文件名区分
     const ex = p.match(/^\/api\/projects\/([^/]+)\/export$/);
     if (ex && req.method === 'GET') {
@@ -472,7 +599,10 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       if (!body || !body.data) return send(res, 400, { error: '缺少图片数据' });
       try {
-        const b64 = String(body.data).replace(/^data:image\/\w+;base64,/, '');
+        const raw = String(body.data || '');
+        const mm = raw.match(/^data:([^;]+);base64,/);
+        if (mm && !/^image\//.test(mm[1])) return send(res, 400, { error: '仅支持图片格式 (image/*)' });
+        const b64 = raw.replace(/^data:image\/\w+;base64,/, '');
         fs.writeFileSync(path.join(PUBLIC, 'brand-logo.png'), Buffer.from(b64, 'base64'));
         return send(res, 200, { ok: true });
       } catch (e) { return send(res, 400, { error: '图片数据无效' }); }
@@ -486,10 +616,22 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'GET') return send(res, 200, projects);
         if (req.method === 'POST') {
           const body = await readBody(req);
-          const tpls = loadJSON(TEMPLATES_FILE, []);
-          const tpl = tpls.find(t => t.id === body.templateId);
-          if (!tpl) return send(res, 400, { error: '模板不存在' });
-          const proj = createFromTemplate(tpl, body.name, { type: body.type, level: body.level, productType: body.productType, cert: body.cert, icon: body.icon, color: body.color, engineers: body.engineers });
+          let proj;
+          if (body && body.templateId) {
+            const tpls = loadJSON(TEMPLATES_FILE, []);
+            const tpl = tpls.find(t => t.id === body.templateId);
+            if (!tpl) return send(res, 400, { error: '模板不存在' });
+            proj = createFromTemplate(tpl, body.name, { type: body.type, level: body.level, productType: body.productType, cert: body.cert, icon: body.icon, color: body.color, engineers: body.engineers });
+          } else if (Array.isArray(body.phases) && Array.isArray(body.tasks)) {
+            // 直接由阶段 + 任务创建（AI 生成 / 模板导入），按阶段顺序排期
+            const startDate = body.startDate || isoDate(new Date());
+            const phases = body.phases.map((ph, i) => ({ id: ph.id || ('p' + (i + 1)), name: ph.name || ('阶段' + (i + 1)), color: ph.color || PHASE_COLORS[i % PHASE_COLORS.length] }));
+            const tasks = body.tasks.map(t => ({ id: uid(), title: t.title || '未命名任务', phaseId: t.phaseId || phases[0].id, note: t.note || '', estimateDays: t.estimateDays || 0, assignee: t.assignee || '', done: !!t.done, startDate: null, dueDate: null }));
+            scheduleTasks(phases, tasks, startDate);
+            proj = { id: uid(), name: body.name || '新项目', templateId: null, icon: body.icon || '◆', color: body.color || '#0a84ff', startDate, type: body.type || 'C端', level: body.level || 'B', productType: body.productType || '', cert: body.cert || '', status: 'active', completedAt: null, engineers: body.engineers || { hardware: '', structure: '', project: '' }, createdAt: new Date().toISOString(), phases, tasks, baseline: tasks.map(t => ({ ...t })) };
+          } else {
+            return send(res, 400, { error: '请提供 templateId 或 phases + tasks' });
+          }
           projects.push(proj); saveJSON(PROJECTS_FILE, projects); return send(res, 201, proj);
         }
         return send(res, 405, { error: '方法不允许' });

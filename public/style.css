@@ -323,8 +323,30 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 
 @media (max-width: 720px) {
   .ptile { flex-basis: 100%; }
-  #sidebar { width: 100%; min-width: 0; position: absolute; z-index: 50; height: 100%; transform: translateX(-100%); transition: transform .2s; }
+  #menuBtn { display: inline-flex; }
+  #sidebar { width: 84%; max-width: 320px; min-width: 0; position: fixed; top: 0; left: 0; z-index: 100; height: 100%; transform: translateX(-100%); transition: transform .22s ease; box-shadow: 0 0 40px rgba(0,0,0,.28); }
+  #sidebar.open { transform: translateX(0); }
+  #topbar { flex-wrap: wrap; height: auto; padding: 10px 14px; gap: 10px; }
+  .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; }
+  .top-actions .btn { flex: 1 1 auto; }
+  #projTitle { font-size: 16px; flex: 1; min-width: 0; }
 }
+
+/* ---------- 移动端抽屉 + 汉堡 ---------- */
+.icon-btn { padding: 9px 11px; display: none; }
+#menuBtn { display: none; }
+
+/* ---------- AI 助手 ---------- */
+.ai-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.tpl-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.ai-preview { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ai-row { display: flex; align-items: center; gap: 8px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.ai-row .ar-seq { width: 22px; height: 22px; flex: none; border-radius: 6px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.ai-row .ar-title { flex: 1; min-width: 0; border: none; background: transparent; color: var(--text); font-size: 13.5px; font-family: inherit; padding: 4px 2px; }
+.ai-row .ar-title:focus { outline: none; }
+.ai-row .ar-phase { font-size: 11px; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-family: inherit; }
+.ai-row .ar-days { width: 58px; flex: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 12px; font-family: inherit; background: var(--surface); color: var(--text); text-align: center; }
+.ai-empty { font-size: 13px; color: var(--text-3); padding: 10px 2px; }
 
 /* =========================================================
    日报 / 周报实时展示页（阶段泳道图）

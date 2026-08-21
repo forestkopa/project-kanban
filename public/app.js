@@ -6,6 +6,13 @@ const PRODUCT_TYPE_COLORS = {
   'WiFi dongle': '#14b8a6', '基础hub': '#94a3b8'
 };
 const LEVEL_COLORS = { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' };
+const ICON = {
+  edit: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+  del: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2l1.9 5.3L19 9l-5.1 1.7L12 16l-1.9-5.3L5 9l5.1-1.7z"/><circle cx="18.6" cy="17.4" r="1.5"/><circle cx="5.4" cy="15.8" r="1.1"/></svg>',
+  box: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg>',
+  tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>'
+};
 let state = { projects: [], templates: [], mappings: [], currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), readonly: false };
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
@@ -87,7 +94,7 @@ function render() {
   const ptc = PRODUCT_TYPE_COLORS[p.productType] || '#8E8E93';
   $('#projTitle').innerHTML = `<span class="pdot" style="background:${p.color}"></span> ${esc(p.name)} <span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}`;
   const isArch = (p.status || 'active') === 'archived';
-  $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">🏷 ${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">📦 已归档</span>' : ''}`;
+  $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">' + ICON.box + ' 已归档</span>' : ''}`;
   if (state.view === 'board') renderBoard(p);
   else if (state.view === 'gantt') renderGantt(p);
   else if (state.view === 'calendar') renderCalendar(p);
@@ -117,8 +124,8 @@ function projCard(p, dim) {
   const ptc = PRODUCT_TYPE_COLORS[p.productType] || '#8E8E93';
   el.innerHTML = `<div class="proj-top"><span class="dot" style="background:${p.color}"></span><span class="pname">${esc(p.name)}</span><span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}</div>
     <div class="bar"><div class="bar-fill" style="width:${pc}%;background:${p.color}"></div></div>
-    <div class="pmeta">${pc}% · ${p.tasks.filter(t => t.done).length}/${p.tasks.length}${p.cert ? `<span class="cert-tag">🏷 ${esc(p.cert)}</span>` : ''}${dim ? ' · 📦已归档' : ''}</div>
-    <button class="proj-edit" title="编辑项目信息">✎</button>`;
+    <div class="pmeta">${pc}% · ${p.tasks.filter(t => t.done).length}/${p.tasks.length}${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${dim ? ' · ' + ICON.box + '已归档' : ''}</div>
+    <button class="proj-edit" title="编辑项目信息">${ICON.edit}</button>`;
   el.querySelector('.proj-edit').onclick = e => {
     e.stopPropagation();
     state.currentId = p.id;
@@ -174,7 +181,7 @@ function taskCard(p, t, ph) {
     <label class="chk"><input type="checkbox" ${t.done ? 'checked' : ''} ${state.readonly ? 'disabled' : ''}><span class="ctitle">${esc(t.title)}</span></label>
     ${t.note ? `<div class="cnote">${esc(t.note)}</div>` : ''}
     <div class="cmeta"><span class="phase" style="color:${ph.color}">${esc(ph.name)}</span>${t.assignee ? `<span class="who">@${esc(t.assignee)}</span>` : ''}${t.estimateDays ? `<span class="days">${t.estimateDays}d</span>` : ''}</div>
-    <div class="cacts"><button class="mini" data-edit>✎</button><button class="mini del" data-del>🗑</button></div>`;
+    <div class="cacts"><button class="mini" data-edit title="编辑">${ICON.edit}</button><button class="mini del" data-del title="删除">${ICON.del}</button></div>`;
   el.querySelector('input').onchange = async e => {
     try { await api(`/projects/${p.id}/tasks/${t.id}`, { method: 'PUT', body: JSON.stringify({ done: e.target.checked }) }); t.done = e.target.checked; render(); }
     catch (err) { toast(err.message); }
@@ -683,6 +690,121 @@ $$('.modal').forEach(m => m.onclick = e => { if (e.target === m) m.classList.add
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal').forEach(m => m.classList.add('hidden')); });
 
 /* =========================================================
+   AI 助手 + 移动端抽屉 + 模板共创
+   ========================================================= */
+const PHASE_OPTIONS = ['需求立项', '设计开发', '打样试制', '测试验证', '量产导入', '上市运营'];
+let aiTasks = null;
+
+/* ---- 移动端抽屉 ---- */
+function openSidebar() { $('#sidebar').classList.add('open'); $('#scrim').classList.remove('hidden'); }
+function closeSidebar() { $('#sidebar').classList.remove('open'); $('#scrim').classList.add('hidden'); }
+$('#menuBtn').onclick = openSidebar;
+$('#scrim').onclick = closeSidebar;
+$$('.tab').forEach(b => { const o = b.onclick; b.onclick = () => { o && o(); closeSidebar(); }; });
+
+/* ---- AI 助手：生成任务清单 ---- */
+async function loadAiConfig() {
+  try { const c = await api('/ai/config'); $('#aiGenNote').textContent = c.configured ? ('已接入：' + (c.model || '')) : '未配置 AI Key：将使用内置模板智能建议'; return c; }
+  catch (e) { return null; }
+}
+function openAiModal() { $('#aiModal').classList.remove('hidden'); $('#aiPreview').innerHTML = ''; $('#aiCreateRow').style.display = 'none'; $('#aiGenNote').textContent = ''; loadAiConfig(); $('#aiDesc').focus(); }
+$('#aiBtn').onclick = openAiModal;
+async function aiGenerate() {
+  const desc = $('#aiDesc').value.trim();
+  if (!desc) { toast('请先描述你的项目'); return; }
+  const btn = $('#aiGenBtn'); btn.disabled = true; const old = btn.textContent; btn.textContent = '生成中…';
+  try {
+    const r = await api('/ai/generate-tasks', { method: 'POST', body: JSON.stringify({ description: desc }) });
+    aiTasks = (r.tasks || []).map(t => ({ title: String(t.title || ''), phase: String(t.phase || ''), estimateDays: Number(t.estimateDays) || 3, assignee: String(t.assignee || '') }));
+    $('#aiGenNote').textContent = r.note || (r.source === 'ai' ? '由大模型生成' : '');
+    renderAiPreview(aiTasks);
+    $('#aiCreateRow').style.display = 'flex';
+    $('#aiProjName').value = desc.slice(0, 24) || 'AI 生成项目';
+  } catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+function renderAiPreview(tasks) {
+  const box = $('#aiPreview'); box.innerHTML = '';
+  if (!tasks.length) { box.innerHTML = '<div class="ai-empty">未生成任务，换个描述试试。</div>'; return; }
+  tasks.forEach((t, i) => {
+    const row = document.createElement('div'); row.className = 'ai-row';
+    row.innerHTML = `<span class="ar-seq">${i + 1}</span>
+      <input class="ar-title" value="${esc(t.title)}" data-i="${i}">
+      <select class="ar-phase" data-i="${i}">${PHASE_OPTIONS.map(o => `<option ${o === t.phase ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
+      <input class="ar-days" type="number" min="0" value="${t.estimateDays}" data-i="${i}">`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('.ar-title').forEach(el => el.oninput = () => { aiTasks[el.dataset.i].title = el.value; });
+  box.querySelectorAll('.ar-phase').forEach(el => el.onchange = () => { aiTasks[el.dataset.i].phase = el.value; });
+  box.querySelectorAll('.ar-days').forEach(el => el.oninput = () => { aiTasks[el.dataset.i].estimateDays = Number(el.value) || 0; });
+}
+async function aiCreate() {
+  if (!aiTasks || !aiTasks.length) { toast('先生成任务清单'); return; }
+  const name = ($('#aiProjName').value || 'AI 生成项目').trim();
+  const order = [], map = {};
+  aiTasks.forEach(t => { const ph = t.phase || PHASE_OPTIONS[0]; if (!map[ph]) { map[ph] = 'p' + (order.length + 1); order.push({ id: map[ph], name: ph, color: PHASE_COLORS[order.length % PHASE_COLORS.length] }); } });
+  const phases = order.length ? order : [{ id: 'p1', name: PHASE_OPTIONS[0], color: PHASE_COLORS[0] }];
+  const tasks = aiTasks.map(t => ({ title: t.title || '未命名', phaseId: map[t.phase || PHASE_OPTIONS[0]] || phases[0].id, estimateDays: t.estimateDays || 0, assignee: t.assignee || '' }));
+  try {
+    const np = await api('/projects', { method: 'POST', body: JSON.stringify({ name, phases, tasks, type: 'C端', level: 'B' }) });
+    state.projects.push(np); state.currentId = np.id; $('#aiModal').classList.add('hidden'); aiTasks = null;
+    toast('项目已创建：' + np.name); render();
+  } catch (e) { toast(e.message); }
+}
+$('#aiGenBtn').onclick = aiGenerate;
+$('#aiCreateBtn').onclick = aiCreate;
+
+/* ---- AI 设置 ---- */
+async function openAiSettings() {
+  $('#aiSettingsModal').classList.remove('hidden');
+  try { const c = await api('/ai/config'); $('#aiBase').value = c.base_url || ''; $('#aiModel').value = c.model || ''; $('#aiKey').value = ''; $('#aiSettingsMsg').textContent = c.configured ? '当前已配置 Key' : '尚未配置 Key'; }
+  catch (e) { $('#aiSettingsMsg').textContent = ''; }
+}
+$('#aiSettingsOpen').onclick = openAiSettings;
+$('#aiSaveBtn').onclick = async () => {
+  try {
+    const r = await api('/ai/config', { method: 'POST', body: JSON.stringify({ base_url: $('#aiBase').value, model: $('#aiModel').value, api_key: $('#aiKey').value }) });
+    $('#aiSettingsMsg').textContent = r.configured ? '已保存（Key 已写入本机 data/ai.json）' : '已保存（未填 Key，将走模板规则兜底）';
+    toast('AI 设置已保存');
+  } catch (e) { $('#aiSettingsMsg').textContent = '保存失败：' + e.message; }
+};
+
+/* ---- AI 项目总结 ---- */
+async function aiSummarize() {
+  const p = proj(); if (!p) { toast('请先选择项目'); return; }
+  const m = $('#aiSummaryModal'); const ta = $('#aiSummaryText');
+  m.classList.remove('hidden'); ta.value = '生成中…';
+  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ project: p }) }); ta.value = r.text || ''; }
+  catch (e) { ta.value = '生成失败：' + e.message; }
+}
+$('#aiSummaryClose').onclick = () => $('#aiSummaryModal').classList.add('hidden');
+$('#aiSummaryCopy').onclick = () => { const ta = $('#aiSummaryText'); ta.select(); try { document.execCommand('copy'); } catch (e) {} toast('已复制'); };
+
+/* ---- 模板共创：导出 / 导入 ---- */
+$('#tplExportBtn').onclick = async () => {
+  try {
+    const data = await api('/templates');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'kanban-templates.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('已导出 ' + data.length + ' 个模板');
+  } catch (e) { toast(e.message); }
+};
+$('#tplImportBtn').onclick = () => $('#tplImportFile').click();
+$('#tplImportFile').onchange = async (e) => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  try {
+    const list = JSON.parse(await f.text());
+    const arr = Array.isArray(list) ? list : (list.templates || []);
+    const r = await api('/templates/import', { method: 'POST', body: JSON.stringify({ templates: arr }) });
+    state.templates = await api('/templates');
+    toast('已导入 ' + r.added + ' 个新模板');
+    openTplModal();
+  } catch (err) { toast('导入失败：' + err.message); }
+  finally { e.target.value = ''; }
+};
+
+/* =========================================================
    全景视图（聚合所有项目）
    ========================================================= */
 function allPhases() {
@@ -930,6 +1052,8 @@ function currentPhaseOf(p) {
 }
 function renderReport() {
   const wrap = $('#report'); wrap.innerHTML = '';
+  if (proj()) { $('#viewActions').innerHTML = `<button class="btn" id="aiSummaryBtn">${ICON.spark} AI 总结</button>`; const b = $('#aiSummaryBtn'); if (b) b.onclick = aiSummarize; }
+  else $('#viewActions').innerHTML = '';
   if (state.view === 'daily') buildDaily(wrap);
   else buildWeekly(wrap);
 }
@@ -1098,6 +1222,8 @@ function buildWeekly(wrap) {
 
 /* ---------- 月度计划：本月内「试产发布」的项目 + 勾选纳入计划 ---------- */
 function renderMonthly() {
+  if (proj()) { $('#viewActions').innerHTML = `<button class="btn" id="aiSummaryBtn">${ICON.spark} AI 总结</button>`; const b = $('#aiSummaryBtn'); if (b) b.onclick = aiSummarize; }
+  else $('#viewActions').innerHTML = '';
   const y = state.monthlyDate.getFullYear(), mo = state.monthlyDate.getMonth();
   const moIso = y + '-' + String(mo + 1).padStart(2, '0');
   const moFirst = isoDate(new Date(y, mo, 1)), moEnd = isoDate(new Date(y, mo + 1, 0));
