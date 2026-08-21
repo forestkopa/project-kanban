@@ -33,6 +33,9 @@ async function api(path, opts = {}) {
   return r.status === 204 ? null : r.json();
 }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 1800); }
+// 输入防抖：连续修改只在停顿后提交一次
+const _db = {};
+function debounce(key, fn, ms) { clearTimeout(_db[key]); _db[key] = setTimeout(fn, ms || 300); }
 function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function proj() { return state.projects.find(p => p.id === state.currentId); }
 function progress(p) {
@@ -285,9 +288,12 @@ function syncFormulaBox(p) {
 }
 function renderGantt(p) {
   $('#viewActions').innerHTML = `<span class="va-label">项目开始</span><input type="date" id="projStart" class="inp" value="${p.startDate || ''}"><button class="btn" id="reschedBtn" title="保留公式，按公式全量重算一遍（无公式则顺序排期）">重新排期</button>`;
-  $('#projStart').onchange = async e => {
-    try { await api('/projects/' + p.id, { method: 'PUT', body: JSON.stringify({ startDate: e.target.value }) }); p.startDate = e.target.value; const np = await api('/projects/' + p.id); Object.assign(p, np); render(); }
-    catch (err) { toast(err.message); }
+  $('#projStart').onchange = e => {
+    const v = e.target.value;
+    debounce('ps', async () => {
+      try { await api('/projects/' + p.id, { method: 'PUT', body: JSON.stringify({ startDate: v }) }); p.startDate = v; const np = await api('/projects/' + p.id); Object.assign(p, np); render(); }
+      catch (err) { toast(err.message); }
+    });
   };
   $('#reschedBtn').onclick = async () => {
     try { const np = await api('/projects/' + p.id + '/reschedule', { method: 'POST' }); Object.assign(p, np); render(); toast('已按公式重算排期'); }
@@ -347,34 +353,40 @@ function renderGantt(p) {
   $$('.g-bar', wrap).forEach(b => b.onclick = () => { const t = p.tasks.find(x => x.id === b.dataset.tid); if (t) openTaskModal(p, t); });
   $$('.g-date-s', wrap).forEach(inp => {
     inp.onfocus = () => { ganttSel = { tid: inp.dataset.tid, field: 'start' }; ganttRM = rm; syncFormulaBox(p); };
-    inp.onchange = async e => {
+    inp.onchange = e => {
       const t = p.tasks.find(x => x.id === e.target.dataset.tid); if (!t) return;
       const v = e.target.value;
-      try {
-        await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ startDate: v }) });
-        const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 级联：后续任务日期同步更新
-      } catch (err) { toast(err.message); }
+      debounce('ds-' + t.id, async () => {
+        try {
+          await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ startDate: v }) });
+          const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 级联：后续任务日期同步更新
+        } catch (err) { toast(err.message); }
+      });
     };
   });
   $$('.g-date-e', wrap).forEach(inp => {
     inp.onfocus = () => { ganttSel = { tid: inp.dataset.tid, field: 'due' }; ganttRM = rm; syncFormulaBox(p); };
-    inp.onchange = async e => {
+    inp.onchange = e => {
       const t = p.tasks.find(x => x.id === e.target.dataset.tid); if (!t) return;
       const v = e.target.value;
-      try {
-        await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ dueDate: v }) });
-        const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 级联：后续任务日期同步更新
-      } catch (err) { toast(err.message); }
+      debounce('de-' + t.id, async () => {
+        try {
+          await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ dueDate: v }) });
+          const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 级联：后续任务日期同步更新
+        } catch (err) { toast(err.message); }
+      });
     };
   });
   $$('.g-days-in', wrap).forEach(inp => {
-    inp.onchange = async e => {
+    inp.onchange = e => {
       const t = p.tasks.find(x => x.id === e.target.dataset.tid); if (!t) return;
       const v = Math.max(0, parseInt(e.target.value) || 0);
-      try {
-        await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ estimateDays: v }) });
-        const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 改工期 → 结束日期按公式级联重算
-      } catch (err) { toast(err.message); }
+      debounce('gd-' + t.id, async () => {
+        try {
+          await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ estimateDays: v }) });
+          const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 改工期 → 结束日期按公式级联重算
+        } catch (err) { toast(err.message); }
+      });
     };
   });
   const fbox = $('#gFormulaBox');
@@ -392,7 +404,7 @@ function renderGantt(p) {
         const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 改公式 → 级联重算
       } catch (err) { toast(err.message); }
     };
-    fbox.onchange = applyFormula;
+    fbox.onchange = () => debounce('gf', applyFormula);
     fbox.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); fbox.blur(); } };
   }
   ganttRM = rm;
