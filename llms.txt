@@ -1,0 +1,33 @@
+# project-kanban — LLM 知识库索引
+
+> 项目：多项目管理个人看板（智能硬件产品模板），Node.js 零框架后端 + 原生 JS 前端。
+> 本文件给 LLM 使用：需要查某主题时，读取对应 `docs/knowledge/` 下的笔记路径。
+> 更完整的 AI 协作上下文见 `docs/开发备忘.md`。
+
+## 知识笔记（原子化）
+
+- docs/knowledge/00-知识地图(MOC).md — 知识库总索引，链接所有原子笔记
+- docs/knowledge/01-部署与双实例.md — 启动命令、端口约定(5180演示/5181正式)、Cloudflare 隧道、共享文件注意
+- docs/knowledge/02-demo正式版机制.md — DEMO_MODE 开关(server.js L10)、8 处分支点表、前端通过 /api/readonly 感知、watchdog 双实例分工
+- docs/knowledge/03-看板业务规则.md — 列宽 calc((100%-80px)/6) 方案、分组折叠、拖拽排序、深色主题按钮配色变量
+- docs/knowledge/04-汇报与AI总结.md — 日报/周报/月报/全景全局化、归档窗口(completedAt)、AI 总结后端 /api/ai/summarize
+- docs/knowledge/05-项目信息选项.md — 工程师姓名/认证纯手填、类型/等级可配置(options.json)、工程师类型增删
+- docs/knowledge/06-模板体系.md — 无 JSON 导入(仅 xlsx)、参考模版导入、reference-xlsx 端点、内置 4 模板、templates.json 双实例共享
+- docs/knowledge/07-甘特公式引擎.md — 甘特方言识别(D/E 日期 F 天数 WORKDAY.INTL)、级联规则、off 数值偏移坑、状态列留空
+- docs/knowledge/08-Excel导出.md — xlsx-js-style 周报待办导出、矢车菊蓝配色表(#1F3864/#B4C7E7/#F2F7FD)
+- docs/knowledge/09-GitHub托管与换机.md — 私有仓库、敏感文件清单(gitignore)、换机重配项、遗留(mappings.json死文件/projects.json入库)、常用命令
+
+## 其它文档
+
+- docs/开发备忘.md — AI 协作总入口（上述笔记的汇总版）
+- docs/PRD.md — 产品需求文档
+- docs/参赛说明.md — 参赛说明
+- docs/操作手册.md — 用户操作手册
+- README.md — 项目说明与启动
+
+## 关键约定速记
+
+- 端口：5180=demo(公网), 5181=正式(本机)；隧道指向 5180
+- 模式开关：`node server.js --demo` 为演示
+- 数据隔离：projects.demo.json(脱敏) vs projects.json(真实)
+- 敏感文件不外传：ai.json / auth.token / tunnel-url.txt / options.json
