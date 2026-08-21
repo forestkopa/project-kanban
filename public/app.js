@@ -1413,7 +1413,7 @@ async function downloadTodoExcel() {
     const blob = await r.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = '周报待办清单.xls';
+    a.download = '周报待办清单.xlsx';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   } catch (err) { toast('导出失败：' + err.message); }

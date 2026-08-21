@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const XLSX = require('xlsx');
+const XLSXS = require('xlsx-js-style'); // 支持单元格样式（周报待办导出用）
 
 const PORT = process.env.PORT || 5180;
 const DEMO_MODE = process.argv.includes('--demo');
@@ -128,9 +129,8 @@ function buildDiffXlsx(proj) {
   XLSX.utils.book_append_sheet(wb, ws, '差异对比');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
-function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-/* 周报待办清单导出：生成带样式的 HTML 表格（.xls 扩展名），Excel/WPS 打开保留颜色/边框/合并/列宽 */
-function buildTodoXls(projects, monIso, sunIso) {
+/* 周报待办清单导出：生成带样式的 xlsx（矢车菊蓝·着色1·深度50% 标题/表头 + 标准 Excel 网格） */
+function buildTodoXlsx(projects, monIso, sunIso) {
   const fmt = s => s ? s.slice(5).replace('-', '/') : '';
   const groups = [];
   (projects || []).forEach(p => {
@@ -141,26 +141,46 @@ function buildTodoXls(projects, monIso, sunIso) {
     if (list.length) groups.push({ p, list });
   });
   groups.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
-  const title = '项目周报 · 待办清单（' + fmt(monIso) + ' — ' + fmt(sunIso) + '）';
-  const th = c => `<th style="background:#0A84FF;color:#fff;font-weight:bold;border:1px solid #7FB0E8;padding:7px 10px;text-align:center">${c}</th>`;
-  let rows = `<tr><td colspan="7" style="background:#0A84FF;color:#fff;font-size:15pt;font-weight:bold;text-align:center;border:1px solid #0A84FF;padding:10px">${title}</td></tr>`;
-  rows += `<tr>${th('项目')}${th('任务')}${th('里程碑')}${th('工期(天)')}${th('开始日期')}${th('截止日期')}${th('状态')}</tr>`;
+  // 矢车菊蓝 着色1 深度50%（Excel 主题色 #1F3864）；表头同色，数据隔行浅蓝
+  const ACCENT1_50 = '1F3864', ZEBRA = 'F2F7FD';
+  const THIN = { style: 'thin', color: { rgb: 'B4C7E7' } };
+  const BD = { top: THIN, bottom: THIN, left: THIN, right: THIN };
+  const FONT = { name: '微软雅黑' };
+  const rows = [[`项目周报 · 待办清单（${fmt(monIso)} — ${fmt(sunIso)}）`], ['项目', '任务', '里程碑', '工期(天)', '开始日期', '截止日期', '状态']];
+  groups.forEach(({ p, list }) => list.forEach((t, ti) => {
+    rows.push([ti === 0 ? p.name : '', t.title + (t.isMilestone ? ' ⚑' : ''), t.isMilestone ? '⚑' : '', t.estimateDays || '', fmt(t.startDate), fmt(t.dueDate), t.overdue ? '⚠ 逾期' : '本周待办']);
+  }));
+  const ws = XLSXS.utils.aoa_to_sheet(rows);
+  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  let rr = 2;
+  groups.forEach(({ list }) => { if (list.length > 1) merges.push({ s: { r: rr, c: 0 }, e: { r: rr + list.length - 1, c: 0 } }); rr += list.length; });
+  ws['!merges'] = merges;
+  ws['!cols'] = [{ wch: 20 }, { wch: 36 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  ws['!rows'] = [{ hpt: 34 }, { hpt: 26 }];
+  const setCell = (r, c, s) => { const a = XLSXS.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].s = s; };
+  const titleS = { font: { ...FONT, bold: true, sz: 16, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
+  for (let c = 0; c < 7; c++) setCell(0, c, titleS);
+  const headS = { font: { ...FONT, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
+  for (let c = 0; c < 7; c++) setCell(1, c, headS);
+  let r = 2;
   groups.forEach(({ p, list }, gi) => {
-    const pColor = p.color || '#0A84FF';
+    const zebra = gi % 2 === 0 ? 'FFFFFF' : ZEBRA;
     list.forEach((t, ti) => {
-      const bg = gi % 2 === 0 ? '#FFFFFF' : '#F5F8FF';
-      rows += `<tr style="background:${bg}">`;
-      if (ti === 0) rows += `<td rowspan="${list.length}" style="border:1px solid #C9D6E8;padding:7px 10px;font-weight:bold;border-left:4px solid ${pColor}">${escHtml(p.name)}</td>`;
-      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px">${escHtml(t.title)}${t.isMilestone ? ' <span style="color:#D48806">⚑</span>' : ''}</td>`;
-      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${t.isMilestone ? '<span style="color:#D48806">⚑</span>' : ''}</td>`;
-      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${t.estimateDays || ''}</td>`;
-      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${fmt(t.startDate)}</td>`;
-      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${fmt(t.dueDate)}</td>`;
-      rows += `<td style="border:1px solid #C9D6E8;padding:6px 10px;text-align:center">${t.overdue ? '<span style="color:#E0241B;font-weight:bold">⚠ 逾期</span>' : '<span style="color:#1F8A5B">本周待办</span>'}</td>`;
-      rows += '</tr>';
+      const ov = t.overdue;
+      for (let c = 0; c < 7; c++) {
+        setCell(r, c, {
+          font: { ...FONT, color: { rgb: ov && c === 6 ? 'E0241B' : '000000' }, bold: !!(ov && c === 6) },
+          fill: { fgColor: { rgb: ti === 0 && c === 0 ? ZEBRA : zebra } },
+          alignment: { horizontal: c === 0 || c === 1 ? 'left' : 'center', vertical: 'center' },
+          border: BD
+        });
+      }
+      r++;
     });
   });
-  return '<html><head><meta charset="utf-8"></head><body><table cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:\'Microsoft YaHei\',sans-serif;font-size:10.5pt">' + rows + '</table></body></html>';
+  const wb = XLSXS.utils.book_new();
+  XLSXS.utils.book_append_sheet(wb, ws, '待办清单');
+  return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 /* ---------- 参考模版：由内置模版生成甘特方言 Excel（开始/截止带公式 → 导入后级联） ---------- */
 function workdayAdd(baseStr, n) {
@@ -671,20 +691,20 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return send(res, 400, { error: '解析参考模版失败: ' + e.message }); }
     }
 
-    // 周报待办清单导出（HTML 表格 → .xls，格式美观，Excel/WPS 直接打开）
+    // 周报待办清单导出（带样式 xlsx）
     if (p === '/api/reports/todo-export' && req.method === 'POST') {
       const body = await readBody(req);
       if (!Array.isArray(body.projects)) return send(res, 400, { error: '缺少项目数据' });
       const monIso = body.mon || isoDate(new Date()), sunIso = body.sun || monIso;
-      const html = buildTodoXls(body.projects, monIso, sunIso);
+      const buf = buildTodoXlsx(body.projects, monIso, sunIso);
       const date = isoDate(new Date()).replace(/-/g, '');
-      const ascii = 'weekly_todo_' + date + '.xls';
-      const utf8 = '周报待办清单_' + date + '.xls';
+      const ascii = 'weekly_todo_' + date + '.xlsx';
+      const utf8 = '周报待办清单_' + date + '.xlsx';
       res.writeHead(200, {
-        'Content-Type': 'application/vnd.ms-excel; charset=utf-8',
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`
       });
-      return res.end('\ufeff' + html);
+      return res.end(buf);
     }
 
     // 导出计划表（初版 / 最新），文件名区分
