@@ -30,7 +30,7 @@ function log(msg) { console.log(new Date().toISOString() + ' [watchdog] ' + msg)
 async function ensureServer() {
   if (await isUp()) return;
   log('服务器未响应，重新拉起 server.js');
-  try { spawn(NODE, [SERVER], { cwd: ROOT, detached: true, stdio: 'ignore' }).unref(); } catch (e) { log('拉起失败: ' + e.message); }
+  try { spawn(NODE, [SERVER, '--demo'], { cwd: ROOT, detached: true, stdio: 'ignore' }).unref(); } catch (e) { log('拉起失败: ' + e.message); }
 }
 
 function cloudflaredRunning() {
