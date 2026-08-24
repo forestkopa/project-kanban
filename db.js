@@ -235,6 +235,7 @@ function reportByUser() {
     FROM users u
     LEFT JOIN projects p ON p.owner_id=u.id
     LEFT JOIN tasks t ON t.project_id=p.id
+    WHERE u.name != 'guest'  -- 排除系统游客账号（guest 无项目，不参与聚合）
     GROUP BY u.id ORDER BY proj_cnt DESC, uname
   `).all();
   const phRows = db.prepare(`
@@ -243,6 +244,7 @@ function reportByUser() {
     JOIN projects p ON p.owner_id=u.id
     JOIN phases ph ON ph.project_id=p.id
     LEFT JOIN tasks t ON t.project_id=p.id AND t.phase_id=ph.id
+    WHERE u.name != 'guest'
     GROUP BY u.id, ph.id ORDER BY u.name, ph.seq
   `).all();
   const byUser = {};
