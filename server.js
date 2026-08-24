@@ -540,9 +540,21 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'GET' && parseInt(req.headers['content-length'] || '0', 10) > BODY_LIMIT) {
       return send(res, 413, { error: '请求体过大（上限 10MB）' });
     }
+    // 自助改密（所有登录用户可调，含 viewer）
+    if (p === '/api/password' && req.method === 'POST') {
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      const body = await readBody(req);
+      const err = db.changePassword(req.user.id, String(body.old || ''), String(body.next || ''));
+      if (err) return send(res, 400, { error: err });
+      return send(res, 200, { ok: true });
+    }
     // 最小鉴权：写操作必须登录（GET 查询不受限，projects 列表在路由内另行校验登录）
     if (req.method !== 'GET' && !authorized(req)) {
       return send(res, 401, { error: '未授权：请先登录（X-Auth-Token）' });
+    }
+    // viewer 只读：任何写操作一律拒绝（含项目/任务/选项/AI/用户）
+    if (req.method !== 'GET' && req.user && req.user.role === 'viewer') {
+      return send(res, 403, { error: '只读访客，无修改权限' });
     }
     // 用户管理（admin）：列出 / 新建用户
     if (p === '/api/users') {
@@ -554,15 +566,18 @@ const server = http.createServer(async (req, res) => {
         const pw = String(body.password || '');
         if (!name || pw.length < 6) return send(res, 400, { error: '用户名必填，密码至少 6 位' });
         if (db.getUserByName(name)) return send(res, 400, { error: '用户名已存在' });
-        const u = db.createUser(name, pw, body.role === 'admin' ? 'admin' : 'user');
+        const role = ['admin', 'member', 'viewer'].includes(body.role) ? body.role : 'member';
+        const u = db.createUser(name, pw, role);
         return send(res, 201, { id: u.id, name: u.name, role: u.role });
       }
       return send(res, 405, { error: '方法不允许' });
     }
-    // 按人聚合报告（admin 全量；演示版全量）
+    // 按人聚合报告：admin/viewer 全量；member 仅自己的统计
     if (p === '/api/report' && req.method === 'GET') {
-      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可查看汇总报告' });
-      return send(res, 200, db.reportByUser());
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      const full = DEMO_MODE || req.user.role === 'admin' || req.user.role === 'viewer';
+      const data = db.reportByUser();
+      return send(res, 200, full ? data : data.filter(r => r.user.id === req.user.id));
     }
     // 只读模式：查询 / 切换（始终可用）
     if (p === '/api/readonly') {
@@ -746,7 +761,7 @@ const server = http.createServer(async (req, res) => {
     const ex = p.match(/^\/api\/projects\/([^/]+)\/export$/);
     if (ex && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const proj = db.getProject(ex[1], req.user.id, req.user.role === 'admin');
+      const proj = db.getProject(ex[1], req.user.id, req.user.role === 'admin' || req.user.role === 'viewer');
       if (!proj) return send(res, 404, { error: '项目不存在' });
       const type = url.searchParams.get('type') || 'latest';
       const date = isoDate(new Date()).replace(/-/g, '');
@@ -826,8 +841,9 @@ const server = http.createServer(async (req, res) => {
       const pid = m[1]; const tid = m[2];
       if (!req.user) return send(res, 401, { error: '请先登录' });
       const isAdmin = req.user.role === 'admin';
+      const canAll = isAdmin || req.user.role === 'viewer'; // admin 全量 + viewer 只读全量
       if (!pid) {
-        if (req.method === 'GET') return send(res, 200, db.listProjects(req.user.id, isAdmin));
+        if (req.method === 'GET') return send(res, 200, db.listProjects(req.user.id, canAll));
         if (req.method === 'POST') {
           const body = await readBody(req);
           let proj;
@@ -850,7 +866,7 @@ const server = http.createServer(async (req, res) => {
         }
         return send(res, 405, { error: '方法不允许' });
       }
-      const proj = db.getProject(pid, req.user.id, isAdmin);
+      const proj = db.getProject(pid, req.user.id, canAll);
       if (!proj) return send(res, 404, { error: '项目不存在' });
       if (m[0].endsWith('/reschedule') && req.method === 'POST') {
         // 保留公式：有公式 → 按公式全量重算一遍；无公式 → 顺序排期兜底

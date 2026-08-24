@@ -110,6 +110,15 @@ function verifyUser(name, password) {
   if (!u || !verifyPassword(password, u.pass_hash)) return null;
   return { id: u.id, name: u.name, role: u.role };
 }
+// 自助改密：校验旧密码后更新（返回错误原因或 null）
+function changePassword(userId, oldPw, newPw) {
+  const u = db.prepare('SELECT * FROM users WHERE id=?').get(userId);
+  if (!u) return '用户不存在';
+  if (!verifyPassword(oldPw, u.pass_hash)) return '旧密码错误';
+  if (String(newPw || '').length < 6) return '新密码至少 6 位';
+  db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(hashPassword(newPw), userId);
+  return null;
+}
 
 /* ---------------- token（每用户单 token） ---------------- */
 function issueToken(userId) {
@@ -283,4 +292,4 @@ function migrateJson(seedFilePath, ownerId) {
   return n;
 }
 
-module.exports = { init, createUser, listUsers, getUserByName, getUserById, verifyUser, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, migrateJson, randomPassword };
+module.exports = { init, createUser, listUsers, getUserByName, getUserById, verifyUser, changePassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, migrateJson, randomPassword };
