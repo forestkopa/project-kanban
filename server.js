@@ -185,9 +185,9 @@ function buildTodoXlsx(projects, monIso, sunIso) {
   XLSXS.utils.book_append_sheet(wb, ws, '待办清单');
   return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
-/* 聚合报告导出：按人汇总（样式同周报：矢车菊蓝表头 + 隔行浅蓝）+ 完成率横向柱状图 sheet */
+/* 聚合报告导出：按人汇总（样式同周报：矢车菊蓝表头 + 隔行浅蓝） */
 function buildReportXlsx(rows) {
-  const ACCENT1_50 = '1F3864', ZEBRA = 'F2F7FD', BAR_BLUE = '0A84FF', BAR_GRAY = 'E3E8F0';
+  const ACCENT1_50 = '1F3864', ZEBRA = 'F2F7FD';
   const THIN = { style: 'thin', color: { rgb: 'B4C7E7' } };
   const BD = { top: THIN, bottom: THIN, left: THIN, right: THIN };
   const FONT = { name: '微软雅黑' };
@@ -209,31 +209,8 @@ function buildReportXlsx(rows) {
       border: BD
     });
   });
-  // Sheet2 统计图表：完成率横向柱状图（单元格填充实现，每格 10%）
-  const BAR = 10;
-  const chartHeader = ['成员', '完成率', '0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'];
-  const aoa2 = [['数据统计 · 项目完成率柱状图'], chartHeader];
-  (rows || []).forEach(r => aoa2.push([r.user.name, r.rate + '%', '', '', '', '', '', '', '', '', '', '', '']));
-  const ws2 = XLSXS.utils.aoa_to_sheet(aoa2);
-  const cols2 = [{ wch: 14 }, { wch: 9 }];
-  for (let k = 0; k < BAR + 1; k++) cols2.push({ wch: 4.2 }); // 刻度列 + 10 格
-  ws2['!cols'] = cols2;
-  const setCell2 = (r, c, s) => { const a = XLSXS.utils.encode_cell({ r, c }); if (!ws2[a]) ws2[a] = { t: 's', v: '' }; ws2[a].s = s; };
-  for (let c = 0; c < 13; c++) setCell2(0, c, titleS);
-  for (let c = 0; c < 13; c++) setCell2(1, c, headS);
-  (rows || []).forEach((r, i) => {
-    const row = i + 2;
-    for (let c = 0; c < 2; c++) setCell2(row, c, { font: { ...FONT, color: { rgb: '000000' }, bold: c === 0 }, fill: { fgColor: { rgb: i % 2 === 0 ? 'FFFFFF' : ZEBRA } }, alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center' }, border: BD });
-    const n = Math.min(BAR, Math.max(0, Math.round((r.rate || 0) / 100 * BAR)));
-    for (let k = 0; k < BAR; k++) setCell2(row, 2 + k, {
-      font: { ...FONT, color: { rgb: '000000' } },
-      fill: { fgColor: { rgb: k < n ? BAR_BLUE : BAR_GRAY } },
-      alignment: { horizontal: 'center', vertical: 'center' }, border: BD
-    });
-  });
   const wb = XLSXS.utils.book_new();
   XLSXS.utils.book_append_sheet(wb, ws, '聚合报告');
-  XLSXS.utils.book_append_sheet(wb, ws2, '统计图表');
   return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 /* ---------- 参考模版：由内置模版生成甘特方言 Excel（开始/截止带公式 → 导入后级联） ---------- */
