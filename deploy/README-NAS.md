@@ -8,6 +8,7 @@
 | 路径 | 内容 |
 |---|---|
 | `/opt/project-kanban/` | 代码 + 数据（git clone） |
+| `/opt/project-kanban/data/app.db` | **SQLite 数据库（从本机拷贝，含用户/项目）** |
 | `/opt/project-kanban/config.yml` | 隧道配置（**需改 credentials-file 路径**） |
 | `/home/kanban/.cloudflared/2bbff070-ae42-4d5b-b846-744c999a2dfc.json` | 隧道凭据（从本机拷贝） |
 | `/etc/systemd/system/kanban*.service`、`cloudflared.service` | 三个服务 |
@@ -49,6 +50,25 @@ sudo mkdir -p /home/kanban/.cloudflared
 sudo cp 2bbff070-ae42-4d5b-b846-744c999a2dfc.json /home/kanban/.cloudflared/
 sudo chown -R kanban:kanban /home/kanban/.cloudflared
 ```
+
+## 3.1 数据库（SQLite）—— 关键！带现有数据上 NAS
+
+> 账号（admin/guest）、角色、项目、任务都存在 `data/app.db`（不进 git）。**必须把本机的库拷过去**，
+> 否则 NAS 会是全新空库（只剩 projects.json 迁移的 7 个种子项目，且无用户体系）。
+
+```bash
+# 从本机拷贝（本机路径 C:/Users/Administrator/WorkBuddy/.../project-kanban/data/app.db，
+# 或用完整快照 app-backup-YYYYMMDD.db 改名为 app.db 拷贝）
+sudo mkdir -p /opt/project-kanban/data
+sudo cp app.db /opt/project-kanban/data/app.db
+sudo chown kanban:kanban /opt/project-kanban/data/app.db
+
+# 验证库内数据（应显示 admin/guest 用户 + 7 个项目）
+sudo -u kanban node -e "const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('/opt/project-kanban/data/app.db');console.log(d.prepare('SELECT name,role FROM users').all());console.log('projects:',d.prepare('SELECT COUNT(*) c FROM projects').get().c);"
+```
+
+> 启动逻辑自动适配：`app.db` 已存在且含 admin/项目 → `ensureAdminAndMigrate` 检测到已有数据，**不会重复建号/导入**。
+> 备份：日常把 `data/app.db` 拷走即可（或定期执行 `VACUUM INTO` 生成干净单文件快照）。
 
 ## 4. 修改 config.yml（关键！）
 
@@ -106,5 +126,7 @@ curl -s http://127.0.0.1:5181 -o /dev/null -w "%{http_code}\n"   # 200
 ## 8. 日常
 
 - 改代码：本机 git clone → 改 → push → NAS 上 `cd /opt/project-kanban && git pull`
-- 备份：NAS 上数据 = `data/projects.json`（一个文件，定期拷走即可）；`data/` 的 git 提交也在 GitHub 留底
+- **备份**：NAS 上数据在 `data/app.db`（SQLite，含用户/角色/项目/任务）——定期拷走该文件即可；
+  更稳的快照：`sudo -u kanban node -e "const {DatabaseSync,backup}=require('node:sqlite');const d=new DatabaseSync('/opt/project-kanban/data/app.db');backup(d,'/opt/project-kanban/data/backup-$(date +%Y%m%d).db').then(()=>console.log('ok'))"`
+- 登录：NAS 首启若用带数据的 app.db → 原账号密码照常；全新库 → admin / 000000
 - 唯一不可用时刻：家里停电/断网/极空间关机
