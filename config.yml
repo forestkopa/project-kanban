@@ -1,0 +1,6 @@
+tunnel: 2bbff070-ae42-4d5b-b846-744c999a2dfc
+credentials-file: C:/Users/Administrator/.cloudflared/2bbff070-ae42-4d5b-b846-744c999a2dfc.json
+ingress:
+  - hostname: kanban.forestkopa.top
+    service: http://localhost:5180
+  - service: http://localhost:5180

@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare Named Tunnel (kanban.forestkopa.top)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kanban
+ExecStart=/usr/local/bin/cloudflared tunnel --config /opt/project-kanban/config.yml run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

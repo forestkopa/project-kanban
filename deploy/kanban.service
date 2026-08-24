@@ -1,0 +1,15 @@
+[Unit]
+Description=Project Kanban Official (port 5181, 真实数据)
+After=network.target
+
+[Service]
+Type=simple
+User=kanban
+WorkingDirectory=/opt/project-kanban
+Environment=PORT=5181
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,31 +1,27 @@
 // =========================================================
-// 看板崩溃守护（watchdog）
-// 每 15 秒探测本地服务：挂了自动拉起 server.js；
-// 同时保证 Cloudflare Named Tunnel 进程存活（固定地址见 FIXED_TUNNEL_URL）。
-// 由任务计划程序在登录时启动：node watchdog.js
-// 双实例：5180 = 演示版(--demo, 公网隧道指向它)；5181 = 正式版(真实数据, 本机使用)
-// 隧道已固化：统一用 Named Tunnel（kanban.forestkopa.top），不再使用 trycloudflare 快速隧道
+// 看板崩溃守护（watchdog）—— 本机开发调试版
+// 每 15 秒探测本地服务：挂了自动拉起 server.js。
+// 双实例：5180 = 演示版(--demo, 脱敏数据) ；5181 = 正式版(真实数据)
+//
+// 注意：本机已不再是生产环境（生产 = 极空间 NAS + systemd）。
+//   - 公网隧道由 NAS 上的 cloudflared.service 负责，本机不再起隧道
+//     （避免两条 cloudflared 抢同一条 Named Tunnel）
+//   - 本机仅用于开发调试；日常访问请用 https://kanban.forestkopa.top
+//   - NAS 部署文件见 deploy/ 目录（README-NAS.md 有完整步骤）
 // =========================================================
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
 const NODE = process.execPath;
 const SERVER = path.join(ROOT, 'server.js');
-const CLOUDFLARED = 'C:/Users/Administrator/.workbuddy/binaries/cloudflared/cloudflared.exe';
-const URL_FILE = path.join(ROOT, 'data', 'tunnel-url.txt');
 const INTERVAL = 15000;
-
-// Named Tunnel 配置与固定公网地址（不再使用 trycloudflare 随机地址）
-const TUNNEL_CONFIG = path.join(ROOT, 'config.yml');
-const FIXED_TUNNEL_URL = 'https://kanban.forestkopa.top';
 
 // 守护的实例：演示版(--demo 免令牌脱敏数据) + 正式版(真实数据需令牌)
 const SERVERS = [
-  { port: 5180, args: ['--demo'], env: {}, name: '演示版(公网评委)' },
-  { port: 5181, args: [], env: { PORT: '5181' }, name: '正式版(本机日常)' }
+  { port: 5180, args: ['--demo'], env: {}, name: '演示版(开发调试)' },
+  { port: 5181, args: [], env: { PORT: '5181' }, name: '正式版(开发调试)' }
 ];
 
 function isUp(port) {
@@ -47,26 +43,6 @@ async function ensureServer() {
   }
 }
 
-function cloudflaredRunning() {
-  try {
-    const out = execSync('tasklist /FI "IMAGENAME eq cloudflared.exe" /NH', { encoding: 'utf8', timeout: 5000 });
-    return out.includes('cloudflared.exe');
-  } catch (e) { return false; }
-}
-
-// 固化：只守护 Named Tunnel（固定地址 kanban.forestkopa.top），不再起 trycloudflare 快速隧道
-function ensureTunnel() {
-  if (cloudflaredRunning()) return;
-  log('cloudflared 未运行，重新拉起 Named Tunnel（固定地址 ' + FIXED_TUNNEL_URL + '）');
-  try {
-    const c = spawn(CLOUDFLARED, ['tunnel', '--config', TUNNEL_CONFIG, 'run'], { cwd: ROOT, detached: true, stdio: 'ignore' });
-    c.unref();
-    // 固定地址，无需动态抓取，直接写入
-    try { fs.writeFileSync(URL_FILE, FIXED_TUNNEL_URL, 'utf8'); } catch (e) {}
-  } catch (e) { log('隧道拉起失败: ' + e.message); }
-}
-
-log('守护已启动（每 ' + INTERVAL / 1000 + ' 秒检测一次，双实例：5180 演示 / 5181 正式；隧道：Named Tunnel ' + FIXED_TUNNEL_URL + '）');
-setInterval(() => { ensureServer(); ensureTunnel(); }, INTERVAL);
+log('守护已启动（本机开发调试版，每 ' + INTERVAL / 1000 + ' 秒检测；隧道由 NAS 负责，公网地址 https://kanban.forestkopa.top）');
+setInterval(ensureServer, INTERVAL);
 ensureServer();
-ensureTunnel();

@@ -1,0 +1,14 @@
+[Unit]
+Description=Project Kanban Demo (port 5180, --demo, 脱敏数据)
+After=network.target
+
+[Service]
+Type=simple
+User=kanban
+WorkingDirectory=/opt/project-kanban
+ExecStart=/usr/bin/node server.js --demo
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
