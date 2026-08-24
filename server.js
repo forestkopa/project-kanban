@@ -17,6 +17,9 @@ const TEMPLATES_FILE = path.join(ROOT, 'templates.json');
 const OPTIONS_FILE = path.join(DATA, 'options.json');
 const RO_FLAG = path.join(DATA, 'readonly.flag');
 const AI_FILE = path.join(DATA, 'ai.json');
+// SQLite 数据层（node:sqlite 内置模块）：正式版 app.db / 演示版 demo.db；存量 JSON 仅作首次迁移种子
+const db = require('./db.js');
+const DB_FILE = path.join(DATA, DEMO_MODE ? 'demo.db' : 'app.db');
 
 function loadJSON(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } }
 // 写队列：所有落盘串行化，杜绝并发覆盖；原子写：临时文件→rename，崩溃不损坏原文件
@@ -401,29 +404,22 @@ if (!fs.existsSync(DATA)) fs.mkdirSync(DATA, { recursive: true });
 if (!fs.existsSync(PROJECTS_FILE)) saveJSON(PROJECTS_FILE, []);
 if (!fs.existsSync(TEMPLATES_FILE)) saveJSON(TEMPLATES_FILE, []);
 if (!fs.existsSync(OPTIONS_FILE)) saveJSON(OPTIONS_FILE, DEFAULT_OPTIONS);
+// 初始化 SQLite 数据层 + 引导：正式版建 admin 并迁移存量 projects.json，演示版建 demo 用户
+db.init(DB_FILE);
+if (DEMO_MODE) db.ensureDemoUser(PROJECTS_FILE);
+else db.ensureAdminAndMigrate(PROJECTS_FILE);
 
-// 为已有项目补齐「初版计划」快照（以当前任务为基线）
-(() => {
-  try {
-    const ps = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf8'));
-    let ch = false;
-    ps.forEach(p => { if (!p.baseline) { p.baseline = (p.tasks || []).map(t => ({ ...t })); ch = true; } });
-    if (ch) fs.writeFileSync(PROJECTS_FILE, JSON.stringify(ps, null, 2));
-  } catch (e) { /* ignore */ }
-})();
-
-// 首次运行（非演示模式）若项目为空，自动播种一个示例项目，避免评委/用户看到空白首屏
+// 首次运行（非演示模式）若项目库为空，自动播种一个示例项目，避免用户看到空白首屏
 (() => {
   if (DEMO_MODE) return;
   try {
-    const ps = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf8'));
-    if (Array.isArray(ps) && ps.length === 0) {
+    if (db.listProjects(null, true).length === 0) {
       const tpls = JSON.parse(fs.readFileSync(TEMPLATES_FILE, 'utf8'));
       const tpl = (tpls.find(t => /音箱|语音|speaker/i.test(t.name)) || tpls[0]);
       if (tpl) {
+        const admin = db.getUserByName('admin');
         const seed = createFromTemplate(tpl, tpl.name + '（示例）', { type: 'C端', level: 'B', productType: 'AI', cert: 'CCC', engineers: { hardware: '张工', structure: '李工', project: '王工' } });
-        ps.push(seed);
-        fs.writeFileSync(PROJECTS_FILE, JSON.stringify(ps, null, 2));
+        db.saveProject(seed, admin.id);
         console.log('[种子] 已生成示例项目：' + seed.name + '（' + seed.tasks.length + ' 个任务）');
       }
     }
@@ -477,7 +473,8 @@ function readBody(req) {
     req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch (e) { resolve({}); } });
   });
 }
-// --- 最小鉴权：非 GET 请求校验静态 token（data/auth.token，首次启动自动生成） ---
+// --- 多用户鉴权：每用户 token（登录下发，存 SQLite tokens 表）---
+// 兼容旧单 token（data/auth.token）：校验通过时视为 admin（老前端无缝升级）
 const TOKEN_FILE = path.join(DATA, 'auth.token');
 function ensureToken() {
   try { const t = fs.readFileSync(TOKEN_FILE, 'utf8').trim(); if (t) return t; } catch (e) {}
@@ -486,7 +483,15 @@ function ensureToken() {
   return t;
 }
 const AUTH_TOKEN = ensureToken();
-function authorized(req) { return DEMO_MODE || req.headers['x-auth-token'] === AUTH_TOKEN; }
+function resolveUser(req) {
+  if (DEMO_MODE) return { id: 'demo', name: 'demo', role: 'admin' }; // 演示版免登录，全量可见
+  const h = req.headers['x-auth-token'] || req.headers.authorization;
+  const uid = db.tokenUserId(h);
+  if (uid) { const u = db.getUserById(uid); if (u) return u; }
+  if (h === AUTH_TOKEN) { const a = db.getUserByName('admin'); if (a) return { id: a.id, name: a.name, role: a.role }; } // 旧 token 兼容 = admin
+  return null;
+}
+function authorized(req) { return !!req.user; }
 
 function createFromTemplate(tpl, name, opts) {
   opts = opts || {};
@@ -521,13 +526,43 @@ const server = http.createServer(async (req, res) => {
   const t0 = Date.now();
   res.on('finish', () => console.log(`${new Date().toISOString()} ${req.method} ${p} ${res.statusCode} ${Date.now() - t0}ms`));
   if (p.startsWith('/api/')) {
+    req.user = resolveUser(req); // 每请求解析当前用户（demo 模式恒为 admin 视角）
+    // 登录接口（免鉴权，放最前）
+    if (p === '/api/login' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const u = db.verifyUser(name, String(body.password || ''));
+      if (!u) return send(res, 401, { error: '用户名或密码错误' });
+      const token = db.issueToken(u.id);
+      return send(res, 200, { token, user: { id: u.id, name: u.name, role: u.role } });
+    }
     // 请求体大小上限（content-length 预检，chunked 由 readBody 兜底断开）
     if (req.method !== 'GET' && parseInt(req.headers['content-length'] || '0', 10) > BODY_LIMIT) {
       return send(res, 413, { error: '请求体过大（上限 10MB）' });
     }
-    // 最小鉴权：写操作必须携带正确 token（GET 查询不受限）
+    // 最小鉴权：写操作必须登录（GET 查询不受限，projects 列表在路由内另行校验登录）
     if (req.method !== 'GET' && !authorized(req)) {
-      return send(res, 401, { error: '未授权：缺少或错误的访问令牌' });
+      return send(res, 401, { error: '未授权：请先登录（X-Auth-Token）' });
+    }
+    // 用户管理（admin）：列出 / 新建用户
+    if (p === '/api/users') {
+      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
+      if (req.method === 'GET') return send(res, 200, db.listUsers());
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const name = String(body.name || '').trim();
+        const pw = String(body.password || '');
+        if (!name || pw.length < 6) return send(res, 400, { error: '用户名必填，密码至少 6 位' });
+        if (db.getUserByName(name)) return send(res, 400, { error: '用户名已存在' });
+        const u = db.createUser(name, pw, body.role === 'admin' ? 'admin' : 'user');
+        return send(res, 201, { id: u.id, name: u.name, role: u.role });
+      }
+      return send(res, 405, { error: '方法不允许' });
+    }
+    // 按人聚合报告（admin 全量；演示版全量）
+    if (p === '/api/report' && req.method === 'GET') {
+      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可查看汇总报告' });
+      return send(res, 200, db.reportByUser());
     }
     // 只读模式：查询 / 切换（始终可用）
     if (p === '/api/readonly') {
@@ -710,8 +745,8 @@ const server = http.createServer(async (req, res) => {
     // 导出计划表（初版 / 最新），文件名区分
     const ex = p.match(/^\/api\/projects\/([^/]+)\/export$/);
     if (ex && req.method === 'GET') {
-      const projects = loadJSON(PROJECTS_FILE, []);
-      const proj = projects.find(x => x.id === ex[1]);
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      const proj = db.getProject(ex[1], req.user.id, req.user.role === 'admin');
       if (!proj) return send(res, 404, { error: '项目不存在' });
       const type = url.searchParams.get('type') || 'latest';
       const date = isoDate(new Date()).replace(/-/g, '');
@@ -758,8 +793,7 @@ const server = http.createServer(async (req, res) => {
       if (!np.startDate) np.startDate = np.tasks[0] ? (np.tasks[0].startDate || isoDate(new Date())) : isoDate(new Date());
       recalcProject(np);
       np.baseline = np.tasks.map(t => ({ ...t }));
-      const projects = loadJSON(PROJECTS_FILE, []);
-      projects.push(np); saveJSON(PROJECTS_FILE, projects);
+      db.saveProject(np, req.user.id);
       return send(res, 201, np);
     }
 
@@ -781,23 +815,19 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/projects/order' && req.method === 'PUT') {
       const body = await readBody(req);
       if (!Array.isArray(body.ids) || !body.ids.length) return send(res, 400, { error: '缺少 ids 数组' });
-      const projects = loadJSON(PROJECTS_FILE, []);
-      const map = new Map(projects.map(x => [x.id, x]));
-      if (body.ids.some(id => !map.has(id))) return send(res, 400, { error: '包含未知项目 id' });
-      const ids = new Set(body.ids);
-      let pos = 0;
-      // 只重排 ids 内的项目，其余项目保持原位置
-      const next = projects.map(x => ids.has(x.id) ? map.get(body.ids[pos++]) : x);
-      saveJSON(PROJECTS_FILE, next);
+      const mine = db.listProjects(req.user.id, req.user.role === 'admin').map(x => x.id);
+      if (body.ids.some(id => !mine.includes(id))) return send(res, 400, { error: '包含未知项目 id' });
+      db.setOrder(body.ids, req.user.id, req.user.role === 'admin');
       return send(res, 200, { ok: true });
     }
 
     const m = p.match(/^\/api\/projects(?:\/([^/]+)(?:\/tasks(?:\/([^/]+))?|\/reschedule)?)?$/);
     if (m) {
-      const projects = loadJSON(PROJECTS_FILE, []);
       const pid = m[1]; const tid = m[2];
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      const isAdmin = req.user.role === 'admin';
       if (!pid) {
-        if (req.method === 'GET') return send(res, 200, projects);
+        if (req.method === 'GET') return send(res, 200, db.listProjects(req.user.id, isAdmin));
         if (req.method === 'POST') {
           const body = await readBody(req);
           let proj;
@@ -816,19 +846,18 @@ const server = http.createServer(async (req, res) => {
           } else {
             return send(res, 400, { error: '请提供 templateId 或 phases + tasks' });
           }
-          projects.push(proj); saveJSON(PROJECTS_FILE, projects); return send(res, 201, proj);
+          db.saveProject(proj, req.user.id); return send(res, 201, proj);
         }
         return send(res, 405, { error: '方法不允许' });
       }
-      const idx = projects.findIndex(x => x.id === pid);
-      if (idx < 0) return send(res, 404, { error: '项目不存在' });
-      const proj = projects[idx];
+      const proj = db.getProject(pid, req.user.id, isAdmin);
+      if (!proj) return send(res, 404, { error: '项目不存在' });
       if (m[0].endsWith('/reschedule') && req.method === 'POST') {
         // 保留公式：有公式 → 按公式全量重算一遍；无公式 → 顺序排期兜底
         const hasRules = (proj.tasks || []).some(t => t.startRule || t.dueRule);
         if (hasRules) recalcProject(proj);
         else scheduleTasks(proj.phases, proj.tasks, proj.startDate || isoDate(new Date()));
-        saveJSON(PROJECTS_FILE, projects); return send(res, 200, proj);
+        db.saveProject(proj, req.user.id); return send(res, 200, proj);
       }
       if (!tid) {
         if (req.method === 'GET') return send(res, 200, proj);
@@ -844,7 +873,7 @@ const server = http.createServer(async (req, res) => {
             startDate: body.startDate || start,
             dueDate: body.dueDate || isoDate(addDays(new Date(start), days))
           };
-          proj.tasks.push(t); saveJSON(PROJECTS_FILE, projects); return send(res, 201, t);
+          proj.tasks.push(t); db.saveProject(proj, req.user.id); return send(res, 201, t);
         }
         if (req.method === 'PUT') {
           const body = await readBody(req);
@@ -870,9 +899,9 @@ const server = http.createServer(async (req, res) => {
             if (hasRules) recalcProject(proj); // 有公式 → 按公式级联
             else scheduleTasks(proj.phases, proj.tasks, proj.startDate);
           }
-          saveJSON(PROJECTS_FILE, projects); return send(res, 200, proj);
+          db.saveProject(proj, req.user.id); return send(res, 200, proj);
         }
-        if (req.method === 'DELETE') { projects.splice(idx, 1); saveJSON(PROJECTS_FILE, projects); return send(res, 200, { ok: true }); }
+        if (req.method === 'DELETE') { db.deleteProject(pid, req.user.id, isAdmin); return send(res, 200, { ok: true }); }
         return send(res, 405, { error: '方法不允许' });
       }
       const tIdx = proj.tasks.findIndex(t => t.id === tid);
@@ -893,11 +922,11 @@ const server = http.createServer(async (req, res) => {
         if (body.startFormula !== undefined) { const sf = String(body.startFormula || '').trim(); t.startF = sf; t.startRule = sf ? parseFormula(sf) : undefined; } // 改公式
         if (body.dueFormula !== undefined) { const df = String(body.dueFormula || '').trim(); t.dueF = df; t.dueRule = df ? parseFormula(df) : undefined; }
         recalcProject(proj); // 级联重算依赖该任务的后继日期
-        saveJSON(PROJECTS_FILE, projects); return send(res, 200, t);
+        db.saveProject(proj, req.user.id); return send(res, 200, t);
       }
       if (req.method === 'DELETE') {
         if (tIdx < 0) return send(res, 404, { error: '任务不存在' });
-        proj.tasks.splice(tIdx, 1); saveJSON(PROJECTS_FILE, projects); return send(res, 200, { ok: true });
+        proj.tasks.splice(tIdx, 1); db.saveProject(proj, req.user.id); return send(res, 200, { ok: true });
       }
       return send(res, 405, { error: '方法不允许' });
     }
@@ -914,6 +943,6 @@ const server = http.createServer(async (req, res) => {
   });
 });
 server.listen(PORT, () => {
-  console.log('Multi-project kanban running at http://localhost:' + PORT + (DEMO_MODE ? '  [演示模式：脱敏数据 + 免令牌]' : ''));
-  if (!DEMO_MODE) console.log('写操作访问令牌 (X-Auth-Token): ' + AUTH_TOKEN + '  (文件: data/auth.token，可在页面首次写操作时输入一次)');
+  console.log('Multi-project kanban running at http://localhost:' + PORT + (DEMO_MODE ? '  [演示模式：脱敏数据 + 免登录]' : ''));
+  if (!DEMO_MODE) console.log('管理员初始账号: admin，初始密码见 data/admin.password（首次登录后请修改）');
 });

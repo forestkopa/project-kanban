@@ -6,4 +6,7 @@ data/tunnel-url.txt
 data/tunnel.log
 data/options.json
 data/ai.json
+data/*.db
+data/*.db-*
+data/admin.password
 public/brand-logo.png
