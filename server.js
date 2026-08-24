@@ -602,16 +602,27 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 405, { error: '方法不允许' });
     }
-    // 修改用户角色（admin；不能改自己的角色，防锁死）
-    const uEdit = p.match(/^\/api\/users\/([^/]+)$/);
-    if (uEdit && req.method === 'PUT') {
+    // 修改角色 / 删除用户（admin；不能操作自己；guest 系统账号禁删；至少保留一名管理员）
+    const uOp = p.match(/^\/api\/users\/([^/]+)$/);
+    if (uOp && (req.method === 'PUT' || req.method === 'DELETE')) {
       if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
-      const body = await readBody(req);
-      const role = ['admin', 'manager', 'member', 'viewer'].includes(body.role) ? body.role : null;
-      if (!role) return send(res, 400, { error: '角色无效' });
-      if (uEdit[1] === req.user.id) return send(res, 400, { error: '不能修改自己的角色' });
-      if (!db.updateUserRole(uEdit[1], role)) return send(res, 404, { error: '用户不存在' });
-      return send(res, 200, { ok: true, role });
+      const targetId = uOp[1];
+      if (targetId === req.user.id) return send(res, 400, { error: '不能操作自己的账号' });
+      const target = db.getUserById(targetId);
+      if (!target) return send(res, 404, { error: '用户不存在' });
+      if (req.method === 'PUT') {
+        const body = await readBody(req);
+        const role = ['admin', 'manager', 'member', 'viewer'].includes(body.role) ? body.role : null;
+        if (!role) return send(res, 400, { error: '角色无效' });
+        if (!db.updateUserRole(targetId, role)) return send(res, 404, { error: '用户不存在' });
+        return send(res, 200, { ok: true, role });
+      }
+      // DELETE
+      if (target.name === 'guest') return send(res, 400, { error: 'guest 为系统游客账号，不可删除' });
+      if (target.role === 'admin' && db.listUsers().filter(u => u.role === 'admin').length <= 1) return send(res, 400, { error: '至少保留一名管理员' });
+      const r = db.deleteUser(targetId);
+      if (!r.ok) return send(res, 400, { error: r.reason });
+      return send(res, 200, { ok: true });
     }
     // 按人聚合报告：admin/manager/viewer 全量；member 仅自己的统计
     if (p === '/api/report' && req.method === 'GET') {

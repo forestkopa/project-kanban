@@ -50,6 +50,7 @@ related: ["02-demo正式版机制", "09-GitHub托管与换机"]
 
 - 副管理员 = admin 全部权限 − 用户管理（/api/users 仅 admin；建用户下拉可选 manager）
 - 角色可改：`PUT /api/users/:id` {role}（admin；白名单 admin/manager/member/viewer；**不能改自己的角色**防锁死）；用户管理表格角色下拉即时生效
+- 删除用户：`DELETE /api/users/:id`（admin；**有项目则拒绝**（避免级联误删数据）；guest 系统账号禁删；不能删自己；至少保留一名管理员）；删除后 token 级联失效即时踢下线
 - viewer 前端：`body.viewer` CSS 隐藏全部编辑入口 + 后端 403 双保险
 - 报告：`GET /api/report`（按人聚合：项目数/任务/完成/逾期/完成率/阶段分布）+ `/api/report/export` xlsx；**系统游客账号 guest 已从报告排除**（无项目不参与聚合）
 

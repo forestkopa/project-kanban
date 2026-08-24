@@ -124,15 +124,22 @@ function openUsersModal() {
     try {
       const users = await api('/users');
       const tbody = $('#usersTable tbody');
+      const isMe = u => u.id === (state.user && state.user.id);
       tbody.innerHTML = users.map(u => `<tr>
         <td>${esc(u.name)}</td>
-        <td><select class="role-sel inp" data-uid="${u.id}" ${u.id === (state.user && state.user.id) ? 'disabled title="不能修改自己的角色"' : ''}>${['admin', 'manager', 'member', 'viewer'].map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${ROLE_NAME[r]}</option>`).join('')}</select></td>
+        <td><select class="role-sel inp" data-uid="${u.id}" ${isMe(u) ? 'disabled title="不能修改自己的角色"' : ''}>${['admin', 'manager', 'member', 'viewer'].map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${ROLE_NAME[r]}</option>`).join('')}</select></td>
         <td class="muted">${(u.created_at || '').slice(0, 10)}</td>
-      </tr>`).join('') || '<tr><td colspan="3" class="muted">暂无用户</td></tr>';
+        <td><button class="btn del-user-btn" data-uid="${u.id}" data-name="${esc(u.name)}" ${isMe(u) || u.name === 'guest' ? 'disabled title="不能删除"' : ''}>删除</button></td>
+      </tr>`).join('') || '<tr><td colspan="4" class="muted">暂无用户</td></tr>';
       $('#usersModal').classList.remove('hidden');
       $$('.role-sel', tbody).forEach(sel => sel.onchange = async () => {
         try { await api('/users/' + sel.dataset.uid, { method: 'PUT', body: JSON.stringify({ role: sel.value }) }); toast('角色已更新为「' + (ROLE_NAME[sel.value] || sel.value) + '」'); }
         catch (e) { toast(e.message); openUsersModal(); }
+      });
+      $$('.del-user-btn', tbody).forEach(btn => btn.onclick = async () => {
+        if (!confirm('确定删除用户「' + btn.dataset.name + '」？删除后该用户立即无法登录，其项目需先处理。')) return;
+        try { await api('/users/' + btn.dataset.uid, { method: 'DELETE' }); toast('已删除用户 ' + btn.dataset.name); openUsersModal(); }
+        catch (e) { toast(e.message); }
       });
     } catch (e) { toast(e.message); }
   })();

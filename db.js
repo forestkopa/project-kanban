@@ -109,6 +109,15 @@ function updateUserRole(userId, role) {
   const r = db.prepare('UPDATE users SET role=? WHERE id=?').run(role, userId);
   return r.changes > 0;
 }
+// 删除用户：有项目则拒绝（避免级联误删数据）；无项目直接删（tokens 级联清除）
+function deleteUser(userId) {
+  const u = db.prepare('SELECT id,name,role FROM users WHERE id=?').get(userId);
+  if (!u) return { ok: false, reason: '用户不存在' };
+  const cnt = db.prepare('SELECT COUNT(*) c FROM projects WHERE owner_id=?').get(userId).c;
+  if (cnt > 0) return { ok: false, reason: '该用户有 ' + cnt + ' 个项目，请先删除或转移项目后再删除用户' };
+  db.prepare('DELETE FROM users WHERE id=?').run(userId);
+  return { ok: true };
+}
 function getUserByName(name) { return db.prepare('SELECT * FROM users WHERE name=?').get(name); }
 function getUserById(id) { return db.prepare('SELECT id,name,role FROM users WHERE id=?').get(id); }
 function verifyUser(name, password) {
@@ -313,4 +322,4 @@ function migrateJson(seedFilePath, ownerId) {
   return n;
 }
 
-module.exports = { init, DEFAULT_PASSWORD, createUser, listUsers, updateUserRole, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };
+module.exports = { init, DEFAULT_PASSWORD, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };

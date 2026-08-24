@@ -517,3 +517,8 @@ body.viewer .proj .bar-fill { opacity: .85; }
 /* 用户管理：角色下拉 */
 .role-sel { width: 112px; padding: 5px 8px; font-size: 13px; margin: 0; }
 .role-sel:disabled { opacity: .6; }
+
+/* 用户管理：删除按钮 */
+.del-user-btn { padding: 4px 10px; font-size: 12px; color: #E0241B; background: none; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.del-user-btn:hover:not(:disabled) { background: rgba(224,36,27,.08); }
+.del-user-btn:disabled { opacity: .45; cursor: not-allowed; }
