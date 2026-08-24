@@ -52,9 +52,14 @@ function showLogin() {
   return new Promise(resolve => {
     const m = $('#loginModal'); if (!m) return resolve(false);
     $('#loginName').value = ''; $('#loginPass').value = ''; $('#loginErr').textContent = '';
+    // 记住密码回填
+    let rm = null; try { rm = JSON.parse(localStorage.getItem('kb-remember') || 'null'); } catch (e) {}
+    if (rm && rm.name) { $('#loginName').value = rm.name; $('#loginPass').value = rm.pass || ''; $('#loginRemember').checked = true; }
+    else { $('#loginRemember').checked = false; }
     m.classList.remove('hidden');
     let settled = false;
     const done = ok => { if (settled) return; settled = true; m.classList.add('hidden'); $('#loginBtn').disabled = false; resolve(ok); };
+    const remember = (name, pw) => { try { if ($('#loginRemember').checked) localStorage.setItem('kb-remember', JSON.stringify({ name, pass: pw })); else localStorage.removeItem('kb-remember'); } catch (e) {} };
     const submit = async () => {
       const name = $('#loginName').value.trim(), pw = $('#loginPass').value;
       if (!name || !pw) { $('#loginErr').textContent = '请输入用户名和密码'; return; }
@@ -63,12 +68,27 @@ function showLogin() {
         const r = await fetch(API + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: pw }) });
         const j = await r.json();
         if (!r.ok) { $('#loginErr').textContent = j.error || '登录失败'; $('#loginBtn').disabled = false; return; }
+        remember(name, pw);
         try { localStorage.setItem('kb-token', j.token); localStorage.setItem('kb-user', JSON.stringify(j.user)); } catch (e) {}
         state.user = j.user;
         updateUserUI();
         toast('欢迎，' + j.user.name);
         done(true);
       } catch (e) { $('#loginErr').textContent = '网络错误，请重试'; $('#loginBtn').disabled = false; }
+    };
+    // 游客登录（guest / 000000，只读）
+    $('#guestBtn').onclick = async () => {
+      $('#loginErr').textContent = '';
+      try {
+        const r = await fetch(API + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'guest', password: '000000' }) });
+        const j = await r.json();
+        if (!r.ok) { $('#loginErr').textContent = j.error || '游客登录失败'; return; }
+        try { localStorage.setItem('kb-token', j.token); localStorage.setItem('kb-user', JSON.stringify(j.user)); } catch (e) {}
+        state.user = j.user;
+        updateUserUI();
+        toast('已以游客身份登录（只读）');
+        done(true);
+      } catch (e) { $('#loginErr').textContent = '网络错误，请重试'; }
     };
     $('#loginBtn').onclick = submit;
     $('#loginPass').onkeydown = e => { if (e.key === 'Enter') submit(); };
@@ -901,8 +921,9 @@ $$('#userMenu button').forEach(b => b.onclick = e => {
 });
 $('#nuAdd').onclick = async () => {
   const name = $('#nuName').value.trim(), pw = $('#nuPass').value, role = $('#nuRole').value;
-  if (!name || pw.length < 6) { toast('用户名必填，密码至少 6 位'); return; }
-  try { await api('/users', { method: 'POST', body: JSON.stringify({ name, password: pw, role }) }); toast('已创建 ' + name); $('#nuName').value = ''; $('#nuPass').value = ''; openUsersModal(); }
+  if (!name) { toast('用户名必填'); return; }
+  if (pw && pw.length < 6) { toast('密码至少 6 位（留空则默认 000000）'); return; }
+  try { await api('/users', { method: 'POST', body: JSON.stringify({ name, password: pw || '000000', role }) }); toast('已创建 ' + name + '（初始密码 ' + (pw || '000000') + '）'); $('#nuName').value = ''; $('#nuPass').value = ''; openUsersModal(); }
   catch (e) { toast(e.message); }
 };
 $('#pwSave').onclick = async () => {

@@ -432,10 +432,11 @@ if (!fs.existsSync(DATA)) fs.mkdirSync(DATA, { recursive: true });
 if (!fs.existsSync(PROJECTS_FILE)) saveJSON(PROJECTS_FILE, []);
 if (!fs.existsSync(TEMPLATES_FILE)) saveJSON(TEMPLATES_FILE, []);
 if (!fs.existsSync(OPTIONS_FILE)) saveJSON(OPTIONS_FILE, DEFAULT_OPTIONS);
-// 初始化 SQLite 数据层 + 引导：正式版建 admin 并迁移存量 projects.json，演示版建 demo 用户
+// 初始化 SQLite 数据层 + 引导：正式版建 admin 并迁移存量 projects.json，演示版建 demo 用户；都确保 guest 游客账号
 db.init(DB_FILE);
 if (DEMO_MODE) db.ensureDemoUser(PROJECTS_FILE);
 else db.ensureAdminAndMigrate(PROJECTS_FILE);
+db.ensureGuestUser();
 
 // 首次运行（非演示模式）若项目库为空，自动播种一个示例项目，避免用户看到空白首屏
 (() => {
@@ -1002,5 +1003,5 @@ const server = http.createServer(async (req, res) => {
 });
 server.listen(PORT, () => {
   console.log('Multi-project kanban running at http://localhost:' + PORT + (DEMO_MODE ? '  [演示模式：脱敏数据 + 免登录]' : ''));
-  if (!DEMO_MODE) console.log('管理员初始账号: admin，初始密码见 data/admin.password（首次登录后请修改）');
+  if (!DEMO_MODE) console.log('账号：admin / 000000（管理员，请登录后改密）· guest / 000000（游客只读）· 新建用户默认密码 000000');
 });

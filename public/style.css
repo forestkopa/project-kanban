@@ -508,3 +508,8 @@ body.viewer .del-btn,
 body.viewer .task-check { display: none !important; }
 body.viewer .proj { cursor: default; }
 body.viewer .proj .bar-fill { opacity: .85; }
+
+/* 登录：记住密码 + 游客 */
+.remember-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); margin: 10px 2px 2px; cursor: pointer; user-select: none; }
+.remember-row input { accent-color: var(--accent); width: 15px; height: 15px; }
+#guestBtn { background: var(--bg); }

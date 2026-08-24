@@ -16,10 +16,12 @@
 - docs/knowledge/07-甘特公式引擎.md — 甘特方言识别(D/E 日期 F 天数 WORKDAY.INTL)、级联规则、off 数值偏移坑、状态列留空
 - docs/knowledge/08-Excel导出.md — xlsx-js-style 周报待办导出、矢车菊蓝配色表(#1F3864/#B4C7E7/#F2F7FD)
 - docs/knowledge/09-GitHub托管与换机.md — 私有仓库、敏感文件清单(gitignore)、换机重配项、遗留(mappings.json死文件/projects.json入库)、常用命令
+- docs/knowledge/10-多用户与SQLite数据层.md — node:sqlite 五表、单项目粒度事务、三角色(admin/member/viewer)权限、登录/游客/记住密码、默认密码 000000、db 运维坑(删库需先停实例)
 
 ## 其它文档
 
 - docs/开发备忘.md — AI 协作总入口（上述笔记的汇总版）
+- docs/权限管理设计.md — 多用户权限设计大纲（参考 Jira/禅道/飞书/GitHub）
 - docs/PRD.md — 产品需求文档
 - docs/参赛说明.md — 参赛说明
 - docs/操作手册.md — 用户操作手册
@@ -29,5 +31,7 @@
 
 - 端口：5180=demo(公网), 5181=正式(本机)；隧道指向 5180
 - 模式开关：`node server.js --demo` 为演示
-- 数据隔离：projects.demo.json(脱敏) vs projects.json(真实)
-- 敏感文件不外传：ai.json / auth.token / tunnel-url.txt / options.json
+- 数据隔离：正式版 SQLite `data/app.db`；演示版 `data/demo.db`；projects.demo.json 仅作迁移种子
+- 账号：admin / 000000（管理员）；guest / 000000（游客只读）；新建用户默认密码 000000
+- 敏感文件不外传：ai.json / auth.token / tunnel-url.txt / options.json / *.db
+- **推送约定：每次 push GitHub 前必须同步更新 docs/knowledge/ 与 llms.txt**

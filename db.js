@@ -95,12 +95,13 @@ function randomPassword(len) {
   for (let i = 0; i < (len || 12); i++) s += chars[crypto.randomInt(chars.length)];
   return s;
 }
+const DEFAULT_PASSWORD = '000000'; // 默认初始密码（admin / 新建用户 / guest 游客）
 function createUser(name, password, role) {
   const id = 'u_' + crypto.randomBytes(8).toString('hex');
-  const plain = password || randomPassword();
+  const plain = password || DEFAULT_PASSWORD;
   db.prepare('INSERT INTO users (id,name,role,pass_hash,created_at) VALUES (?,?,?,?,?)')
-    .run(id, name, role || 'user', hashPassword(plain), new Date().toISOString());
-  return { id, name, role: role || 'user', _plainPassword: plain };
+    .run(id, name, role || 'member', hashPassword(plain), new Date().toISOString());
+  return { id, name, role: role || 'member' };
 }
 function listUsers() { return db.prepare('SELECT id,name,role,created_at FROM users ORDER BY created_at').all(); }
 function getUserByName(name) { return db.prepare('SELECT * FROM users WHERE name=?').get(name); }
@@ -116,6 +117,12 @@ function changePassword(userId, oldPw, newPw) {
   if (!u) return '用户不存在';
   if (!verifyPassword(oldPw, u.pass_hash)) return '旧密码错误';
   if (String(newPw || '').length < 6) return '新密码至少 6 位';
+  db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(hashPassword(newPw), userId);
+  return null;
+}
+// 管理员重置任意用户密码（不校验旧密码）
+function resetPassword(userId, newPw) {
+  if (String(newPw || '').length < 6) return '密码至少 6 位';
   db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(hashPassword(newPw), userId);
   return null;
 }
@@ -255,14 +262,21 @@ function reportByUser() {
 function ensureAdminAndMigrate(seedFilePath) {
   let admin = db.prepare("SELECT * FROM users WHERE role='admin' ORDER BY created_at LIMIT 1").get();
   if (!admin) {
-    const created = createUser('admin', randomPassword(), 'admin');
-    // 初始密码落盘一次（同原 auth.token 模式，仅本机可见）
-    fs.writeFileSync(path.join(path.dirname(DB_FILE), 'admin.password'), created._plainPassword + '\n');
+    const created = createUser('admin', DEFAULT_PASSWORD, 'admin'); // 初始密码 000000
     admin = { id: created.id, name: created.name, role: created.role };
-    console.log('[初始化] 已创建管理员 admin，初始密码见 data/admin.password（首次登录后请修改）');
+    console.log('[初始化] 已创建管理员 admin，初始密码 000000（登录后请在「修改密码」中更改）');
   }
   migrateJson(seedFilePath, admin.id);
   return admin;
+}
+function ensureGuestUser() {
+  // 游客只读账号（viewer），登录页"以游客身份登录"使用
+  let guest = db.prepare("SELECT * FROM users WHERE name='guest' LIMIT 1").get();
+  if (!guest) {
+    const created = createUser('guest', DEFAULT_PASSWORD, 'viewer');
+    guest = { id: created.id, name: created.name, role: created.role };
+  }
+  return guest;
 }
 function ensureDemoUser(seedFilePath) {
   let demo = db.prepare("SELECT * FROM users WHERE name='demo' LIMIT 1").get();
@@ -292,4 +306,4 @@ function migrateJson(seedFilePath, ownerId) {
   return n;
 }
 
-module.exports = { init, createUser, listUsers, getUserByName, getUserById, verifyUser, changePassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, migrateJson, randomPassword };
+module.exports = { init, DEFAULT_PASSWORD, createUser, listUsers, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };
