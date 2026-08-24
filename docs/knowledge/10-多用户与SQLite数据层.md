@@ -17,6 +17,8 @@ related: ["02-demo正式版机制", "09-GitHub托管与换机"]
 - 特点：内置模块开箱即用（Node ≥22.5，实验性警告无害）、同步 API、单文件好备份
 - **单项目粒度事务保存**（db.js `saveProject`）：每次保存 = 事务内重写该项目 phases/tasks，
   多用户并发编辑不同项目**互不覆盖**（旧 JSON 整数组保存会互相覆盖）
+- **所有权规则**：`saveProject` 只在**创建**时设定 owner（按 id 查库：已有项目保留原 owner_id）——
+  修复过 bug：编辑他人项目时曾把 owner 覆盖为编辑者（副管理员测试时把 admin 项目转给了自己）
 - 项目对象往返组回原结构 `{phases, tasks, baseline}`，现有 API/前端无感知
 
 ### 五张表

@@ -177,6 +177,9 @@ function rowToProj(r) {
 function saveProject(proj, userId) {
   if (!proj || !proj.id) throw new Error('项目无效');
   if (!userId) throw new Error('缺少归属用户');
+  // 所有权只随创建设定：已有项目保持原 owner（修复：编辑他人项目时曾把 owner 覆盖为编辑者）
+  const existing = db.prepare('SELECT owner_id FROM projects WHERE id=?').get(proj.id);
+  const ownerId = existing ? existing.owner_id : userId;
   db.exec('BEGIN');
   try {
     db.prepare(`INSERT INTO projects (id,owner_id,name,template_id,icon,color,type,level,product_type,cert,status,completed_at,engineers_json,start_date,start_cell,baseline_json,sort,created_at)
@@ -187,7 +190,7 @@ function saveProject(proj, userId) {
         cert=excluded.cert, status=excluded.status, completed_at=excluded.completed_at,
         engineers_json=excluded.engineers_json, start_date=excluded.start_date, start_cell=excluded.start_cell,
         baseline_json=excluded.baseline_json, sort=excluded.sort, created_at=excluded.created_at`)
-      .run(proj.id, userId, proj.name || '未命名项目', proj.templateId || null, proj.icon || '', proj.color || '#0a84ff',
+      .run(proj.id, ownerId, proj.name || '未命名项目', proj.templateId || null, proj.icon || '', proj.color || '#0a84ff',
         proj.type || 'C端', proj.level || 'B', proj.productType || '', proj.cert || '', proj.status || 'active',
         proj.completedAt ?? null, JSON.stringify(proj.engineers || {}), proj.startDate || null, proj.startCell || null,
         proj.baseline ? JSON.stringify(proj.baseline) : null, proj.sort || 0, proj.createdAt || new Date().toISOString());
