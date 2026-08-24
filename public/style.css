@@ -471,3 +471,40 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .sw-none { color: var(--text-3); font-size: 12px; padding: 14px; }
 .sw-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 12px; }
 .sw-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+
+/* ---------- 多用户：用户菜单 / 报告表格 / viewer 只读 ---------- */
+.user-wrap { position: relative; }
+.user-wrap .btn { white-space: nowrap; }
+#userMenu { position: absolute; top: calc(100% + 8px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 6px; min-width: 160px; box-shadow: var(--shadow); z-index: 130; display: none; }
+#userMenu.open { display: block; }
+#userMenu button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 11px 13px; border-radius: 9px; font-size: 14px; cursor: pointer; font-family: inherit; }
+#userMenu button:hover { background: var(--bg); }
+
+.rpt-head { display: flex; align-items: center; gap: 14px; padding: 4px 2px 12px; }
+.rpt-head h3 { margin: 0; font-size: 16px; }
+.rpt-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px; overflow-x: auto; }
+.rpt-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.rpt-table th { text-align: left; padding: 9px 10px; border-bottom: 2px solid var(--border); color: var(--text-2); font-weight: 600; white-space: nowrap; }
+.rpt-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+.rpt-table tbody tr:hover { background: var(--bg); }
+.rpt-table .muted { color: var(--text-2); }
+
+.nu-row { display: flex; gap: 9px; margin: 10px 0 16px; flex-wrap: wrap; }
+.nu-row .inp { flex: 1; min-width: 110px; margin: 0; }
+
+/* viewer（只读访客）：隐藏所有编辑入口，仅保留查看 */
+body.viewer #newProjectBtn,
+body.viewer #addTaskBtn,
+body.viewer #archiveBtn,
+body.viewer #delProjectBtn,
+body.viewer #exportBtn,
+body.viewer #exportMenu,
+body.viewer #aiBtn,
+body.viewer #roBtn,
+body.viewer .proj-edit,
+body.viewer .task-actions,
+body.viewer .edit-btn,
+body.viewer .del-btn,
+body.viewer .task-check { display: none !important; }
+body.viewer .proj { cursor: default; }
+body.viewer .proj .bar-fill { opacity: .85; }

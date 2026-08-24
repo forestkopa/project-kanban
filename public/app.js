@@ -20,37 +20,136 @@ const ICON = {
   tag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>',
   download: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg>'
 };
-let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false };
+let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null };
+try { const u = localStorage.getItem('kb-user'); if (u) state.user = JSON.parse(u); } catch (e) {}
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+function getToken() { try { return localStorage.getItem('kb-token') || ''; } catch (e) { return ''; } }
 async function api(path, opts = {}) {
   const method = opts.method || 'GET';
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  const doFetch = () => fetch(API + path, { ...opts, method, headers });
-  // 演示模式（--demo）：服务端免令牌鉴权，前端不再弹"访问令牌"输入框
-  if (method !== 'GET' && !state.demo) {
-    let tok = ''; try { tok = localStorage.getItem('kb-token') || ''; } catch (e) {}
-    if (tok) headers['X-Auth-Token'] = tok;
-    let r = await doFetch();
-    if (r.status === 401) {
-      // 写操作需要访问令牌：提示输入一次并记住（令牌在服务器 data/auth.token 或启动日志中）
-      const t = prompt('写操作需要访问令牌，请输入（本机服务器 data/auth.token 文件里可以查看）：');
-      if (t && t.trim()) {
-        try { localStorage.setItem('kb-token', t.trim()); } catch (e) {}
-        headers['X-Auth-Token'] = t.trim();
-        r = await doFetch();
-      }
+  const tok = getToken();
+  if (tok) headers['X-Auth-Token'] = tok;
+  let r = await fetch(API + path, { ...opts, method, headers });
+  // 未登录 / 会话失效 → 弹登录框，成功后重试一次（演示模式免登录不弹）
+  if (r.status === 401 && !state.demo && path !== '/login') {
+    const ok = await showLogin();
+    if (ok) {
+      headers['X-Auth-Token'] = getToken();
+      r = await fetch(API + path, { ...opts, method, headers });
     }
-    if (!r.ok) { const e = await r.json().catch(() => ({ error: r.status })); throw new Error(e.error || r.status); }
-    return r.status === 204 ? null : r.json();
   }
-  let r = await doFetch();
   if (!r.ok) { const e = await r.json().catch(() => ({ error: r.status })); throw new Error(e.error || r.status); }
   return r.status === 204 ? null : r.json();
 }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 1800); }
+
+/* ---------- 多用户：登录 / 登出 / 用户菜单 ---------- */
+const ROLE_NAME = { admin: '管理员', member: '成员', viewer: '访客' };
+function showLogin() {
+  return new Promise(resolve => {
+    const m = $('#loginModal'); if (!m) return resolve(false);
+    $('#loginName').value = ''; $('#loginPass').value = ''; $('#loginErr').textContent = '';
+    m.classList.remove('hidden');
+    let settled = false;
+    const done = ok => { if (settled) return; settled = true; m.classList.add('hidden'); $('#loginBtn').disabled = false; resolve(ok); };
+    const submit = async () => {
+      const name = $('#loginName').value.trim(), pw = $('#loginPass').value;
+      if (!name || !pw) { $('#loginErr').textContent = '请输入用户名和密码'; return; }
+      $('#loginBtn').disabled = true; $('#loginErr').textContent = '';
+      try {
+        const r = await fetch(API + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: pw }) });
+        const j = await r.json();
+        if (!r.ok) { $('#loginErr').textContent = j.error || '登录失败'; $('#loginBtn').disabled = false; return; }
+        try { localStorage.setItem('kb-token', j.token); localStorage.setItem('kb-user', JSON.stringify(j.user)); } catch (e) {}
+        state.user = j.user;
+        updateUserUI();
+        toast('欢迎，' + j.user.name);
+        done(true);
+      } catch (e) { $('#loginErr').textContent = '网络错误，请重试'; $('#loginBtn').disabled = false; }
+    };
+    $('#loginBtn').onclick = submit;
+    $('#loginPass').onkeydown = e => { if (e.key === 'Enter') submit(); };
+    $('#loginName').focus();
+  });
+}
+function logout() {
+  try { localStorage.removeItem('kb-token'); localStorage.removeItem('kb-user'); } catch (e) {}
+  state.user = null;
+  updateUserUI();
+  toast('已退出登录');
+  location.reload();
+}
+function updateUserUI() {
+  const wrap = document.querySelector('.user-wrap'), nameEl = $('#userName'), menu = $('#userMenu');
+  if (!wrap || !nameEl) return;
+  if (state.demo) { wrap.style.display = 'none'; document.body.classList.remove('viewer'); return; }
+  if (state.user) {
+    wrap.style.display = '';
+    nameEl.textContent = state.user.name + ' ' + (ROLE_NAME[state.user.role] || state.user.role);
+    const um = $('#userMenuUsers'); if (um) um.style.display = state.user.role === 'admin' ? '' : 'none';
+    document.body.classList.toggle('viewer', state.user.role === 'viewer');
+  } else {
+    wrap.style.display = '';
+    nameEl.textContent = '未登录';
+    const um = $('#userMenuUsers'); if (um) um.style.display = 'none';
+    document.body.classList.remove('viewer');
+  }
+  if (menu) menu.classList.remove('open');
+}
+function openUsersModal() {
+  (async () => {
+    try {
+      const users = await api('/users');
+      const tbody = $('#usersTable tbody');
+      tbody.innerHTML = users.map(u => `<tr><td>${esc(u.name)}</td><td>${ROLE_NAME[u.role] || u.role}</td><td class="muted">${(u.created_at || '').slice(0, 10)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">暂无用户</td></tr>';
+      $('#usersModal').classList.remove('hidden');
+    } catch (e) { toast(e.message); }
+  })();
+}
+function openPasswordModal() { $('#pwOld').value = ''; $('#pwNew').value = ''; $('#pwErr').textContent = ''; $('#passwordModal').classList.remove('hidden'); }
+
+/* ---------- 报告：按人聚合 ---------- */
+async function renderSummary() {
+  const wrap = $('#summary'); if (!wrap) return;
+  wrap.innerHTML = '<div class="empty">加载中…</div>';
+  try {
+    const data = await api('/report');
+    const rows = data.map(r => {
+      const phs = Object.entries(r.phases || {}).map(([n, s]) => `${n} ${s.done}/${s.total}`).join(' · ');
+      return `<tr>
+        <td><b>${esc(r.user.name)}</b> <span class="muted" style="font-weight:400">(${ROLE_NAME[r.user.role] || r.user.role})</span></td>
+        <td>${r.projects}</td><td>${r.tasks}</td><td>${r.done}</td>
+        <td style="color:${r.overdue ? '#E0241B' : ''};font-weight:${r.overdue ? '600' : '400'}">${r.overdue}</td>
+        <td>${r.rate}%</td><td class="muted" style="font-size:12px;line-height:1.6">${phs || '—'}</td>
+      </tr>`;
+    }).join('');
+    wrap.innerHTML = `
+      <div class="rpt-head">
+        <h3>项目聚合报告 · 按人汇总 <span class="muted" style="font-weight:400;font-size:12px">（${state.user && state.user.role === 'member' ? '仅显示你的统计' : '全量成员'}）</span></h3>
+        <button id="rptExport" class="btn">📄 导出 xlsx</button>
+      </div>
+      <div class="rpt-wrap">
+        <table class="rpt-table">
+          <thead><tr><th>成员</th><th>项目数</th><th>任务数</th><th>已完成</th><th>逾期</th><th>完成率</th><th>阶段分布</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    $('#rptExport').onclick = async () => {
+      try {
+        const r = await fetch(API + '/report/export?t=' + Date.now(), { headers: { 'X-Auth-Token': getToken() } });
+        if (!r.ok) throw new Error('导出失败');
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = '项目聚合报告_' + isoDate(new Date()).replace(/-/g, '') + '.xlsx';
+        a.click(); URL.revokeObjectURL(a.href);
+      } catch (e) { toast(e.message); }
+    };
+  } catch (e) { wrap.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>'; }
+}
 // 输入防抖：连续修改只在停顿后提交一次
 const _db = {};
 function debounce(key, fn, ms) { clearTimeout(_db[key]); _db[key] = setTimeout(fn, ms || 300); }
@@ -76,6 +175,7 @@ async function loadAll() {
     state.projects = await api('/projects');
     try { state.options = await api('/options'); } catch (e) { state.options = null; }
     try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
+    updateUserUI();
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
   render();
@@ -85,11 +185,11 @@ function render() {
   renderSidebar();
   const p = proj();
   $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
-  const secMap = { board: 'board', gantt: 'gantt', calendar: 'calendar', panorama: 'panorama', daily: 'report', weekly: 'report', monthly: 'monthly' };
-  ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly'].forEach(id => $('#' + id).classList.add('hidden'));
+  const secMap = { board: 'board', gantt: 'gantt', calendar: 'calendar', panorama: 'panorama', daily: 'report', weekly: 'report', monthly: 'monthly', summary: 'summary' };
+  ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly', 'summary'].forEach(id => $('#' + id).classList.add('hidden'));
   if (secMap[state.view]) $('#' + secMap[state.view]).classList.remove('hidden');
   $('#viewActions').innerHTML = '';
-  const globalViews = ['daily', 'weekly', 'monthly', 'panorama'];
+  const globalViews = ['daily', 'weekly', 'monthly', 'panorama', 'summary'];
   if (!p && !globalViews.includes(state.view)) {
     $('#projTitle').innerHTML = '<span class="muted">未选择项目</span>';
     $('#projMeta').innerHTML = '';
@@ -119,6 +219,7 @@ function render() {
   else if (state.view === 'calendar') renderCalendar(p);
   else if (state.view === 'panorama') renderPanorama();
   else if (state.view === 'monthly') renderMonthly();
+  else if (state.view === 'summary') renderSummary();
   else renderReport();
   $('#stats').style.display = (state.view === 'board') ? 'flex' : 'none';
   updateIOState();
@@ -783,6 +884,33 @@ $('#refTplDownload').onclick = () => {
 
 /* ---------- 事件 ---------- */
 $$('.tab').forEach(b => b.onclick = () => { state.view = b.dataset.view; render(); });
+/* ---- 用户菜单：登录 / 用户管理 / 改密 / 登出 ---- */
+$('#userBtn').onclick = e => {
+  e.stopPropagation();
+  if (!state.user && !state.demo) { showLogin(); return; }
+  $('#userMenu').classList.toggle('open');
+};
+document.addEventListener('click', () => { const m = $('#userMenu'); if (m) m.classList.remove('open'); });
+$$('#userMenu button').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  $('#userMenu').classList.remove('open');
+  const u = b.dataset.u;
+  if (u === 'logout') logout();
+  else if (u === 'users') openUsersModal();
+  else if (u === 'password') openPasswordModal();
+});
+$('#nuAdd').onclick = async () => {
+  const name = $('#nuName').value.trim(), pw = $('#nuPass').value, role = $('#nuRole').value;
+  if (!name || pw.length < 6) { toast('用户名必填，密码至少 6 位'); return; }
+  try { await api('/users', { method: 'POST', body: JSON.stringify({ name, password: pw, role }) }); toast('已创建 ' + name); $('#nuName').value = ''; $('#nuPass').value = ''; openUsersModal(); }
+  catch (e) { toast(e.message); }
+};
+$('#pwSave').onclick = async () => {
+  const old = $('#pwOld').value, next = $('#pwNew').value;
+  if (next.length < 6) { $('#pwErr').textContent = '新密码至少 6 位'; return; }
+  try { await api('/password', { method: 'POST', body: JSON.stringify({ old, next }) }); $('#passwordModal').classList.add('hidden'); toast('密码已修改'); }
+  catch (e) { $('#pwErr').textContent = e.message; }
+};
 $('#newProjectBtn').onclick = () => { if (state.readonly) { toast('只读模式，无法新建项目'); return; } $('#newProjectModal').classList.remove('hidden'); };
 $('#roBtn').onclick = async () => {
   const target = !state.readonly;

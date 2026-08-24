@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>多项目管理看板</title>
-<link rel="stylesheet" href="/style.css?v=20260820-r51">
+<link rel="stylesheet" href="/style.css?v=20260824-r52">
 </head>
 <body>
 <div id="roBanner" class="hidden">🔒 只读模式：当前仅可查看，修改已锁定</div>
@@ -42,6 +42,14 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6 6 0 0021 12.8z"/></svg></button>
       <button id="roBtn" class="btn" title="只读模式开关（分享前开启，防止他人修改）">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> 只读</button>
+      <div class="user-wrap">
+        <button id="userBtn" class="btn" title="账户菜单">👤 <span id="userName"></span> ▾</button>
+        <div id="userMenu" class="export-menu">
+          <button id="userMenuUsers" data-u="users"><span class="em-ico">👥</span>用户管理</button>
+          <button data-u="password"><span class="em-ico">🔑</span>修改密码</button>
+          <button data-u="logout"><span class="em-ico">🚪</span>退出登录</button>
+        </div>
+      </div>
     </div>
   </header>
   <div id="scrim" class="hidden"></div>
@@ -54,6 +62,7 @@
       <button class="tab" data-view="daily">日报</button>
       <button class="tab" data-view="weekly">周报</button>
       <button class="tab" data-view="monthly">月度计划</button>
+      <button class="tab" data-view="summary">📊 报告</button>
     </div>
     <div id="viewActions" class="view-actions"></div>
   </div>
@@ -64,7 +73,49 @@
   <section id="panorama" class="view hidden"></section>
   <section id="report" class="view hidden"></section>
   <section id="monthly" class="view hidden"></section>
+  <section id="summary" class="view hidden"></section>
 </main>
+
+<!-- 登录 -->
+<div id="loginModal" class="modal hidden">
+  <div class="modal-box" style="width:min(380px,92vw)">
+    <div class="modal-head"><h3>🔐 登录</h3><span class="pi-sub" style="margin:0" id="loginSub"></span></div>
+    <input id="loginName" class="inp" placeholder="用户名" autocomplete="username">
+    <input id="loginPass" class="inp" type="password" placeholder="密码" autocomplete="current-password">
+    <div id="loginErr" class="pi-sub" style="color:#E0241B;min-height:18px"></div>
+    <button id="loginBtn" class="btn primary" style="width:100%">登 录</button>
+  </div>
+</div>
+
+<!-- 用户管理（admin） -->
+<div id="usersModal" class="modal hidden">
+  <div class="modal-box" style="width:min(560px,94vw)">
+    <div class="modal-head"><h3>👥 用户管理</h3><button class="x" data-close>×</button></div>
+    <div class="pi-sub">新建用户（密码 ≥ 6 位；成员可自行修改密码）</div>
+    <div class="nu-row">
+      <input id="nuName" class="inp" placeholder="用户名">
+      <input id="nuPass" class="inp" placeholder="初始密码">
+      <select id="nuRole" class="inp">
+        <option value="member">成员</option>
+        <option value="viewer">访客（只读）</option>
+        <option value="admin">管理员</option>
+      </select>
+      <button id="nuAdd" class="btn primary">添加</button>
+    </div>
+    <table id="usersTable" class="rpt-table"><thead><tr><th>用户名</th><th>角色</th><th>创建时间</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<!-- 修改密码 -->
+<div id="passwordModal" class="modal hidden">
+  <div class="modal-box" style="width:min(380px,92vw)">
+    <div class="modal-head"><h3>🔑 修改密码</h3><button class="x" data-close>×</button></div>
+    <input id="pwOld" class="inp" type="password" placeholder="当前密码" autocomplete="current-password">
+    <input id="pwNew" class="inp" type="password" placeholder="新密码（≥6 位）" autocomplete="new-password">
+    <div id="pwErr" class="pi-sub" style="color:#E0241B;min-height:18px"></div>
+    <button id="pwSave" class="btn primary" style="width:100%">保存</button>
+  </div>
+</div>
 
 <!-- 新建项目：双入口 -->
 <div id="newProjectModal" class="modal hidden">
@@ -238,7 +289,7 @@
   </div>
 </div>
 
-<script src="/app.js?v=20260820-r51"></script>
+<script src="/app.js?v=20260824-r52"></script>
 <script>
 (function(){
   var root = document.documentElement;

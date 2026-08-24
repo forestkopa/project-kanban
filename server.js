@@ -185,6 +185,34 @@ function buildTodoXlsx(projects, monIso, sunIso) {
   XLSXS.utils.book_append_sheet(wb, ws, '待办清单');
   return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
+/* 聚合报告导出：按人汇总（样式同周报：矢车菊蓝表头 + 隔行浅蓝） */
+function buildReportXlsx(rows) {
+  const ACCENT1_50 = '1F3864', ZEBRA = 'F2F7FD';
+  const THIN = { style: 'thin', color: { rgb: 'B4C7E7' } };
+  const BD = { top: THIN, bottom: THIN, left: THIN, right: THIN };
+  const FONT = { name: '微软雅黑' };
+  const header = ['成员', '角色', '项目数', '任务数', '已完成', '逾期', '完成率'];
+  const aoa = [[`项目聚合报告（按人汇总 · ${isoDate(new Date())}）`], header];
+  (rows || []).forEach(r => aoa.push([r.user.name, r.user.role, r.projects, r.tasks, r.done, r.overdue, r.rate + '%']));
+  const ws = XLSXS.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+  const setCell = (r, c, s) => { const a = XLSXS.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].s = s; };
+  const titleS = { font: { ...FONT, bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
+  for (let c = 0; c < 7; c++) setCell(0, c, titleS);
+  const headS = { font: { ...FONT, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
+  for (let c = 0; c < 7; c++) setCell(1, c, headS);
+  (rows || []).forEach((r, i) => {
+    for (let c = 0; c < 7; c++) setCell(i + 2, c, {
+      font: { ...FONT, color: { rgb: '000000' } },
+      fill: { fgColor: { rgb: i % 2 === 0 ? 'FFFFFF' : ZEBRA } },
+      alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center' },
+      border: BD
+    });
+  });
+  const wb = XLSXS.utils.book_new();
+  XLSXS.utils.book_append_sheet(wb, ws, '聚合报告');
+  return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
 /* ---------- 参考模版：由内置模版生成甘特方言 Excel（开始/截止带公式 → 导入后级联） ---------- */
 function workdayAdd(baseStr, n) {
   const wk = [0, 6]; // weekend=1：周六日休息
@@ -578,6 +606,20 @@ const server = http.createServer(async (req, res) => {
       const full = DEMO_MODE || req.user.role === 'admin' || req.user.role === 'viewer';
       const data = db.reportByUser();
       return send(res, 200, full ? data : data.filter(r => r.user.id === req.user.id));
+    }
+    // 聚合报告导出 xlsx（权限同 /api/report）
+    if (p === '/api/report/export' && req.method === 'GET') {
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      const full = DEMO_MODE || req.user.role === 'admin' || req.user.role === 'viewer';
+      const data = db.reportByUser();
+      const rows = full ? data : data.filter(r => r.user.id === req.user.id);
+      const buf = buildReportXlsx(rows);
+      const date = isoDate(new Date()).replace(/-/g, '');
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="kanban_report_${date}.xlsx"; filename*=UTF-8''${encodeURIComponent('项目聚合报告_' + date + '.xlsx')}`
+      });
+      return res.end(buf);
     }
     // 只读模式：查询 / 切换（始终可用）
     if (p === '/api/readonly') {
