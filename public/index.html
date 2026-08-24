@@ -271,9 +271,15 @@
   <div class="modal-box" style="width:min(480px,94vw)">
     <div class="modal-head"><h3>AI 设置</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">兼容 OpenAI / 任意 OpenAI 格式接口（本地 Ollama、Azure、第三方代理均可）。Key 仅保存在本机 data/ai.json，不会上传。</div>
-    <input id="aiBase" class="inp" placeholder="Base URL（如 https://api.openai.com/v1）">
-    <input id="aiModel" class="inp" placeholder="模型名（如 gpt-4o-mini）">
-    <input id="aiKey" class="inp" type="password" placeholder="API Key（留空 = 保持不变）">
+    <input id="aiBase" class="inp" placeholder="Base URL（云 API 或本地服务，如 http://127.0.0.1:11434/v1）">
+    <input id="aiModel" class="inp" placeholder="模型名（如 gpt-4o-mini / llama3）">
+    <input id="aiKey" class="inp" type="password" placeholder="API Key（本地模型无需填写）">
+    <label class="remember-row"><input type="checkbox" id="aiLocal"> 🖥 本地大模型（无需 API Key，需 OpenAI 兼容服务：Ollama / LM Studio / vLLM）</label>
+    <div class="nu-row" style="margin:6px 0">
+      <button class="btn" id="aiDetectOllama">🔍 检测本机 Ollama</button>
+      <select id="aiLocalModel" class="inp" style="display:none;margin:0"></select>
+      <span id="aiOllamaMsg" class="pi-sub" style="margin:0"></span>
+    </div>
     <div style="display:flex;gap:10px;margin-top:4px">
       <button class="btn" id="aiKeyClear" style="display:none">🗑 清除 Key</button>
       <button class="btn primary" id="aiSaveBtn" style="flex:1">保存设置</button>

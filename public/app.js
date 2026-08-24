@@ -1042,9 +1042,12 @@ async function openAiSettings() {
     $('#aiBase').value = c.base_url || '';
     $('#aiModel').value = c.model || '';
     $('#aiKey').value = '';
-    $('#aiKey').placeholder = c.configured ? ('留空=保持不变（当前 ' + (c.key_masked || '****') + '）') : 'API Key（留空则用模板规则兜底）';
-    $('#aiSettingsMsg').textContent = c.configured ? ('已配置 Key：' + (c.key_masked || '****') + '（留空保存不会清除，填新值可更换）') : '尚未配置 Key';
-    $('#aiKeyClear').style.display = c.configured ? '' : 'none';
+    $('#aiLocal').checked = !!c.local;
+    $('#aiLocalModel').style.display = 'none';
+    $('#aiOllamaMsg').textContent = '';
+    $('#aiKey').placeholder = c.local ? '本地模型无需 API Key' : (c.configured ? ('留空=保持不变（当前 ' + (c.key_masked || '****') + '）') : 'API Key（本地模型可留空）');
+    $('#aiSettingsMsg').textContent = c.local ? ('已启用本地大模型：' + (c.base_url || '') + ' · ' + (c.model || '')) : (c.configured ? ('已配置 Key：' + (c.key_masked || '****') + '（留空保存不会清除，填新值可更换）') : '尚未配置（可填云 API Key 或启用本地模型）');
+    $('#aiKeyClear').style.display = (c.configured && !c.local) ? '' : 'none';
   } catch (e) { $('#aiSettingsMsg').textContent = ''; }
 }
 $('#aiSettingsOpen').onclick = openAiSettings;
@@ -1053,16 +1056,37 @@ $('#aiKeyClear').onclick = async () => {
     await api('/ai/config', { method: 'POST', body: JSON.stringify({ clear_key: true }) });
     $('#aiSettingsMsg').textContent = '已清除 Key（将走模板规则兜底）';
     $('#aiKeyClear').style.display = 'none';
-    $('#aiKey').placeholder = 'API Key';
+    $('#aiKey').placeholder = 'API Key（本地模型可留空）';
     toast('API Key 已清除');
   } catch (e) { $('#aiSettingsMsg').textContent = '清除失败：' + e.message; }
 };
+// 本地大模型：检测本机 Ollama
+$('#aiDetectOllama').onclick = async () => {
+  const msg = $('#aiOllamaMsg'), sel = $('#aiLocalModel');
+  msg.textContent = '检测中…';
+  try {
+    const r = await api('/ai/ollama-models');
+    if (r.online && r.models.length) {
+      sel.innerHTML = r.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      sel.style.display = '';
+      msg.textContent = '已检测到 Ollama，选择模型自动配置：';
+    } else { sel.style.display = 'none'; msg.textContent = '未检测到本机 Ollama（需先安装并启动：ollama serve）'; }
+  } catch (e) { sel.style.display = 'none'; msg.textContent = '检测失败：' + e.message; }
+};
+$('#aiLocalModel').onchange = () => {
+  $('#aiBase').value = 'http://127.0.0.1:11434/v1';
+  $('#aiModel').value = $('#aiLocalModel').value;
+  $('#aiLocal').checked = true;
+  $('#aiKey').value = '';
+  $('#aiKeyClear').style.display = 'none';
+  $('#aiSettingsMsg').textContent = '已选用本地模型「' + $('#aiLocalModel').value + '」，点「保存设置」生效（无需 Key）';
+};
 $('#aiSaveBtn').onclick = async () => {
   try {
-    const r = await api('/ai/config', { method: 'POST', body: JSON.stringify({ base_url: $('#aiBase').value, model: $('#aiModel').value, api_key: $('#aiKey').value }) });
-    $('#aiSettingsMsg').textContent = r.configured ? ('已保存（Key：' + (r.key_masked || '****') + '）') : '已保存（未配置 Key，将走模板规则兜底）';
+    const r = await api('/ai/config', { method: 'POST', body: JSON.stringify({ base_url: $('#aiBase').value, model: $('#aiModel').value, api_key: $('#aiKey').value, local: $('#aiLocal').checked }) });
+    $('#aiSettingsMsg').textContent = r.local ? ('已启用本地大模型：' + (r.base_url || '') + ' · ' + (r.model || '')) : (r.configured ? ('已保存（Key：' + (r.key_masked || '****') + '）') : '已保存（未配置 Key，将走模板规则兜底）');
     $('#aiKey').value = '';
-    $('#aiKeyClear').style.display = r.configured ? '' : 'none';
+    $('#aiKeyClear').style.display = (r.configured && !r.local) ? '' : 'none';
     toast('AI 设置已保存');
   } catch (e) { $('#aiSettingsMsg').textContent = '保存失败：' + e.message; }
 };

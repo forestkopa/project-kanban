@@ -455,10 +455,11 @@ db.ensureGuestUser();
   } catch (e) { /* 不影响启动 */ }
 })();
 
-/* ---------- AI 助手：OpenAI 兼容接口（Node 原生 https，无额外依赖） ---------- */
-function loadAI() { return Object.assign({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', api_key: '' }, loadJSON(AI_FILE, {})); }
+/* ---------- AI 助手：OpenAI 兼容接口（Node 原生 https/http，无额外依赖；支持本地大模型） ---------- */
+function loadAI() { return Object.assign({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', api_key: '', local: false }, loadJSON(AI_FILE, {})); }
 function saveAI(cfg) { try { fs.writeFileSync(AI_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {} return cfg; }
-function aiConfigured(cfg) { return !!(cfg && cfg.api_key); }
+// 已配置判定：云 Key 或本地模型（local 标志）任一即可
+function aiConfigured(cfg) { return !!(cfg && (cfg.api_key || cfg.local)); }
 function maskKey(k) { if (!k) return ''; const s = String(k); if (s.length <= 8) return '****'; return s.slice(0, 3) + '****' + s.slice(-4); }
 function chatCompletions(cfg, messages, temperature) {
   return new Promise((resolve, reject) => {
@@ -468,10 +469,9 @@ function chatCompletions(cfg, messages, temperature) {
     const data = Buffer.from(payload);
     const isHttps = url.protocol === 'https:';
     const lib = isHttps ? https : require('http');
-    const options = {
-      hostname: url.hostname, port: url.port || (isHttps ? 443 : 80), path: url.pathname + url.search, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, 'Authorization': 'Bearer ' + (cfg.api_key || '') }, timeout: 60000
-    };
+    const headers = { 'Content-Type': 'application/json', 'Content-Length': data.length };
+    if (cfg.api_key) headers['Authorization'] = 'Bearer ' + cfg.api_key; // 本地模型无 Key 不带头
+    const options = { hostname: url.hostname, port: url.port || (isHttps ? 443 : 80), path: url.pathname + url.search, method: 'POST', headers, timeout: 60000 };
     const req = lib.request(options, resp => {
       let buf = ''; resp.on('data', d => buf += d);
       resp.on('end', () => {
@@ -691,19 +691,32 @@ const server = http.createServer(async (req, res) => {
 
     // ---- AI 助手（OpenAI 兼容） ----
     if (p === '/api/ai/config') {
-      if (req.method === 'GET') { const c = loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key) }); }
+      if (req.method === 'GET') { const c = loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local }); }
       if (req.method === 'POST') {
         const body = await readBody(req);
         const c = loadAI();
         if (body.base_url !== undefined) c.base_url = String(body.base_url).trim() || 'https://api.openai.com/v1';
         if (body.model !== undefined) c.model = String(body.model).trim() || 'gpt-4o-mini';
+        if (body.local !== undefined) c.local = !!body.local;
         // Key：留空/未传 = 保持不变（修复：旧逻辑空串会清掉已配置 Key）；显式 clear_key 才清除
         if (body.clear_key === true) c.api_key = '';
         else if (body.api_key !== undefined && body.api_key !== null && String(body.api_key).trim() !== '') c.api_key = String(body.api_key).trim();
         saveAI(c);
-        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key) });
+        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local });
       }
       return send(res, 405, { error: '方法不允许' });
+    }
+    // 本地大模型：探测本机 Ollama（OpenAI 兼容本地服务），返回可用模型列表
+    if (p === '/api/ai/ollama-models' && req.method === 'GET') {
+      try {
+        const body = await new Promise((resolve, reject) => {
+          const rq = http.get('http://127.0.0.1:11434/api/tags', { timeout: 2000 }, resp => { let b = ''; resp.on('data', d => b += d); resp.on('end', () => resolve(b)); });
+          rq.on('error', reject); rq.on('timeout', () => rq.destroy(new Error('timeout')));
+        });
+        const j = JSON.parse(body);
+        const models = ((j.models || []).map(m => m.name)).filter(Boolean);
+        return send(res, 200, { online: true, models });
+      } catch (e) { return send(res, 200, { online: false, models: [] }); }
     }
     if (p === '/api/ai/chat' && req.method === 'POST') {
       const body = await readBody(req);
