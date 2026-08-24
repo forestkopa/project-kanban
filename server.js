@@ -196,6 +196,7 @@ function buildReportXlsx(rows) {
   (rows || []).forEach(r => aoa.push([r.user.name, r.user.role, r.projects, r.tasks, r.done, r.overdue, r.rate + '%']));
   const ws = XLSXS.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }]; // 标题行跨列合并居中
   const setCell = (r, c, s) => { const a = XLSXS.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].s = s; };
   const titleS = { font: { ...FONT, bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
   for (let c = 0; c < 7; c++) setCell(0, c, titleS);
