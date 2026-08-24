@@ -104,6 +104,11 @@ function createUser(name, password, role) {
   return { id, name, role: role || 'member' };
 }
 function listUsers() { return db.prepare('SELECT id,name,role,created_at FROM users ORDER BY created_at').all(); }
+// 管理员修改用户角色（role 白名单由调用方校验）
+function updateUserRole(userId, role) {
+  const r = db.prepare('UPDATE users SET role=? WHERE id=?').run(role, userId);
+  return r.changes > 0;
+}
 function getUserByName(name) { return db.prepare('SELECT * FROM users WHERE name=?').get(name); }
 function getUserById(id) { return db.prepare('SELECT id,name,role FROM users WHERE id=?').get(id); }
 function verifyUser(name, password) {
@@ -308,4 +313,4 @@ function migrateJson(seedFilePath, ownerId) {
   return n;
 }
 
-module.exports = { init, DEFAULT_PASSWORD, createUser, listUsers, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };
+module.exports = { init, DEFAULT_PASSWORD, createUser, listUsers, updateUserRole, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };

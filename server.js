@@ -586,7 +586,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'GET' && req.user && req.user.role === 'viewer') {
       return send(res, 403, { error: '只读访客，无修改权限' });
     }
-    // 用户管理（admin）：列出 / 新建用户
+    // 用户管理（admin）：列出 / 新建 / 改角色
     if (p === '/api/users') {
       if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
       if (req.method === 'GET') return send(res, 200, db.listUsers());
@@ -601,6 +601,17 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { id: u.id, name: u.name, role: u.role });
       }
       return send(res, 405, { error: '方法不允许' });
+    }
+    // 修改用户角色（admin；不能改自己的角色，防锁死）
+    const uEdit = p.match(/^\/api\/users\/([^/]+)$/);
+    if (uEdit && req.method === 'PUT') {
+      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
+      const body = await readBody(req);
+      const role = ['admin', 'manager', 'member', 'viewer'].includes(body.role) ? body.role : null;
+      if (!role) return send(res, 400, { error: '角色无效' });
+      if (uEdit[1] === req.user.id) return send(res, 400, { error: '不能修改自己的角色' });
+      if (!db.updateUserRole(uEdit[1], role)) return send(res, 404, { error: '用户不存在' });
+      return send(res, 200, { ok: true, role });
     }
     // 按人聚合报告：admin/manager/viewer 全量；member 仅自己的统计
     if (p === '/api/report' && req.method === 'GET') {

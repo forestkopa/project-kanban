@@ -124,8 +124,16 @@ function openUsersModal() {
     try {
       const users = await api('/users');
       const tbody = $('#usersTable tbody');
-      tbody.innerHTML = users.map(u => `<tr><td>${esc(u.name)}</td><td>${ROLE_NAME[u.role] || u.role}</td><td class="muted">${(u.created_at || '').slice(0, 10)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">暂无用户</td></tr>';
+      tbody.innerHTML = users.map(u => `<tr>
+        <td>${esc(u.name)}</td>
+        <td><select class="role-sel inp" data-uid="${u.id}" ${u.id === (state.user && state.user.id) ? 'disabled title="不能修改自己的角色"' : ''}>${['admin', 'manager', 'member', 'viewer'].map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${ROLE_NAME[r]}</option>`).join('')}</select></td>
+        <td class="muted">${(u.created_at || '').slice(0, 10)}</td>
+      </tr>`).join('') || '<tr><td colspan="3" class="muted">暂无用户</td></tr>';
       $('#usersModal').classList.remove('hidden');
+      $$('.role-sel', tbody).forEach(sel => sel.onchange = async () => {
+        try { await api('/users/' + sel.dataset.uid, { method: 'PUT', body: JSON.stringify({ role: sel.value }) }); toast('角色已更新为「' + (ROLE_NAME[sel.value] || sel.value) + '」'); }
+        catch (e) { toast(e.message); openUsersModal(); }
+      });
     } catch (e) { toast(e.message); }
   })();
 }

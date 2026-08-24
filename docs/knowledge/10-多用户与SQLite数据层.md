@@ -49,6 +49,7 @@ related: ["02-demo正式版机制", "09-GitHub托管与换机"]
 | viewer 访客（游客） | 全量只读 | ❌ 403 | — | 全量 |
 
 - 副管理员 = admin 全部权限 − 用户管理（/api/users 仅 admin；建用户下拉可选 manager）
+- 角色可改：`PUT /api/users/:id` {role}（admin；白名单 admin/manager/member/viewer；**不能改自己的角色**防锁死）；用户管理表格角色下拉即时生效
 - viewer 前端：`body.viewer` CSS 隐藏全部编辑入口 + 后端 403 双保险
 - 报告：`GET /api/report`（按人聚合：项目数/任务/完成/逾期/完成率/阶段分布）+ `/api/report/export` xlsx；**系统游客账号 guest 已从报告排除**（无项目不参与聚合）
 

@@ -513,3 +513,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
 .remember-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); margin: 10px 2px 2px; cursor: pointer; user-select: none; }
 .remember-row input { accent-color: var(--accent); width: 15px; height: 15px; }
 #guestBtn { background: var(--bg); }
+
+/* 用户管理：角色下拉 */
+.role-sel { width: 112px; padding: 5px 8px; font-size: 13px; margin: 0; }
+.role-sel:disabled { opacity: .6; }
