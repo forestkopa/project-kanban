@@ -247,7 +247,7 @@ function render() {
     const ptc = productTypeColor(p.productType);
     $('#projTitle').innerHTML = `<span class="pdot" style="background:${p.color}"></span> ${esc(p.name)} <span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}`;
     const isArch = (p.status || 'active') === 'archived';
-    $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">' + ICON.box + ' 已归档</span>' : ''}`;
+    $('#projMeta').innerHTML = `${p.cert ? `<span class="cert-tag">${esc(p.cert)}</span>` : ''}${isArch ? '<span class="tag" style="background:#8E8E93;color:#fff">' + ICON.box + ' 已归档</span>' : ''}`;
   }
   if (state.view === 'board') renderBoard(p);
   else if (state.view === 'gantt') renderGantt(p);
@@ -283,7 +283,7 @@ function projCard(p, dim) {
   const ptc = productTypeColor(p.productType);
   el.innerHTML = `<div class="proj-top"><span class="dot" style="background:${p.color}"></span><span class="pname">${esc(p.name)}</span><span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}</div>
     <div class="bar"><div class="bar-fill" style="width:${pc}%;background:${p.color}"></div></div>
-    <div class="pmeta">${pc}% · ${p.tasks.filter(t => t.done).length}/${p.tasks.length}${p.cert ? `<span class="cert-tag">${ICON.tag} ${esc(p.cert)}</span>` : ''}${dim ? ' · ' + ICON.box + '已归档' : ''}</div>
+    <div class="pmeta">${pc}% · ${p.tasks.filter(t => t.done).length}/${p.tasks.length}${p.cert ? `<span class="cert-tag">${esc(p.cert)}</span>` : ''}${dim ? ' · ' + ICON.box + '已归档' : ''}</div>
     <button class="proj-edit" title="编辑项目信息">${ICON.edit}</button>`;
   el.querySelector('.proj-edit').onclick = e => {
     e.stopPropagation();
