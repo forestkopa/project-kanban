@@ -459,6 +459,7 @@ db.ensureGuestUser();
 function loadAI() { return Object.assign({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', api_key: '' }, loadJSON(AI_FILE, {})); }
 function saveAI(cfg) { try { fs.writeFileSync(AI_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {} return cfg; }
 function aiConfigured(cfg) { return !!(cfg && cfg.api_key); }
+function maskKey(k) { if (!k) return ''; const s = String(k); if (s.length <= 8) return '****'; return s.slice(0, 3) + '****' + s.slice(-4); }
 function chatCompletions(cfg, messages, temperature) {
   return new Promise((resolve, reject) => {
     const base = String(cfg.base_url || 'https://api.openai.com/v1').replace(/\/+$/, '');
@@ -690,15 +691,17 @@ const server = http.createServer(async (req, res) => {
 
     // ---- AI 助手（OpenAI 兼容） ----
     if (p === '/api/ai/config') {
-      if (req.method === 'GET') { const c = loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c) }); }
+      if (req.method === 'GET') { const c = loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key) }); }
       if (req.method === 'POST') {
         const body = await readBody(req);
         const c = loadAI();
         if (body.base_url !== undefined) c.base_url = String(body.base_url).trim() || 'https://api.openai.com/v1';
         if (body.model !== undefined) c.model = String(body.model).trim() || 'gpt-4o-mini';
-        if (body.api_key !== undefined) c.api_key = String(body.api_key);
+        // Key：留空/未传 = 保持不变（修复：旧逻辑空串会清掉已配置 Key）；显式 clear_key 才清除
+        if (body.clear_key === true) c.api_key = '';
+        else if (body.api_key !== undefined && body.api_key !== null && String(body.api_key).trim() !== '') c.api_key = String(body.api_key).trim();
         saveAI(c);
-        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c) });
+        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key) });
       }
       return send(res, 405, { error: '方法不允许' });
     }

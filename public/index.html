@@ -273,8 +273,11 @@
     <div class="pi-sub">兼容 OpenAI / 任意 OpenAI 格式接口（本地 Ollama、Azure、第三方代理均可）。Key 仅保存在本机 data/ai.json，不会上传。</div>
     <input id="aiBase" class="inp" placeholder="Base URL（如 https://api.openai.com/v1）">
     <input id="aiModel" class="inp" placeholder="模型名（如 gpt-4o-mini）">
-    <input id="aiKey" class="inp" type="password" placeholder="API Key（留空则使用模板规则兜底）">
-    <button class="btn primary" id="aiSaveBtn">保存设置</button>
+    <input id="aiKey" class="inp" type="password" placeholder="API Key（留空 = 保持不变）">
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn" id="aiKeyClear" style="display:none">🗑 清除 Key</button>
+      <button class="btn primary" id="aiSaveBtn" style="flex:1">保存设置</button>
+    </div>
     <div id="aiSettingsMsg" class="pi-sub" style="margin-top:8px"></div>
   </div>
 </div>

@@ -1037,14 +1037,32 @@ $('#aiCreateBtn').onclick = aiCreate;
 /* ---- AI 设置 ---- */
 async function openAiSettings() {
   $('#aiSettingsModal').classList.remove('hidden');
-  try { const c = await api('/ai/config'); $('#aiBase').value = c.base_url || ''; $('#aiModel').value = c.model || ''; $('#aiKey').value = ''; $('#aiSettingsMsg').textContent = c.configured ? '当前已配置 Key' : '尚未配置 Key'; }
-  catch (e) { $('#aiSettingsMsg').textContent = ''; }
+  try {
+    const c = await api('/ai/config');
+    $('#aiBase').value = c.base_url || '';
+    $('#aiModel').value = c.model || '';
+    $('#aiKey').value = '';
+    $('#aiKey').placeholder = c.configured ? ('留空=保持不变（当前 ' + (c.key_masked || '****') + '）') : 'API Key（留空则用模板规则兜底）';
+    $('#aiSettingsMsg').textContent = c.configured ? ('已配置 Key：' + (c.key_masked || '****') + '（留空保存不会清除，填新值可更换）') : '尚未配置 Key';
+    $('#aiKeyClear').style.display = c.configured ? '' : 'none';
+  } catch (e) { $('#aiSettingsMsg').textContent = ''; }
 }
 $('#aiSettingsOpen').onclick = openAiSettings;
+$('#aiKeyClear').onclick = async () => {
+  try {
+    await api('/ai/config', { method: 'POST', body: JSON.stringify({ clear_key: true }) });
+    $('#aiSettingsMsg').textContent = '已清除 Key（将走模板规则兜底）';
+    $('#aiKeyClear').style.display = 'none';
+    $('#aiKey').placeholder = 'API Key';
+    toast('API Key 已清除');
+  } catch (e) { $('#aiSettingsMsg').textContent = '清除失败：' + e.message; }
+};
 $('#aiSaveBtn').onclick = async () => {
   try {
     const r = await api('/ai/config', { method: 'POST', body: JSON.stringify({ base_url: $('#aiBase').value, model: $('#aiModel').value, api_key: $('#aiKey').value }) });
-    $('#aiSettingsMsg').textContent = r.configured ? '已保存（Key 已写入本机 data/ai.json）' : '已保存（未填 Key，将走模板规则兜底）';
+    $('#aiSettingsMsg').textContent = r.configured ? ('已保存（Key：' + (r.key_masked || '****') + '）') : '已保存（未配置 Key，将走模板规则兜底）';
+    $('#aiKey').value = '';
+    $('#aiKeyClear').style.display = r.configured ? '' : 'none';
     toast('AI 设置已保存');
   } catch (e) { $('#aiSettingsMsg').textContent = '保存失败：' + e.message; }
 };
