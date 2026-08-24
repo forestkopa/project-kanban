@@ -595,23 +595,23 @@ const server = http.createServer(async (req, res) => {
         const pw = String(body.password || '');
         if (!name || pw.length < 6) return send(res, 400, { error: '用户名必填，密码至少 6 位' });
         if (db.getUserByName(name)) return send(res, 400, { error: '用户名已存在' });
-        const role = ['admin', 'member', 'viewer'].includes(body.role) ? body.role : 'member';
+        const role = ['admin', 'manager', 'member', 'viewer'].includes(body.role) ? body.role : 'member';
         const u = db.createUser(name, pw, role);
         return send(res, 201, { id: u.id, name: u.name, role: u.role });
       }
       return send(res, 405, { error: '方法不允许' });
     }
-    // 按人聚合报告：admin/viewer 全量；member 仅自己的统计
+    // 按人聚合报告：admin/manager/viewer 全量；member 仅自己的统计
     if (p === '/api/report' && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const full = DEMO_MODE || req.user.role === 'admin' || req.user.role === 'viewer';
+      const full = DEMO_MODE || ['admin', 'manager', 'viewer'].includes(req.user.role);
       const data = db.reportByUser();
       return send(res, 200, full ? data : data.filter(r => r.user.id === req.user.id));
     }
     // 聚合报告导出 xlsx（权限同 /api/report）
     if (p === '/api/report/export' && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const full = DEMO_MODE || req.user.role === 'admin' || req.user.role === 'viewer';
+      const full = DEMO_MODE || ['admin', 'manager', 'viewer'].includes(req.user.role);
       const data = db.reportByUser();
       const rows = full ? data : data.filter(r => r.user.id === req.user.id);
       const buf = buildReportXlsx(rows);
@@ -804,7 +804,7 @@ const server = http.createServer(async (req, res) => {
     const ex = p.match(/^\/api\/projects\/([^/]+)\/export$/);
     if (ex && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const proj = db.getProject(ex[1], req.user.id, req.user.role === 'admin' || req.user.role === 'viewer');
+      const proj = db.getProject(ex[1], req.user.id, ['admin', 'manager', 'viewer'].includes(req.user.role));
       if (!proj) return send(res, 404, { error: '项目不存在' });
       const type = url.searchParams.get('type') || 'latest';
       const date = isoDate(new Date()).replace(/-/g, '');
@@ -883,8 +883,8 @@ const server = http.createServer(async (req, res) => {
     if (m) {
       const pid = m[1]; const tid = m[2];
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const isAdmin = req.user.role === 'admin';
-      const canAll = isAdmin || req.user.role === 'viewer'; // admin 全量 + viewer 只读全量
+      const isAdmin = req.user.role === 'admin' || req.user.role === 'manager'; // admin/副管理员：全量项目权限
+      const canAll = isAdmin || req.user.role === 'viewer'; // + viewer 只读全量
       if (!pid) {
         if (req.method === 'GET') return send(res, 200, db.listProjects(req.user.id, canAll));
         if (req.method === 'POST') {

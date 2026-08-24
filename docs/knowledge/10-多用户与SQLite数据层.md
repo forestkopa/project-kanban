@@ -39,14 +39,16 @@ related: ["02-demo正式版机制", "09-GitHub托管与换机"]
 - 兼容：旧 `data/auth.token` 单 token 视为 admin（老前端无缝升级）
 - 改密：`POST /api/password`（校验旧密码，含 viewer）；admin 可 `resetPassword` 重置任意用户
 
-### 三角色权限
+### 四角色权限（2026-08-24 起）
 
 | 角色 | 项目可见 | 写操作 | 用户管理 | 聚合报告 |
 |---|---|---|---|---|
-| admin | 全量 | ✅ | ✅ | 全量 |
-| member | 仅自己 | 自己的 | — | 仅自己的 |
-| viewer（游客） | 全量只读 | ❌ 403 | — | 全量 |
+| admin 管理员 | 全量 | ✅ | ✅ | 全量 |
+| manager 副管理员 | 全量 | ✅（含他人项目） | ❌ 403 | 全量 |
+| member 成员 | 仅自己 | 自己的 | — | 仅自己的 |
+| viewer 访客（游客） | 全量只读 | ❌ 403 | — | 全量 |
 
+- 副管理员 = admin 全部权限 − 用户管理（/api/users 仅 admin；建用户下拉可选 manager）
 - viewer 前端：`body.viewer` CSS 隐藏全部编辑入口 + 后端 403 双保险
 - 报告：`GET /api/report`（按人聚合：项目数/任务/完成/逾期/完成率/阶段分布）+ `/api/report/export` xlsx；**系统游客账号 guest 已从报告排除**（无项目不参与聚合）
 

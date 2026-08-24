@@ -47,7 +47,7 @@ async function api(path, opts = {}) {
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 1800); }
 
 /* ---------- 多用户：登录 / 登出 / 用户菜单 ---------- */
-const ROLE_NAME = { admin: '管理员', member: '成员', viewer: '访客' };
+const ROLE_NAME = { admin: '管理员', manager: '副管理员', member: '成员', viewer: '访客' };
 function showLogin() {
   return new Promise(resolve => {
     const m = $('#loginModal'); if (!m) return resolve(false);
