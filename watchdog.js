@@ -16,7 +16,8 @@ const ROOT = __dirname;
 const NODE = process.execPath;
 const SERVER = path.join(ROOT, 'server.js');
 const INTERVAL = 15000;
-const CLOUDFLARED = 'C:/Users/Administrator/.cloudflared/cloudflared.exe';
+// cloudflared 可执行文件：默认本机路径；服务器部署可用环境变量 CLOUDFLARED_PATH 覆盖（见 tools/deploy-server.ps1）
+const CLOUDFLARED = process.env.CLOUDFLARED_PATH || 'C:/Users/Administrator/.cloudflared/cloudflared.exe';
 const TUNNEL_CONFIG = path.join(ROOT, 'config.yml');
 const TUNNEL_URL = 'https://kanban.forestkopa.top';
 
