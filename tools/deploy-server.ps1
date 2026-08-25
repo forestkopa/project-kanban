@@ -76,9 +76,10 @@ if (Test-Path $Config) {
 }
 
 # ---------- 4. NSSM service (idempotent) ----------
-& $Nssm stop $Svc 2>$null | Out-Null
+# wrap nssm via cmd /c so a non-zero exit (e.g. service not installed) does NOT throw under $ErrorActionPreference='Stop'
+cmd /c "nssm stop $Svc 2>nul" | Out-Null
 Start-Sleep -Milliseconds 800
-& $Nssm remove $Svc confirm 2>$null | Out-Null
+cmd /c "nssm remove $Svc confirm 2>nul" | Out-Null
 Start-Sleep -Milliseconds 800
 
 Write-Host "Registering service $Svc ..."
