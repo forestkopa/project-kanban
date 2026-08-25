@@ -111,10 +111,14 @@ body {
 .board { flex: 1; display: flex; flex-wrap: nowrap; gap: 16px; align-items: flex-start; padding: 18px 26px 26px; overflow-y: auto; overflow-x: auto; }
 /* 列宽固定为「6 列正好占满看板」的尺寸：(内容宽 - 5×16px gap) / 6。
    少于 6 个阶段时列宽不变、右侧留白不铺满；恰好 6 个阶段一屏放满；超过 6 个阶段横向滚动（列宽保持） */
-.col { flex: 0 0 calc((100% - 80px) / 6); width: calc((100% - 80px) / 6); min-width: 0; max-width: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; max-height: 100%; overflow: hidden; }
+.col { flex: 0 0 calc((100% - 80px) / 6); width: calc((100% - 80px) / 6); min-width: 0; max-width: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; max-height: 100%; min-height: 0; overflow: hidden; }
 .col-head { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border-top: 3px solid var(--border-strong); border-radius: var(--radius) var(--radius) 0 0; font-size: 13.5px; font-weight: 600; }
 .col-count { background: var(--bg-2); color: var(--text-2); font-size: 11px; border-radius: 20px; padding: 2px 10px; font-weight: 600; }
-.col-body { padding: 13px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; }
+.col-body { padding: 13px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; min-height: 0; }
+.col-body::-webkit-scrollbar { width: 8px; }
+.col-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+.col-body::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+.col-body::-webkit-scrollbar-track { background: transparent; }
 .col.drag .col-body { background: var(--accent-weak); outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 12px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px 11px 16px; cursor: grab; position: relative; overflow: hidden; transition: background .15s, box-shadow .15s, border-color .15s; }
 .card:hover { background: var(--surface); box-shadow: var(--shadow); border-color: var(--border-strong); }
