@@ -18,3 +18,5 @@ data/*.db
 data/*.db-*
 data/admin.password
 public/brand-logo.png
+# xlsx 离线依赖包不入库（仅本地 vendor 使用，防 CDN 供应链风险）
+vendor/*.tgz
