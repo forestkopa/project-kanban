@@ -8,6 +8,8 @@
 #Requires -RunAsAdministrator
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+# TLS 1.2: PS 5.1 默认可能与 Cloudflare 443 握手失败（Invoke-WebRequest 验证公网 URL 必需）
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 # ---------- 0. paths ----------
 $Root   = Split-Path -Parent $PSScriptRoot
