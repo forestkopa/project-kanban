@@ -302,11 +302,15 @@ function projCard(p, dim) {
   return el;
 }
 function renderSidebar() {
+  // 局部刷新（2026-08-25）：侧栏数据未变化时跳过重建，保留滚动位置；折叠/项目/进度/选中项任一变化才重建
+  let folds = {}; try { folds = JSON.parse(localStorage.getItem('kb-side-folds') || '{}'); } catch (e) {}
+  const key = JSON.stringify([state.projects.map(p => p.id + '|' + p.name + '|' + (p.status || 'active') + '|' + progress(p)), state.currentId, state.readonly, folds]);
+  if (renderSidebar._lastKey === key) return;
+  renderSidebar._lastKey = key;
   const list = $('#projList'); list.innerHTML = '';
   const active = state.projects.filter(p => (p.status || 'active') !== 'archived');
   const archived = state.projects.filter(p => (p.status || 'active') === 'archived');
   if (!state.projects.length) { list.innerHTML = '<div class="empty">还没有项目。<br>点上方「新建项目」，用模板快速搭建。</div>'; return; }
-  let folds = {}; try { folds = JSON.parse(localStorage.getItem('kb-side-folds') || '{}'); } catch (e) {}
   const group = (label, items, key, dim) => {
     if (!items.length) return;
     const folded = !!folds[key];
@@ -495,7 +499,74 @@ function syncFormulaBox(p) {
   else if (raw) { const rf = String(raw).trim(); box.value = (rf.startsWith('=') ? '' : '=') + rf; box.placeholder = '原表公式（xlsx 坐标），可直接修改'; }
   else { box.value = ''; box.placeholder = t ? '无公式 · 输入公式可设置联动（空=清除）' : ''; }
 }
+/* 甘特事件委托（2026-08-25：替代每任务 4 个监听器 → #gantt 容器一次绑定，innerHTML 重建后仍有效） */
+let _ganttDelegated = false;
+function ensureGanttDelegation() {
+  if (_ganttDelegated) return;
+  const root = document.getElementById('gantt');
+  if (!root) return;
+  _ganttDelegated = true;
+  root.addEventListener('click', e => {
+    const bar = e.target.closest('.g-bar');
+    if (!bar) return;
+    const p = proj(); if (!p) return;
+    const t = p.tasks.find(x => x.id === bar.dataset.tid);
+    if (t) openTaskModal(p, t);
+  });
+  root.addEventListener('focusin', e => {
+    const inp = e.target.closest('.g-date-s, .g-date-e');
+    if (!inp) return;
+    const p = proj(); if (!p) return;
+    ganttSel = { tid: inp.dataset.tid, field: inp.classList.contains('g-date-s') ? 'start' : 'due' };
+    ganttRM = ganttRowMap(p);
+    syncFormulaBox(p);
+  });
+  root.addEventListener('change', e => {
+    const inp = e.target.closest('.g-date-s, .g-date-e, .g-days-in');
+    if (!inp) return;
+    const p = proj(); if (!p) return;
+    const t = p.tasks.find(x => x.id === inp.dataset.tid); if (!t) return;
+    const save = (body, key) => debounce(key + t.id, async () => {
+      try { await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify(body) }); const np = await api('/projects/' + p.id); Object.assign(p, np); render(); }
+      catch (err) { toast(err.message); }
+    });
+    if (inp.classList.contains('g-days-in')) {
+      save({ estimateDays: Math.max(0, parseInt(inp.value) || 0) }, 'gd-');
+    } else if (inp.classList.contains('g-date-s')) {
+      save({ startDate: inp.value }, 'ds-');
+    } else {
+      save({ dueDate: inp.value }, 'de-');
+    }
+  });
+  // 虚拟滚动：.g-body-virtual 容器滚动 → 窗口重渲（capture 捕获，容器每次重建，闭包挂在元素上避免泄漏）
+  root.addEventListener('scroll', e => {
+    const sc = e.target.closest('.g-body-virtual');
+    if (sc && sc._winRender) debounce('gv', sc._winRender, 40);
+  }, { passive: true, capture: true });
+}
+// 甘特行 HTML（供常规/虚拟滚动两种模式共用）
+function ganttRowHtml(r, p, min, dayW, trackW, bg) {
+  if (r.kind === 'group') {
+    const ph = p.phases.find(x => x.name === r.name) || { color: 'var(--border-strong)' };
+    return `<div class="g-row g-group-row"><div class="g-rnum">${r.row}</div>` +
+      `<div class="g-group" style="border-left-color:${ph.color}">${esc(r.name)} · ${p.tasks.filter(t => t.phaseId === ph.id).length}</div>` +
+      `<div class="g-track" style="width:${trackW}px"></div></div>`;
+  }
+  const t = r.task;
+  const s = parseD(t.startDate || p.startDate), due = parseD(t.dueDate || t.startDate || p.startDate);
+  const left = dayDiff(isoDate(s), isoDate(min)) * dayW;
+  const w = Math.max(dayW, dayDiff(isoDate(due), isoDate(s)) * dayW);
+  const ph = p.phases.find(x => x.id === t.phaseId) || { color: '#888' };
+  return `<div class="g-row"><div class="g-rnum">${r.row}</div>` +
+    `<div class="g-colA" title="${esc(t.title)}">${t.done ? '✓ ' : ''}${esc(t.title)}</div>` +
+    `<div class="g-colB"><input type="date" class="g-date-in g-date-s" data-tid="${t.id}" value="${t.startDate || ''}" ${state.readonly ? 'disabled' : ''}></div>` +
+    `<div class="g-colC"><input type="date" class="g-date-in g-date-e" data-tid="${t.id}" value="${t.dueDate || ''}" ${state.readonly ? 'disabled' : ''}></div>` +
+    `<div class="g-colD"><input type="number" class="g-days-in" data-tid="${t.id}" value="${t.estimateDays || ''}" min="0" step="1" title="工期（天），修改后结束日期级联更新" ${state.readonly ? 'disabled' : ''}></div>` +
+    `<div class="g-track" style="width:${trackW}px;background-image:${bg}">` +
+    `<div class="g-bar ${t.done ? 'done' : ''}" style="left:${left}px;width:${w}px;background:${ph.color}" data-tid="${t.id}"><span class="g-bar-txt">${t.estimateDays ? t.estimateDays + 'd' : ''}</span></div></div></div>`;
+}
 function renderGantt(p) {
+  ensureGanttDelegation();
   $('#viewActions').innerHTML = `<span class="va-label">项目开始</span><input type="date" id="projStart" class="inp" value="${p.startDate || ''}"><button class="btn" id="reschedBtn" title="保留公式，按公式全量重算一遍（无公式则顺序排期）">重新排期</button>`;
   $('#projStart').onchange = e => {
     const v = e.target.value;
@@ -535,69 +606,25 @@ function renderGantt(p) {
     `<div class="g-fbox"><span class="g-fbox-label">公式</span><input type="text" id="gFormulaBox" placeholder="点选开始/结束日期查看并修改公式"${state.readonly ? ' disabled' : ''}></div>` +
     headCell('g-date-head', '开始') + headCell('g-date-head', '结束') + headCell('g-colD', '天数') +
     `<div class="g-track-head" style="width:${trackW}px"></div></div>`;
-  let body = '';
-  // 分组/任务行（行号 2..）
-  rm.rows.forEach(r => {
-    if (r.kind === 'group') {
-      const ph = p.phases.find(x => x.name === r.name) || { color: 'var(--border-strong)' };
-      body += `<div class="g-row g-group-row"><div class="g-rnum">${r.row}</div>` +
-        `<div class="g-group" style="border-left-color:${ph.color}">${esc(r.name)} · ${p.tasks.filter(t => t.phaseId === ph.id).length}</div>` +
-        `<div class="g-track" style="width:${trackW}px"></div></div>`;
-      return;
-    }
-    const t = r.task;
-    const s = parseD(t.startDate || p.startDate), due = parseD(t.dueDate || t.startDate || p.startDate);
-    const left = dayDiff(isoDate(s), isoDate(min)) * dayW;
-    const w = Math.max(dayW, dayDiff(isoDate(due), isoDate(s)) * dayW);
-    const ph = p.phases.find(x => x.id === t.phaseId) || { color: '#888' };
-    body += `<div class="g-row"><div class="g-rnum">${r.row}</div>` +
-      `<div class="g-colA" title="${esc(t.title)}">${t.done ? '✓ ' : ''}${esc(t.title)}</div>` +
-      `<div class="g-colB"><input type="date" class="g-date-in g-date-s" data-tid="${t.id}" value="${t.startDate || ''}" ${state.readonly ? 'disabled' : ''}></div>` +
-      `<div class="g-colC"><input type="date" class="g-date-in g-date-e" data-tid="${t.id}" value="${t.dueDate || ''}" ${state.readonly ? 'disabled' : ''}></div>` +
-      `<div class="g-colD"><input type="number" class="g-days-in" data-tid="${t.id}" value="${t.estimateDays || ''}" min="0" step="1" title="工期（天），修改后结束日期级联更新" ${state.readonly ? 'disabled' : ''}></div>` +
-      `<div class="g-track" style="width:${trackW}px;background-image:${bg}">` +
-      `<div class="g-bar ${t.done ? 'done' : ''}" style="left:${left}px;width:${w}px;background:${ph.color}" data-tid="${t.id}"><span class="g-bar-txt">${t.estimateDays ? t.estimateDays + 'd' : ''}</span></div></div></div>`;
-  });
-  wrap.innerHTML = `<div class="gantt">${head}<div class="g-body">${body}</div></div>`;
-  $$('.g-bar', wrap).forEach(b => b.onclick = () => { const t = p.tasks.find(x => x.id === b.dataset.tid); if (t) openTaskModal(p, t); });
-  $$('.g-date-s', wrap).forEach(inp => {
-    inp.onfocus = () => { ganttSel = { tid: inp.dataset.tid, field: 'start' }; ganttRM = rm; syncFormulaBox(p); };
-    inp.onchange = e => {
-      const t = p.tasks.find(x => x.id === e.target.dataset.tid); if (!t) return;
-      const v = e.target.value;
-      debounce('ds-' + t.id, async () => {
-        try {
-          await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ startDate: v }) });
-          const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 级联：后续任务日期同步更新
-        } catch (err) { toast(err.message); }
-      });
+  const ROW_H = 37; // .g-row = 36px 轨道 + 1px 边框
+  const V_THRESH = 60, V_WIN = 40;
+  if (rm.rows.length > V_THRESH) {
+    // 虚拟滚动（2026-08-25）：行数 >60 时只渲染可视窗口行 + 上下占位；事件/滚动走 #gantt 委托
+    wrap.innerHTML = `<div class="gantt">${head}<div class="g-body g-body-virtual"><div class="g-rows"></div></div></div>`;
+    const rowsEl = wrap.querySelector('.g-rows');
+    const sc = rowsEl.parentElement;
+    const renderWin = () => {
+      const top = Math.max(0, Math.floor(sc.scrollTop / ROW_H) - 4);
+      const end = Math.min(rm.rows.length, top + V_WIN);
+      rowsEl.innerHTML = `<div style="height:${top * ROW_H}px"></div>` +
+        rm.rows.slice(top, end).map(r => ganttRowHtml(r, p, min, dayW, trackW, bg)).join('') +
+        `<div style="height:${Math.max(0, rm.rows.length - end) * ROW_H}px"></div>`;
     };
-  });
-  $$('.g-date-e', wrap).forEach(inp => {
-    inp.onfocus = () => { ganttSel = { tid: inp.dataset.tid, field: 'due' }; ganttRM = rm; syncFormulaBox(p); };
-    inp.onchange = e => {
-      const t = p.tasks.find(x => x.id === e.target.dataset.tid); if (!t) return;
-      const v = e.target.value;
-      debounce('de-' + t.id, async () => {
-        try {
-          await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ dueDate: v }) });
-          const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 级联：后续任务日期同步更新
-        } catch (err) { toast(err.message); }
-      });
-    };
-  });
-  $$('.g-days-in', wrap).forEach(inp => {
-    inp.onchange = e => {
-      const t = p.tasks.find(x => x.id === e.target.dataset.tid); if (!t) return;
-      const v = Math.max(0, parseInt(e.target.value) || 0);
-      debounce('gd-' + t.id, async () => {
-        try {
-          await api('/projects/' + p.id + '/tasks/' + t.id, { method: 'PUT', body: JSON.stringify({ estimateDays: v }) });
-          const np = await api('/projects/' + p.id); Object.assign(p, np); render(); // 改工期 → 结束日期按公式级联重算
-        } catch (err) { toast(err.message); }
-      });
-    };
-  });
+    sc._winRender = renderWin;
+    renderWin();
+  } else {
+    wrap.innerHTML = `<div class="gantt">${head}<div class="g-body">${rm.rows.map(r => ganttRowHtml(r, p, min, dayW, trackW, bg)).join('')}</div></div>`;
+  }
   const fbox = $('#gFormulaBox');
   if (fbox) {
     const applyFormula = async () => {

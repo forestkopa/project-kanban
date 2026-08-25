@@ -289,6 +289,9 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .g-bar { position: absolute; top: 8px; height: 20px; border-radius: 10px; display: flex; align-items: center; padding: 0 9px; font-size: 10.5px; color: #fff; cursor: pointer; overflow: hidden; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .g-bar.done { opacity: .45; }
 .g-bar-txt { opacity: .92; font-weight: 500; }
+/* 甘特虚拟滚动（2026-08-25）：大项目行数窗口化，容器内纵向滚动 */
+.g-body-virtual { max-height: calc(100vh - 300px); overflow-y: auto; }
+.g-rows { display: block; }
 
 /* ---------- calendar ---------- */
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; max-width: 1040px; }
