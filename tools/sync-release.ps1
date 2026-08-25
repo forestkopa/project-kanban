@@ -3,6 +3,7 @@
 #   $env:GH_PAT = "ghp_xxxx"                      # 需 contents:write 权限的 PAT
 #   .\tools\sync-release.ps1                       # 仅推送 main（普通 push，不改版本/标签）
 #   .\tools\sync-release.ps1 -Version v1.2          # 发版：打不可变版本号 v1.2 + 把 latest 标签滚动到该提交
+#   .\tools\sync-release.ps1 -Force                  # 跳过交互确认（仅当用户已明确批准推送时使用）
 # 版本约定（2026-08-25 确定，用户要求）：
 #   - `latest` 标签 = 移动指针，始终指向「当前最大版本号」对应的提交（如当前 v1.1）。
 #     发布更高版本（如 v1.2）后，`latest` 标签移动到新提交，旧版本（v1.1）即不再带 latest。
@@ -13,7 +14,8 @@
 # 注意：push 走带 PAT 的远端 URL；git 路径显式解析（先 Get-Command，失败回退常见路径），
 #       避免 PowerShell 子进程下 git 不在 PATH 导致静默 no-op。
 param(
-    [string]$Version = ''   # 形如 v1.2；为空则只推送 main，不动版本号/latest
+    [string]$Version = '',  # 形如 v1.2；为空则只推送 main，不动版本号/latest
+    [switch]$Force          # 跳过交互确认（仅当用户已明确批准推送后、由脚本/自动化显式传入）
 )
 
 $ErrorActionPreference = 'Continue'
@@ -59,6 +61,20 @@ $apiHdr = @{
 Log "=== sync-release 开始（Version='$Version'）==="
 Push-Location $repoRoot
 try {
+    # 0) 推送前确认门禁（2026-08-25 用户要求：每日推送 GitHub 须先获用户同意）
+    if (-not $Force) {
+        $scope = if ($Version) { "main + 版本标签 $Version + latest 滚动" } else { 'main' }
+        Write-Host ''
+        Write-Host "⚠️  即将推送至 GitHub：$scope"
+        Write-Host "    仓库：$repo"
+        $ans = Read-Host '输入 YES 确认推送（输入其他任意内容则取消）'
+        if ($ans -ne 'YES') {
+            Log '❌ 用户未确认，已取消推送'
+            exit 0
+        }
+        Log '✅ 用户已确认推送'
+    }
+
     # 1) 推送代码（带 PAT 的 URL，PowerShell 下也能鉴权）
     Log '> git push origin main'
     Invoke-Git push -q $remote main

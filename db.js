@@ -33,7 +33,8 @@ function init(file) {
     CREATE TABLE IF NOT EXISTS tokens (
       token TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      expires_at TEXT
     );
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
@@ -75,6 +76,9 @@ function init(file) {
     CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id, sort);
     CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
   `);
+  // 兼容旧库：tokens 表补充 expires_at 列（新建表已含该列，此处幂等，重复执行报错被忽略）
+  try { db.exec('ALTER TABLE tokens ADD COLUMN expires_at TEXT'); } catch (e) { /* 列已存在 */ }
+  cleanupExpiredTokens(); // 启动即清理过期 token
 }
 
 /* ---------------- 密码与用户 ---------------- */
@@ -123,7 +127,7 @@ function getUserById(id) { return db.prepare('SELECT id,name,role FROM users WHE
 function verifyUser(name, password) {
   const u = getUserByName(name);
   if (!u || !verifyPassword(password, u.pass_hash)) return null;
-  return { id: u.id, name: u.name, role: u.role };
+  return { id: u.id, name: u.name, role: u.role, mustChange: password === DEFAULT_PASSWORD };
 }
 // 自助改密：校验旧密码后更新（返回错误原因或 null）
 function changePassword(userId, oldPw, newPw) {
@@ -144,13 +148,23 @@ function resetPassword(userId, newPw) {
 /* ---------------- token（每用户单 token） ---------------- */
 function issueToken(userId) {
   const token = crypto.randomBytes(24).toString('hex');
+  const days = Math.max(1, parseInt(process.env.KB_TOKEN_TTL_DAYS || '30', 10) || 30); // 默认 30 天过期
+  const exp = new Date(Date.now() + days * 86400000).toISOString();
   db.prepare('DELETE FROM tokens WHERE user_id=?').run(userId);
-  db.prepare('INSERT INTO tokens (token,user_id,created_at) VALUES (?,?,?)').run(token, userId, new Date().toISOString());
+  db.prepare('INSERT INTO tokens (token,user_id,created_at,expires_at) VALUES (?,?,?,?)').run(token, userId, new Date().toISOString(), exp);
   return token;
 }
 function tokenUserId(token) {
-  const r = db.prepare('SELECT user_id FROM tokens WHERE token=?').get(String(token || ''));
-  return r ? r.user_id : null;
+  const r = db.prepare('SELECT user_id, expires_at FROM tokens WHERE token=?').get(String(token || ''));
+  if (!r) return null;
+  if (r.expires_at && new Date(r.expires_at).getTime() < Date.now()) {
+    db.prepare('DELETE FROM tokens WHERE token=?').run(String(token)); // 过期即清理
+    return null;
+  }
+  return r.user_id;
+}
+function cleanupExpiredTokens() {
+  try { db.prepare('DELETE FROM tokens WHERE expires_at IS NOT NULL AND expires_at < ?').run(new Date().toISOString()); } catch (e) {}
 }
 
 /* ---------------- 项目（单项目粒度保存） ---------------- */
@@ -283,7 +297,7 @@ function ensureAdminAndMigrate(seedFilePath) {
   if (!admin) {
     const created = createUser('admin', DEFAULT_PASSWORD, 'admin'); // 初始密码 000000
     admin = { id: created.id, name: created.name, role: created.role };
-    console.log('[初始化] 已创建管理员 admin，初始密码 000000（登录后请在「修改密码」中更改）');
+    console.log('[初始化] 已创建管理员 admin（请登录后立即修改默认密码）');
   }
   migrateJson(seedFilePath, admin.id);
   return admin;
@@ -325,4 +339,4 @@ function migrateJson(seedFilePath, ownerId) {
   return n;
 }
 
-module.exports = { init, DEFAULT_PASSWORD, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };
+module.exports = { init, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, cleanupExpiredTokens, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };

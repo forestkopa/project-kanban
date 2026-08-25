@@ -1,0 +1,9 @@
+# config.example.yml —— Cloudflare Tunnel 配置示例
+# 使用方法：复制本文件为 config.yml，把下面占位值换成真实值。
+# config.yml 已被 .gitignore 忽略，不会提交到仓库（避免泄露 Tunnel UUID / 凭据路径 / 域名）。
+tunnel: REPLACE_TUNNEL_UUID
+credentials-file: C:/Users/<用户名>/.cloudflared/REPLACE_TUNNEL_UUID.json
+ingress:
+  - hostname: kanban.example.com
+    service: http://localhost:5180
+  - service: http://localhost:5180

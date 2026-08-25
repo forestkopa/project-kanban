@@ -1,5 +1,9 @@
 node_modules/
 *.tmp
+config.yml
+.workbuddy/
+data/*.log
+tools/nssm-2.24/
 data/readonly.flag
 data/auth.token
 data/tunnel-url.txt

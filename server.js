@@ -1,6 +1,7 @@
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const cp = require('child_process');
 const XLSX = require('xlsx');
@@ -21,30 +22,35 @@ const AI_FILE = path.join(DATA, 'ai.json');
 const db = require('./db.js');
 const DB_FILE = path.join(DATA, DEMO_MODE ? 'demo.db' : 'app.db');
 
-function loadJSON(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } }
+async function loadJSON(file, fallback) { try { return JSON.parse(await fsp.readFile(file, 'utf8')); } catch (e) { return fallback; } }
 // 写队列：所有落盘串行化，杜绝并发覆盖；原子写：临时文件→rename，崩溃不损坏原文件
 let writeQ = Promise.resolve();
 function saveJSON(file, data) {
   const tmp = file + '.tmp';
   const json = JSON.stringify(data, null, 2);
-  writeQ = writeQ.then(() => {
-    fs.writeFileSync(tmp, json, 'utf8');
-    fs.renameSync(tmp, file);
+  writeQ = writeQ.then(async () => {
+    await fsp.writeFile(tmp, json, 'utf8');
+    await fsp.rename(tmp, file);
     gitAutoCommit(file);
   }).catch(e => { try { fs.unlinkSync(tmp); } catch (_) {} console.error('保存失败:', file, e.message); });
   return writeQ;
 }
-// data 目录 git 自动提交（静默失败：未初始化 git 或无可提交变更时忽略）
+// data 目录 git 自动提交（静默失败：未初始化 git 或无可提交变更时忽略；2s 防抖合并高频写入，单进程串行执行）
 let GIT_OK = false;
 try { GIT_OK = cp.execSync('git rev-parse --is-inside-work-tree', { cwd: ROOT, stdio: 'pipe' }).toString().trim() === 'true'; } catch (e) { GIT_OK = false; }
+let gitPending = new Set();
+let gitTimer = null;
 function gitAutoCommit(file) {
   if (!GIT_OK || !file || DEMO_MODE) return;
-  try {
-    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
-    cp.spawn('git', ['add', '--', rel], { cwd: ROOT, stdio: 'ignore' }).on('exit', () => {
-      cp.spawn('git', ['commit', '-m', 'data: ' + rel + ' ' + new Date().toISOString(), '--no-verify'], { cwd: ROOT, stdio: 'ignore' });
-    });
-  } catch (e) {}
+  gitPending.add(path.relative(ROOT, file).replace(/\\/g, '/'));
+  if (gitTimer) return;
+  gitTimer = setTimeout(() => {
+    gitTimer = null;
+    const files = [...gitPending]; gitPending = new Set();
+    if (!files.length) return;
+    const args = files.map(f => '-- ' + JSON.stringify(f)).join(' ');
+    cp.exec('git add ' + args + ' && git commit -m "data: ' + files.length + ' file(s) ' + new Date().toISOString() + '" --no-verify', { cwd: ROOT, stdio: 'ignore' }, () => {});
+  }, 2000);
 }
 function uid() { return 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function isoDate(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
@@ -56,7 +62,7 @@ const DEFAULT_OPTIONS = {
   levels: { 'S': '#E0241B', 'A': '#FF9F0A', 'B': '#30D158', 'C': '#0A84FF', 'D': '#BF5AF2', 'E': '#64D2FF', 'F': '#8E8E93' },
   engineerTypes: ['硬件工程师', '结构工程师', '项目工程师', '测试工程师']
 };
-function loadOptions() { return Object.assign({}, DEFAULT_OPTIONS, loadJSON(OPTIONS_FILE, {})); }
+async function loadOptions() { return Object.assign({}, DEFAULT_OPTIONS, await loadJSON(OPTIONS_FILE, {})); }
 function scheduleTasks(phases, tasks, startStr) {
   let cursor = new Date(startStr);
   for (const ph of phases) {
@@ -457,8 +463,20 @@ db.ensureGuestUser();
 })();
 
 /* ---------- AI 助手：OpenAI 兼容接口（Node 原生 https/http，无额外依赖；支持本地大模型） ---------- */
-function loadAI() { return Object.assign({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', api_key: '', local: false }, loadJSON(AI_FILE, {})); }
-function saveAI(cfg) { try { fs.writeFileSync(AI_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {} return cfg; }
+async function loadAI() {
+  const cfg = Object.assign({ base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', api_key: '', local: false }, await loadJSON(AI_FILE, {}));
+  const envKey = (process.env.KB_AI_API_KEY || '').trim();
+  if (envKey) cfg.api_key = envKey; // 环境变量优先（KB_AI_API_KEY），且密钥不落盘
+  return cfg;
+}
+async function saveAI(cfg) {
+  try {
+    const out = Object.assign({}, cfg);
+    if ((process.env.KB_AI_API_KEY || '').trim()) out.api_key = ''; // 有环境变量时密钥不写盘
+    await fsp.writeFile(AI_FILE, JSON.stringify(out, null, 2));
+  } catch (e) {}
+  return cfg;
+}
 // 已配置判定：云 Key 或本地模型（local 标志）任一即可
 function aiConfigured(cfg) { return !!(cfg && (cfg.api_key || cfg.local)); }
 function maskKey(k) { if (!k) return ''; const s = String(k); if (s.length <= 8) return '****'; return s.slice(0, 3) + '****' + s.slice(-4); }
@@ -494,8 +512,26 @@ const MIME = {
   '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png'
 };
-function send(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); }
+// 安全响应头（防 XSS/点击劫持/MIME 嗅探；HSTS 仅 HTTPS 生效，浏览器对 http://localhost 自动忽略）
+const SEC_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+};
+function send(res, status, body) { res.writeHead(status, Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, SEC_HEADERS)); res.end(typeof body === 'string' ? body : JSON.stringify(body)); }
 const BODY_LIMIT = 10 * 1024 * 1024; // 请求体上限 10MB
+// 内存速率限制（登录防爆破 / AI 防额度滥用；过期桶定时清理，防 Map 无限增长）
+const rateBuckets = new Map();
+function rateLimit(key, max, windowMs) {
+  const now = Date.now();
+  let b = rateBuckets.get(key);
+  if (!b || now - b.t > windowMs) { b = { n: 0, t: now }; rateBuckets.set(key, b); }
+  b.n++;
+  return b.n <= max;
+}
+setInterval(() => { const now = Date.now(); for (const [k, b] of rateBuckets) if (now - b.t > 3600000) rateBuckets.delete(k); }, 600000).unref();
 function readBody(req) {
   return new Promise((resolve) => {
     let d = '';
@@ -548,7 +584,14 @@ function createFromTemplate(tpl, name, opts) {
   };
 }
 
-function isRO() { try { return fs.readFileSync(RO_FLAG, 'utf8').trim() === '1'; } catch (e) { return false; } }
+// 只读标记（1s 缓存避免每请求读盘；切换后 1s 内生效）
+let roCache = { v: false, t: 0 };
+async function isRO() {
+  const now = Date.now();
+  if (now - roCache.t < 1000) return roCache.v;
+  try { const s = await fsp.readFile(RO_FLAG, 'utf8'); roCache = { v: s.trim() === '1', t: now }; return roCache.v; }
+  catch (e) { roCache = { v: false, t: now }; return false; }
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -560,12 +603,14 @@ const server = http.createServer(async (req, res) => {
     req.user = resolveUser(req); // 每请求解析当前用户（demo 模式恒为 admin 视角）
     // 登录接口（免鉴权，放最前）
     if (p === '/api/login' && req.method === 'POST') {
+      const ip = req.socket.remoteAddress || '?';
+      if (!rateLimit('login:' + ip, 10, 15 * 60 * 1000)) return send(res, 429, { error: '登录尝试过于频繁，请 15 分钟后再试' });
       const body = await readBody(req);
       const name = String(body.name || '').trim();
       const u = db.verifyUser(name, String(body.password || ''));
       if (!u) return send(res, 401, { error: '用户名或密码错误' });
       const token = db.issueToken(u.id);
-      return send(res, 200, { token, user: { id: u.id, name: u.name, role: u.role } });
+      return send(res, 200, { token, user: { id: u.id, name: u.name, role: u.role }, mustChange: !!u.mustChange });
     }
     // 请求体大小上限（content-length 预检，chunked 由 readBody 兜底断开）
     if (req.method !== 'GET' && parseInt(req.headers['content-length'] || '0', 10) > BODY_LIMIT) {
@@ -648,7 +693,7 @@ const server = http.createServer(async (req, res) => {
     }
     // 只读模式：查询 / 切换（始终可用）
     if (p === '/api/readonly') {
-      if (req.method === 'GET') return send(res, 200, { on: isRO(), demo: DEMO_MODE });
+      if (req.method === 'GET') return send(res, 200, { on: await isRO(), demo: DEMO_MODE });
       if (req.method === 'POST') {
         const body = await readBody(req);
         try { fs.writeFileSync(RO_FLAG, (body && body.on) ? '1' : '0'); }
@@ -658,16 +703,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 405, { error: '方法不允许' });
     }
     // 只读模式：拦截所有非 GET 修改请求
-    if (req.method !== 'GET' && isRO()) {
+    if (req.method !== 'GET' && await isRO()) {
       return send(res, 403, { error: '只读模式，禁止修改' });
     }
-    if (p === '/api/templates' && req.method === 'GET') return send(res, 200, loadJSON(TEMPLATES_FILE, []));
+    if (p === '/api/templates' && req.method === 'GET') return send(res, 200, await loadJSON(TEMPLATES_FILE, []));
     // 可配置选项：项目类型 / 产品类型 / 等级 / 认证 / 工程师
-    if (p === '/api/options' && req.method === 'GET') return send(res, 200, loadOptions());
+    if (p === '/api/options' && req.method === 'GET') return send(res, 200, await loadOptions());
     if (p === '/api/options' && req.method === 'POST') {
       const body = await readBody(req);
       if (!body || typeof body !== 'object') return send(res, 400, { error: '参数无效' });
-      const o = loadOptions();
+      const o = await loadOptions();
       ['types', 'productTypes', 'levels'].forEach(k => { if (body[k] && typeof body[k] === 'object') o[k] = body[k]; });
       ['engineerTypes'].forEach(k => { if (Array.isArray(body[k])) o[k] = body[k]; });
       saveJSON(OPTIONS_FILE, o);
@@ -677,7 +722,7 @@ const server = http.createServer(async (req, res) => {
     const tplPut = p.match(/^\/api\/templates\/([^/]+)$/);
     if (tplPut && req.method === 'PUT') {
       const body = await readBody(req);
-      const cur = loadJSON(TEMPLATES_FILE, []);
+      const cur = await loadJSON(TEMPLATES_FILE, []);
       const t = cur.find(x => x.id === tplPut[1]);
       if (!t) return send(res, 404, { error: '模版不存在' });
       const name = body && body.name ? String(body.name).trim() : '';
@@ -689,7 +734,7 @@ const server = http.createServer(async (req, res) => {
     // 删除模版（模板共创：内置/导入的模板均可删）
     const tplDel = p.match(/^\/api\/templates\/([^/]+)$/);
     if (tplDel && req.method === 'DELETE') {
-      const cur = loadJSON(TEMPLATES_FILE, []);
+      const cur = await loadJSON(TEMPLATES_FILE, []);
       const next = cur.filter(t => t.id !== tplDel[1]);
       if (next.length === cur.length) return send(res, 404, { error: '模版不存在' });
       saveJSON(TEMPLATES_FILE, next);
@@ -697,7 +742,7 @@ const server = http.createServer(async (req, res) => {
     }
     // 下载参考模版（内置模版生成的甘特方言 Excel，开始/截止带公式 → 导入后甘特级联）
     if (p === '/api/templates/reference-xlsx' && req.method === 'GET') {
-      const tpls = loadJSON(TEMPLATES_FILE, []);
+      const tpls = await loadJSON(TEMPLATES_FILE, []);
       const id = url.searchParams.get('tplId');
       const tpl = (id && tpls.find(t => t.id === id)) || tpls[0];
       if (!tpl) return send(res, 404, { error: '暂无内置模版' });
@@ -714,10 +759,10 @@ const server = http.createServer(async (req, res) => {
 
     // ---- AI 助手（OpenAI 兼容） ----
     if (p === '/api/ai/config') {
-      if (req.method === 'GET') { const c = loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local }); }
+      if (req.method === 'GET') { const c = await loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local }); }
       if (req.method === 'POST') {
         const body = await readBody(req);
-        const c = loadAI();
+        const c = await loadAI();
         if (body.base_url !== undefined) c.base_url = String(body.base_url).trim() || 'https://api.openai.com/v1';
         if (body.model !== undefined) c.model = String(body.model).trim() || 'gpt-4o-mini';
         if (body.local !== undefined) c.local = !!body.local;
@@ -742,8 +787,9 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return send(res, 200, { online: false, models: [] }); }
     }
     if (p === '/api/ai/chat' && req.method === 'POST') {
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
       const body = await readBody(req);
-      const c = loadAI();
+      const c = await loadAI();
       if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
       const messages = Array.isArray(body.messages) ? body.messages : [];
       if (!messages.length) return send(res, 400, { error: 'messages 为空' });
@@ -751,13 +797,14 @@ const server = http.createServer(async (req, res) => {
       catch (e) { return send(res, 502, { error: 'AI 调用失败: ' + e.message }); }
     }
     if (p === '/api/ai/generate-tasks' && req.method === 'POST') {
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
       const body = await readBody(req);
       const desc = String(body.description || '').trim();
       if (!desc) return send(res, 400, { error: '请描述项目' });
-      const c = loadAI();
+      const c = await loadAI();
       if (!aiConfigured(c)) {
         // 离线兜底：基于内置模板的规则建议（非 LLM，界面会明确标注）
-        const tpls = loadJSON(TEMPLATES_FILE, []);
+        const tpls = await loadJSON(TEMPLATES_FILE, []);
         const tpl = tpls.find(t => /音箱|语音|speaker/i.test(t.name)) || tpls[0];
         const nameMap = {}; (tpl ? tpl.phases || [] : []).forEach(ph => nameMap[ph.id] = ph.name);
         const tasks = (tpl ? tpl.tasks : []).map(t => ({ title: t.title, phase: nameMap[t.phaseId] || '', estimateDays: t.estimateDays || 3, assignee: t.assignee || '' }));
@@ -773,8 +820,9 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return send(res, 502, { error: 'AI 生成失败: ' + e.message }); }
     }
     if (p === '/api/ai/summarize' && req.method === 'POST') {
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
       const body = await readBody(req);
-      const c = loadAI();
+      const c = await loadAI();
       if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
       const projects = Array.isArray(body.projects) ? body.projects : (body.project ? [body.project] : null);
       if (!projects || !projects.length) return send(res, 400, { error: '缺少项目数据' });
@@ -807,7 +855,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/templates/import' && req.method === 'POST') {
       const body = await readBody(req);
       if (body.kind !== 'xlsx' || !body.data) return send(res, 400, { error: '仅支持 .xlsx 参考模版导入' });
-      const cur = loadJSON(TEMPLATES_FILE, []);
+      const cur = await loadJSON(TEMPLATES_FILE, []);
       try {
         const buf = Buffer.from(body.data, 'base64');
         const parsed = parseXlsxProject(buf);
@@ -930,7 +978,7 @@ const server = http.createServer(async (req, res) => {
           const body = await readBody(req);
           let proj;
           if (body && body.templateId) {
-            const tpls = loadJSON(TEMPLATES_FILE, []);
+            const tpls = await loadJSON(TEMPLATES_FILE, []);
             const tpl = tpls.find(t => t.id === body.templateId);
             if (!tpl) return send(res, 400, { error: '模板不存在' });
             proj = createFromTemplate(tpl, body.name, { type: body.type, level: body.level, productType: body.productType, cert: body.cert, icon: body.icon, color: body.color, engineers: body.engineers });
@@ -1036,11 +1084,11 @@ const server = http.createServer(async (req, res) => {
   fs.readFile(filepath, (err, buf) => {
     if (err) return send(res, 404, { error: 'not found' });
     const ext = path.extname(filepath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' }, SEC_HEADERS));
     res.end(buf);
   });
 });
 server.listen(PORT, () => {
   console.log('Multi-project kanban running at http://localhost:' + PORT + (DEMO_MODE ? '  [演示模式：脱敏数据 + 免登录]' : ''));
-  if (!DEMO_MODE) console.log('账号：admin / 000000（管理员，请登录后改密）· guest / 000000（游客只读）· 新建用户默认密码 000000');
+  if (!DEMO_MODE) console.log('就绪：admin（管理员）· guest（游客只读）。首次登录请修改默认密码，密码不再输出到日志。');
 });

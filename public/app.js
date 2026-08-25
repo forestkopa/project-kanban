@@ -54,12 +54,12 @@ function showLogin() {
     $('#loginName').value = ''; $('#loginPass').value = ''; $('#loginErr').textContent = '';
     // 记住密码回填
     let rm = null; try { rm = JSON.parse(localStorage.getItem('kb-remember') || 'null'); } catch (e) {}
-    if (rm && rm.name) { $('#loginName').value = rm.name; $('#loginPass').value = rm.pass || ''; $('#loginRemember').checked = true; }
+    if (rm && rm.name) { $('#loginName').value = rm.name; $('#loginRemember').checked = true; } // 仅回填用户名，密码不落盘（安全）
     else { $('#loginRemember').checked = false; }
     m.classList.remove('hidden');
     let settled = false;
     const done = ok => { if (settled) return; settled = true; m.classList.add('hidden'); $('#loginBtn').disabled = false; resolve(ok); };
-    const remember = (name, pw) => { try { if ($('#loginRemember').checked) localStorage.setItem('kb-remember', JSON.stringify({ name, pass: pw })); else localStorage.removeItem('kb-remember'); } catch (e) {} };
+    const remember = name => { try { if ($('#loginRemember').checked) localStorage.setItem('kb-remember', JSON.stringify({ name })); else localStorage.removeItem('kb-remember'); } catch (e) {} };
     const submit = async () => {
       const name = $('#loginName').value.trim(), pw = $('#loginPass').value;
       if (!name || !pw) { $('#loginErr').textContent = '请输入用户名和密码'; return; }
@@ -68,12 +68,13 @@ function showLogin() {
         const r = await fetch(API + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: pw }) });
         const j = await r.json();
         if (!r.ok) { $('#loginErr').textContent = j.error || '登录失败'; $('#loginBtn').disabled = false; return; }
-        remember(name, pw);
+        remember(name);
         try { localStorage.setItem('kb-token', j.token); localStorage.setItem('kb-user', JSON.stringify(j.user)); } catch (e) {}
         state.user = j.user;
         updateUserUI();
         toast('欢迎，' + j.user.name);
         done(true);
+        if (j.mustChange) setTimeout(() => { toast('您正在使用初始密码，请立即修改'); openPasswordModal(); }, 500);
       } catch (e) { $('#loginErr').textContent = '网络错误，请重试'; $('#loginBtn').disabled = false; }
     };
     // 游客登录（guest / 000000，只读）
