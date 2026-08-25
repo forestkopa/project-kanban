@@ -4,11 +4,21 @@
 #   .\tools\sync-release.ps1
 # 功能：把当前分支推送到 origin/main，并把名为 latest 的 GitHub Release 同步到最新提交。
 # 说明：用本脚本代替裸 `git push`，即可满足“每次 push 同步更新 release”。
-# 注意：
-#   - push 直接走带 PAT 的远端 URL，避免 PowerShell 子进程下 git 凭据助手不可用导致静默失败。
-#   - 所有 git 调用统一走 Invoke-Git（重定向 stderr，按退出码判断是否失败），
-#     避免 PowerShell 因 git 进度信息（stderr）误判为终止错误而中断后续步骤。
+# 注意：push 直接走带 PAT 的远端 URL；git 路径显式解析（先 Get-Command，失败回退常见路径），
+#       避免 PowerShell 子进程下 git 不在 PATH 导致静默 no-op。
 $ErrorActionPreference = 'Continue'
+
+# 解析 git 可执行文件（不依赖 PATH）
+$gitExe = (Get-Command git -ErrorAction SilentlyContinue).Source
+if (-not $gitExe) {
+    $candidates = @(
+        'C:/Program Files/Git/bin/git.exe',
+        'C:/Users/Administrator/.workbuddy/binaries/PortableGit/versions/1.2.0/cmd/git.exe',
+        'C:/Users/Administrator/.workbuddy/binaries/PortableGit/versions/1.2.0/mingw64/bin/git.exe'
+    )
+    foreach ($c in $candidates) { if (Test-Path $c) { $gitExe = $c; break } }
+}
+if (-not $gitExe) { Write-Error '找不到 git 可执行文件，请确认已安装 Git 并在 PATH 中'; exit 1 }
 
 $repo    = 'forestkopa/project-kanban'
 $pat     = $env:GH_PAT
@@ -18,15 +28,19 @@ $repoRoot = Split-Path -Parent $PSScriptRoot   # 项目根目录（tools 的父�
 $remote   = "https://$pat@github.com/$repo.git"
 $log      = Join-Path $repoRoot 'data/_sync.log'
 
-function Log($m) { $s = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $m"; Write-Host $s; try { Add-Content -Path $log -Value $s -Encoding utf8 } catch {} }
+function Log($m) {
+    $s = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $m"
+    Write-Host $s
+    try { Add-Content -Path $log -Value $s -Encoding utf8 } catch {}
+}
 function Invoke-Git {
     param([string[]]$GitArgs)
-    $out = & git @GitArgs 2>$null
+    $out = & $gitExe @GitArgs 2>$null
     if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') 失败（exit $LASTEXITCODE）" }
     return $out
 }
 
-Log "=== sync-release 开始（repoRoot=$repoRoot）==="
+Log "=== sync-release 开始（git=$gitExe, repoRoot=$repoRoot）==="
 Push-Location $repoRoot
 try {
     # 1) 推送代码（带 PAT 的 URL，PowerShell 下也能鉴权）
