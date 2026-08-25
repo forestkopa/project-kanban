@@ -56,7 +56,7 @@ async function ensureTunnel() {
   if (await isTunnelUp()) return;
   log('公网不可达，清理残留并重启 Named Tunnel（' + TUNNEL_URL + '）');
   try { spawnSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { timeout: 5000, stdio: 'ignore' }); } catch (e) {}
-  try { spawn(CLOUDFLARED, ['tunnel', '--config', TUNNEL_CONFIG, 'run'], { detached: true, stdio: 'ignore' }).unref(); }
+  try { spawn(CLOUDFLARED, ['tunnel', '--protocol', 'http2', '--config', TUNNEL_CONFIG, 'run'], { detached: true, stdio: 'ignore' }).unref(); }
   catch (e) { log('隧道拉起失败: ' + e.message); }
 }
 
