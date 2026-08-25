@@ -6,8 +6,9 @@
 # 说明：用本脚本代替裸 `git push`，即可满足“每次 push 同步更新 release”。
 # 注意：
 #   - push 直接走带 PAT 的远端 URL，避免 PowerShell 子进程下 git 凭据助手不可用导致静默失败。
-#   - git 进度信息走 stderr，已被重定向，避免 PowerShell 误判为终止错误而中断后续步骤。
-$ErrorActionPreference = 'Stop'
+#   - 所有 git 调用统一走 Invoke-Git（重定向 stderr，按退出码判断是否失败），
+#     避免 PowerShell 因 git 进度信息（stderr）误判为终止错误而中断后续步骤。
+$ErrorActionPreference = 'Continue'
 
 $repo    = 'forestkopa/project-kanban'
 $pat     = $env:GH_PAT
@@ -15,28 +16,31 @@ if (-not $pat) { Write-Error '缺少环境变量 GH_PAT（需 contents:write 权
 
 $repoRoot = Split-Path -Parent $PSScriptRoot   # 项目根目录（tools 的父目录）
 $remote   = "https://$pat@github.com/$repo.git"
+$log      = Join-Path $repoRoot 'data/_sync.log'
 
-# git 包装：重定向 stderr（进度信息），仅按退出码判断是否失败
+function Log($m) { $s = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $m"; Write-Host $s; try { Add-Content -Path $log -Value $s -Encoding utf8 } catch {} }
 function Invoke-Git {
     param([string[]]$GitArgs)
-    & git @GitArgs 2>$null
+    $out = & git @GitArgs 2>$null
     if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') 失败（exit $LASTEXITCODE）" }
+    return $out
 }
 
+Log "=== sync-release 开始（repoRoot=$repoRoot）==="
 Push-Location $repoRoot
 try {
     # 1) 推送代码（带 PAT 的 URL，PowerShell 下也能鉴权）
-    Write-Host '> git push origin main'
+    Log '> git push origin main'
     Invoke-Git push -q $remote main
 
     # 2) 取最新提交信息
-    $sha = (git rev-parse HEAD).Trim()
-    $msg = (git log -1 --pretty='%s').Trim()
-    Write-Host "  最新提交 $sha : $msg"
+    $sha = (Invoke-Git rev-parse HEAD).Trim()
+    $msg = (Invoke-Git log -1 --pretty='%s').Trim()
+    Log "  最新提交 $sha : $msg"
 
     # 3) 移动 latest 标签到该提交
     Invoke-Git tag -f latest $sha
-    Write-Host '> git push -f origin refs/tags/latest'
+    Log '> git push -f origin refs/tags/latest'
     Invoke-Git push -q -f $remote refs/tags/latest
 
     # 4) 更新 Release 元数据（GitHub REST API）
@@ -62,7 +66,10 @@ try {
         prerelease = $false
     } | ConvertTo-Json -Compress
     Invoke-RestMethod -Headers $hdr -Uri "https://api.github.com/repos/$repo/releases/$($rel.id)" -Method Patch -Body $body -ContentType 'application/json'
-    Write-Host "✅ latest release 已同步到 $sha"
+    Log "✅ latest release 已同步到 $sha"
+} catch {
+    Log "❌ 失败：$($_.Exception.Message)"
+    exit 1
 } finally {
     Pop-Location
 }
