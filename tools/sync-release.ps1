@@ -4,21 +4,30 @@
 #   .\tools\sync-release.ps1
 # 功能：把当前分支推送到 origin/main，并把名为 latest 的 GitHub Release 同步到最新提交。
 # 说明：用本脚本代替裸 `git push`，即可满足“每次 push 同步更新 release”。
-# 注意：push 直接走带 PAT 的远端 URL，避免 PowerShell 子进程下 git 凭据助手不可用导致静默失败。
+# 注意：
+#   - push 直接走带 PAT 的远端 URL，避免 PowerShell 子进程下 git 凭据助手不可用导致静默失败。
+#   - git 进度信息走 stderr，已被重定向，避免 PowerShell 误判为终止错误而中断后续步骤。
 $ErrorActionPreference = 'Stop'
 
-$repo  = 'forestkopa/project-kanban'
-$pat   = $env:GH_PAT
+$repo    = 'forestkopa/project-kanban'
+$pat     = $env:GH_PAT
 if (-not $pat) { Write-Error '缺少环境变量 GH_PAT（需 contents:write 权限的 Personal Access Token）'; exit 1 }
 
-$root   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$remote = "https://$pat@github.com/$repo.git"
+$repoRoot = Split-Path -Parent $PSScriptRoot   # 项目根目录（tools 的父目录）
+$remote   = "https://$pat@github.com/$repo.git"
 
-Push-Location $root
+# git 包装：重定向 stderr（进度信息），仅按退出码判断是否失败
+function Invoke-Git {
+    param([string[]]$GitArgs)
+    & git @GitArgs 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') 失败（exit $LASTEXITCODE）" }
+}
+
+Push-Location $repoRoot
 try {
     # 1) 推送代码（带 PAT 的 URL，PowerShell 下也能鉴权）
     Write-Host '> git push origin main'
-    git push -q $remote main
+    Invoke-Git push -q $remote main
 
     # 2) 取最新提交信息
     $sha = (git rev-parse HEAD).Trim()
@@ -26,9 +35,9 @@ try {
     Write-Host "  最新提交 $sha : $msg"
 
     # 3) 移动 latest 标签到该提交
-    git tag -f latest $sha
+    Invoke-Git tag -f latest $sha
     Write-Host '> git push -f origin refs/tags/latest'
-    git push -q -f $remote "refs/tags/latest"
+    Invoke-Git push -q -f $remote refs/tags/latest
 
     # 4) 更新 Release 元数据（GitHub REST API）
     $hdr = @{
