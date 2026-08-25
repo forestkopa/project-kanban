@@ -5,7 +5,8 @@
   "description": "多项目管理个人看板（内置智能硬件产品模板）",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/formula-engine.test.js test/db-report.test.js"
+    "test": "node --test test/formula-engine.test.js test/db-report.test.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz",

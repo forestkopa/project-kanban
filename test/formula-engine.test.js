@@ -1,17 +1,8 @@
 // test/formula-engine.test.js —— 甘特公式引擎单元测试（Node 内置 node:test，零依赖）
-// server.js 被运行中的服务锁定暂无法拆分模块，故测试直接从 server.js 提取公式引擎函数（即线上真实逻辑）
+// 公式引擎已抽取为独立模块 lib/formula-engine.js（2026-08-25），测试直接 require
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
-
-const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-const a = src.indexOf('function isoDate');
-const b = src.indexOf('const DEFAULT_MAPPING');
-if (a < 0 || b < 0 || b <= a) throw new Error('公式引擎提取边界异常');
-const fx = {};
-new Function('module', src.slice(a, b) + '\nmodule.exports = { isoDate, addDays, parseFormula, recalcProject };')(fx);
-const { isoDate, addDays, parseFormula, recalcProject } = fx.exports;
+const { isoDate, addDays, parseFormula, recalcProject } = require('../lib/formula-engine.js');
 
 describe('公式引擎：解析', () => {
   it('parseFormula 解析 =D3+5 → off/arith', () => {
