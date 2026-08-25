@@ -1,5 +1,7 @@
 node_modules/
 *.tmp
+coverage/
+eslint-report.txt
 config.yml
 .workbuddy/
 data/*.log

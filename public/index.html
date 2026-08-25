@@ -54,7 +54,7 @@
   </header>
   <div id="scrim" class="hidden"></div>
   <div id="viewbar">
-    <div class="seg">
+    <div class="seg" role="tablist">
       <button class="tab active" data-view="board">看板</button>
       <button class="tab" data-view="gantt">甘特图</button>
       <button class="tab" data-view="calendar">日历</button>
@@ -77,7 +77,7 @@
 </main>
 
 <!-- 登录 -->
-<div id="loginModal" class="modal hidden">
+<div id="loginModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(380px,92vw)">
     <div class="modal-head"><h3>🔐 登录</h3><span class="pi-sub" style="margin:0" id="loginSub"></span></div>
     <input id="loginName" class="inp" placeholder="用户名" autocomplete="username">
@@ -90,7 +90,7 @@
 </div>
 
 <!-- 用户管理（admin） -->
-<div id="usersModal" class="modal hidden">
+<div id="usersModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(560px,94vw)">
     <div class="modal-head"><h3>👥 用户管理</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">新建用户（密码 ≥ 6 位；成员可自行修改密码）</div>
@@ -110,7 +110,7 @@
 </div>
 
 <!-- 修改密码 -->
-<div id="passwordModal" class="modal hidden">
+<div id="passwordModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(380px,92vw)">
     <div class="modal-head"><h3>🔑 修改密码</h3><button class="x" data-close>×</button></div>
     <input id="pwOld" class="inp" type="password" placeholder="当前密码" autocomplete="current-password">
@@ -121,7 +121,7 @@
 </div>
 
 <!-- 新建项目：双入口 -->
-<div id="newProjectModal" class="modal hidden">
+<div id="newProjectModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box">
     <div class="modal-head"><h3>新建项目</h3><button class="x" data-close>×</button></div>
     <div class="np-options">
@@ -140,7 +140,7 @@
 </div>
 
 <!-- 模版选择 -->
-<div id="tplModal" class="modal hidden">
+<div id="tplModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box">
     <div class="modal-head"><h3>选择产品模板</h3><button class="x" data-close>×</button></div>
     <input id="projName" class="inp" placeholder="项目名称（默认用模板名）">
@@ -156,7 +156,7 @@
 </div>
 
 <!-- 项目信息：工程师 + 类型（选项可配置，可新增/编辑/删除） -->
-<div id="projInfoModal" class="modal hidden">
+<div id="projInfoModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box">
     <div class="modal-head"><h3 id="piTitle">项目信息</h3><button class="x" data-close>×</button></div>
     <div class="pi-grid">
@@ -176,7 +176,7 @@
 </div>
 
 <!-- 选项编辑：新增 / 修改（名称 + 色板选色） -->
-<div id="optModal" class="modal hidden">
+<div id="optModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(420px,92vw)">
     <div class="modal-head"><h3 id="optTitle">新增选项</h3><button class="x" id="optX">×</button></div>
     <input id="optName" class="inp" placeholder="选项名称">
@@ -189,7 +189,7 @@
 </div>
 
 <!-- 更换看板图标（上传 + 裁剪） -->
-<div id="brandModal" class="modal hidden">
+<div id="brandModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(420px,92vw)">
     <div class="modal-head"><h3>更换看板图标</h3><button class="x" data-close>×</button></div>
     <input type="file" id="brandFile" accept="image/*" style="display:none">
@@ -208,7 +208,7 @@
 </div>
 
 <!-- 导入计划表：下载参考模版 + 选择文件 -->
-<div id="importModal" class="modal hidden">
+<div id="importModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(440px,92vw)">
     <div class="modal-head"><h3>导入计划表</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">① 下载参考模版（由内置模版生成，开始/截止含公式 → 导入后甘特级联）</div>
@@ -225,7 +225,7 @@
 </div>
 
 <!-- 任务 -->
-<div id="taskModal" class="modal hidden">
+<div id="taskModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box">
     <div class="modal-head"><h3 id="taskModalTitle">新建任务</h3><button class="x" data-close>×</button></div>
     <input id="taskTitle" class="inp" placeholder="任务标题">
@@ -248,7 +248,7 @@
 <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
 
 <!-- AI 助手：描述生成任务 -->
-<div id="aiModal" class="modal hidden">
+<div id="aiModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(580px,94vw)">
     <div class="modal-head"><h3>AI 助手 · 智能生成项目</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">用一句话描述你的项目 / 产品，AI 自动拆解任务清单（阶段 + 工期 + 负责人建议）。</div>
@@ -267,7 +267,7 @@
 </div>
 
 <!-- AI 设置 -->
-<div id="aiSettingsModal" class="modal hidden">
+<div id="aiSettingsModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(480px,94vw)">
     <div class="modal-head"><h3>AI 设置</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">兼容 OpenAI / 任意 OpenAI 格式接口（本地 Ollama、Azure、第三方代理均可）。Key 仅保存在本机 data/ai.json，不会上传。</div>
@@ -289,7 +289,7 @@
 </div>
 
 <!-- AI 项目总结 -->
-<div id="aiSummaryModal" class="modal hidden">
+<div id="aiSummaryModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(580px,94vw)">
     <div class="modal-head"><h3>AI 项目总结</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">由大模型基于项目数据生成（需配置 AI Key）。</div>

@@ -88,10 +88,11 @@ function init(file) {
 
 /* ---------------- 密码与用户 ---------------- */
 // scrypt 参数（2026-08-25 两轮评审提升）：N=2^17, r=8, p=1, keylen=64；哈希串带参数前缀以便升级，旧格式(salt:hash)按默认参数兼容校验
-const SCRYPT_N = 131072, SCRYPT_R = 8, SCRYPT_P = 1, SCRYPT_KEYLEN = 64;
+// 注意：N=131072 需要约 134MB 内存，必须显式 maxmem，否则 Node 默认 32MB 上限直接抛 RangeError（memory limit exceeded）
+const SCRYPT_N = 131072, SCRYPT_R = 8, SCRYPT_P = 1, SCRYPT_KEYLEN = 64, SCRYPT_MAXMEM = 256 * 1024 * 1024;
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const h = crypto.scryptSync(pw, salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P }).toString('hex');
+  const h = crypto.scryptSync(pw, salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem: SCRYPT_MAXMEM }).toString('hex');
   return SCRYPT_N + ':' + SCRYPT_R + ':' + SCRYPT_P + ':' + salt + ':' + h;
 }
 function verifyPassword(pw, stored) {
@@ -102,7 +103,7 @@ function verifyPassword(pw, stored) {
   else return false;
   if (!salt || !h) return false;
   try {
-    const t = crypto.scryptSync(pw, salt, h.length / 2, { N: +N || 16384, r: +r || 8, p: +p || 1 }).toString('hex');
+    const t = crypto.scryptSync(pw, salt, h.length / 2, { N: +N || 16384, r: +r || 8, p: +p || 1, maxmem: SCRYPT_MAXMEM }).toString('hex');
     return crypto.timingSafeEqual(Buffer.from(t, 'hex'), Buffer.from(h, 'hex'));
   } catch (e) { return false; }
 }
