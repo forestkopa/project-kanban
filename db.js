@@ -30,6 +30,10 @@ function init(file) {
       pass_hash TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS meta (
+      k TEXT PRIMARY KEY,
+      v TEXT
+    );
     CREATE TABLE IF NOT EXISTS tokens (
       token TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -75,6 +79,7 @@ function init(file) {
     );
     CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id, sort);
     CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens(user_id);
   `);
   // 兼容旧库：tokens 表补充 expires_at 列（新建表已含该列，此处幂等，重复执行报错被忽略）
   try { db.exec('ALTER TABLE tokens ADD COLUMN expires_at TEXT'); } catch (e) { /* 列已存在 */ }
@@ -82,16 +87,24 @@ function init(file) {
 }
 
 /* ---------------- 密码与用户 ---------------- */
+// scrypt 参数（2026-08-25 两轮评审提升）：N=2^17, r=8, p=1, keylen=64；哈希串带参数前缀以便升级，旧格式(salt:hash)按默认参数兼容校验
+const SCRYPT_N = 131072, SCRYPT_R = 8, SCRYPT_P = 1, SCRYPT_KEYLEN = 64;
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const h = crypto.scryptSync(pw, salt, 32).toString('hex');
-  return salt + ':' + h;
+  const h = crypto.scryptSync(pw, salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P }).toString('hex');
+  return SCRYPT_N + ':' + SCRYPT_R + ':' + SCRYPT_P + ':' + salt + ':' + h;
 }
 function verifyPassword(pw, stored) {
-  const [salt, h] = String(stored || '').split(':');
+  const parts = String(stored || '').split(':');
+  let N, r, p, salt, h;
+  if (parts.length === 5) { [N, r, p, salt, h] = parts; }            // 新格式：N:r:p:salt:hash
+  else if (parts.length === 2) { [salt, h] = parts; N = 16384; r = 8; p = 1; } // 旧格式：默认参数
+  else return false;
   if (!salt || !h) return false;
-  const t = crypto.scryptSync(pw, salt, 32).toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(t, 'hex'), Buffer.from(h, 'hex'));
+  try {
+    const t = crypto.scryptSync(pw, salt, h.length / 2, { N: +N || 16384, r: +r || 8, p: +p || 1 }).toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(t, 'hex'), Buffer.from(h, 'hex'));
+  } catch (e) { return false; }
 }
 function randomPassword(len) {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -321,13 +334,16 @@ function ensureDemoUser(seedFilePath) {
   return demo;
 }
 function migrateJson(seedFilePath, ownerId) {
-  if (!seedFilePath || !fs.existsSync(seedFilePath)) return 0;
+  if (!seedFilePath) return 0;
+  const marker = 'migrated:' + path.basename(seedFilePath);
+  // 显式迁移标记（2026-08-25 两轮评审）：避免"用户已有项目 → 存量 JSON 永不导入"的漏迁
+  if (db.prepare('SELECT v FROM meta WHERE k=?').get(marker)) return 0;
   let arr = [];
   try { arr = JSON.parse(fs.readFileSync(seedFilePath, 'utf8')); } catch (e) { return 0; }
   if (!Array.isArray(arr)) return 0;
-  // 已有项目则跳过（幂等：重启不重复导入）
+  // 已有项目则视为已完成迁移（幂等：重启不重复导入），并记录标记
   const existing = db.prepare('SELECT COUNT(*) c FROM projects WHERE owner_id=?').get(ownerId);
-  if (existing.c > 0) return 0;
+  if (existing.c > 0) { db.prepare('INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)').run(marker, 'done'); return 0; }
   let n = 0;
   arr.forEach(p => {
     if (p && p.tasks && p.id) {
@@ -335,7 +351,7 @@ function migrateJson(seedFilePath, ownerId) {
       try { saveProject(p, ownerId); n++; } catch (e) { console.error('[迁移] 项目导入失败:', p.name, e.message); }
     }
   });
-  if (n) console.log('[迁移] 已从 JSON 导入 ' + n + ' 个项目到 SQLite（归属 ' + ownerId + '）');
+  if (n) { db.prepare('INSERT OR REPLACE INTO meta (k,v) VALUES (?,?)').run(marker, 'done'); console.log('[迁移] 已从 JSON 导入 ' + n + ' 个项目到 SQLite（归属 ' + ownerId + '）'); }
   return n;
 }
 

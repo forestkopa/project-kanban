@@ -4,6 +4,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const cp = require('child_process');
+const crypto = require('crypto');
 const XLSX = require('xlsx');
 const XLSXS = require('xlsx-js-style'); // 支持单元格样式（周报待办导出用）
 
@@ -52,7 +53,7 @@ function gitAutoCommit(file) {
     cp.exec('git add ' + args + ' && git commit -m "data: ' + files.length + ' file(s) ' + new Date().toISOString() + '" --no-verify', { cwd: ROOT, stdio: 'ignore' }, () => {});
   }, 2000);
 }
-function uid() { return 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function uid() { return 'id_' + crypto.randomUUID().replace(/-/g, ''); }
 function isoDate(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 /* ---------- 可配置选项（项目类型/产品类型/等级/工程师类型），默认值 + 可新增；姓名/认证为手填字段 ---------- */
@@ -497,8 +498,8 @@ function chatCompletions(cfg, messages, temperature) {
         try {
           const j = JSON.parse(buf);
           const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-          if (t) resolve(t); else reject(new Error('AI 未返回内容: ' + (buf || '').slice(0, 160)));
-        } catch (e) { reject(new Error('解析 AI 响应失败: ' + (buf || '').slice(0, 160))); }
+          if (t) resolve(t); else { console.error('AI 未返回内容:', (buf || '').slice(0, 300)); reject(new Error('AI 未返回内容')); }
+        } catch (e) { console.error('解析 AI 响应失败:', e.message, (buf || '').slice(0, 300)); reject(new Error('解析 AI 响应失败')); }
       });
     });
     req.on('error', e => reject(e));
@@ -533,11 +534,15 @@ function rateLimit(key, max, windowMs) {
 }
 setInterval(() => { const now = Date.now(); for (const [k, b] of rateBuckets) if (now - b.t > 3600000) rateBuckets.delete(k); }, 600000).unref();
 function readBody(req) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let d = '';
     let tooLarge = false;
-    req.on('data', c => { d += c; if (!tooLarge && d.length > BODY_LIMIT) { tooLarge = true; req.destroy(); } });
-    req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch (e) { resolve({}); } });
+    req.on('data', c => {
+      d += c;
+      if (!tooLarge && d.length > BODY_LIMIT) { tooLarge = true; req.destroy(); reject(Object.assign(new Error('请求体过大'), { code: 'BODY_TOO_LARGE' })); }
+    });
+    req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch (e) { reject(Object.assign(new Error('请求体不是合法 JSON'), { code: 'INVALID_JSON' })); } });
+    req.on('error', reject);
   });
 }
 // --- 多用户鉴权：每用户 token（登录下发，存 SQLite tokens 表）---
@@ -594,6 +599,7 @@ async function isRO() {
 }
 
 const server = http.createServer(async (req, res) => {
+  try {
   const url = new URL(req.url, 'http://localhost');
   const p = url.pathname;
   // 请求日志（响应结束打印：方法 路径 状态 耗时）
@@ -611,6 +617,11 @@ const server = http.createServer(async (req, res) => {
       if (!u) return send(res, 401, { error: '用户名或密码错误' });
       const token = db.issueToken(u.id);
       return send(res, 200, { token, user: { id: u.id, name: u.name, role: u.role }, mustChange: !!u.mustChange });
+    }
+    // GET 接口统一鉴权（2026-08-25 两轮评审）：除登录 / 只读状态 / 本机 Ollama 探测外，其余 GET 均需登录
+    const PUBLIC_GET = ['/api/readonly', '/api/ai/ollama-models'];
+    if (req.method === 'GET' && !PUBLIC_GET.includes(p) && !req.user) {
+      return send(res, 401, { error: '请先登录（X-Auth-Token）' });
     }
     // 请求体大小上限（content-length 预检，chunked 由 readBody 兜底断开）
     if (req.method !== 'GET' && parseInt(req.headers['content-length'] || '0', 10) > BODY_LIMIT) {
@@ -949,9 +960,18 @@ const server = http.createServer(async (req, res) => {
       try {
         const raw = String(body.data || '');
         const mm = raw.match(/^data:([^;]+);base64,/);
-        if (mm && !/^image\//.test(mm[1])) return send(res, 400, { error: '仅支持图片格式 (image/*)' });
-        const b64 = raw.replace(/^data:image\/\w+;base64,/, '');
-        fs.writeFileSync(path.join(PUBLIC, 'brand-logo.png'), Buffer.from(b64, 'base64'));
+        if (mm && !/^image\/(png|jpe?g|gif|webp)$/.test(mm[1])) return send(res, 400, { error: '仅支持 PNG/JPEG/GIF/WebP 图片（禁止 SVG）' });
+        const b64 = raw.replace(/^data:[^;]+;base64,/, '');
+        if (b64.length > 4 * 1024 * 1024) return send(res, 400, { error: '图片过大（上限 4MB）' });
+        const imgBuf = Buffer.from(b64, 'base64');
+        // magic bytes 内容校验（防 polyglot/伪装文件；SVG 天然不含这些头 → 拒绝）
+        const magic = imgBuf.slice(0, 12).toString('hex');
+        const ok = magic.startsWith('89504e47') // PNG
+          || magic.startsWith('ffd8ff')          // JPEG
+          || magic.startsWith('47494638')        // GIF
+          || magic.startsWith('52494646');       // WebP (RIFF....WEBP)
+        if (!ok || imgBuf.length < 8 || imgBuf.length > 8 * 1024 * 1024) return send(res, 400, { error: '文件内容不是有效图片' });
+        fs.writeFileSync(path.join(PUBLIC, 'brand-logo.png'), imgBuf);
         return send(res, 200, { ok: true });
       } catch (e) { return send(res, 400, { error: '图片数据无效' }); }
     }
@@ -1079,14 +1099,23 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, { error: '接口不存在' });
   }
   let rel = p === '/' ? '/index.html' : p;
-  const filepath = path.join(PUBLIC, path.normalize(rel));
-  if (!filepath.startsWith(PUBLIC)) return send(res, 403, { error: 'forbidden' });
+  // 路径遍历加固：path.resolve 归一后做「大小写无关 + 分隔符感知」前缀校验（Windows 大小写/短名绕过防护）
+  const filepath = path.resolve(PUBLIC, '.' + rel);
+  const base = path.resolve(PUBLIC).toLowerCase();
+  const full = filepath.toLowerCase();
+  if (full !== base && !full.startsWith(base + path.sep)) return send(res, 403, { error: 'forbidden' });
   fs.readFile(filepath, (err, buf) => {
     if (err) return send(res, 404, { error: 'not found' });
     const ext = path.extname(filepath).toLowerCase();
     res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' }, SEC_HEADERS));
     res.end(buf);
   });
+  } catch (e) {
+    if (e && e.code === 'INVALID_JSON') return send(res, 400, { error: '请求体不是合法 JSON' });
+    if (e && e.code === 'BODY_TOO_LARGE') return send(res, 413, { error: '请求体过大（上限 10MB）' });
+    console.error('请求处理异常:', req.method, req.url, e);
+    try { if (!res.headersSent) send(res, 500, { error: '服务器内部错误' }); } catch (_) {}
+  }
 });
 server.listen(PORT, () => {
   console.log('Multi-project kanban running at http://localhost:' + PORT + (DEMO_MODE ? '  [演示模式：脱敏数据 + 免登录]' : ''));

@@ -61,6 +61,9 @@ async function ensureTunnel() {
 }
 
 log('守护已启动（本机模式，每 ' + INTERVAL / 1000 + ' 秒检测；本机负责公网隧道 ' + TUNNEL_URL + '）');
-setInterval(() => { ensureServer(); ensureTunnel(); }, INTERVAL);
-ensureServer();
-ensureTunnel();
+// 错误边界（2026-08-25 两轮评审）：allSettled 吞掉未处理拒绝，周期回调不因单次异常崩溃
+setInterval(() => {
+  try { Promise.allSettled([ensureServer(), ensureTunnel()]); }
+  catch (e) { log('守护周期异常: ' + e.message); }
+}, INTERVAL);
+Promise.allSettled([ensureServer(), ensureTunnel()]);

@@ -81,7 +81,7 @@
   <div class="modal-box" style="width:min(380px,92vw)">
     <div class="modal-head"><h3>🔐 登录</h3><span class="pi-sub" style="margin:0" id="loginSub"></span></div>
     <input id="loginName" class="inp" placeholder="用户名" autocomplete="username">
-    <input id="loginPass" class="inp" type="password" placeholder="密码（默认 000000）" autocomplete="current-password">
+    <input id="loginPass" class="inp" type="password" placeholder="密码" autocomplete="current-password">
     <label class="remember-row"><input type="checkbox" id="loginRemember"> 记住密码（仅本机保存）</label>
     <div id="loginErr" class="pi-sub" style="color:#E0241B;min-height:18px"></div>
     <button id="loginBtn" class="btn primary" style="width:100%">登 录</button>
@@ -96,7 +96,7 @@
     <div class="pi-sub">新建用户（密码 ≥ 6 位；成员可自行修改密码）</div>
     <div class="nu-row">
       <input id="nuName" class="inp" placeholder="用户名">
-      <input id="nuPass" class="inp" placeholder="初始密码（默认 000000）">
+      <input id="nuPass" class="inp" placeholder="初始密码（≥6 位）">
       <select id="nuRole" class="inp">
         <option value="member">成员</option>
         <option value="manager">副管理员</option>
@@ -245,7 +245,7 @@
 
 <input type="file" id="importFile" accept=".json,.xlsx" style="display:none">
 <input type="file" id="tplImportFile" accept=".xlsx" style="display:none">
-<div id="toast" class="toast hidden"></div>
+<div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
 
 <!-- AI 助手：描述生成任务 -->
 <div id="aiModal" class="modal hidden">

@@ -32,13 +32,20 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const tok = getToken();
   if (tok) headers['X-Auth-Token'] = tok;
-  let r = await fetch(API + path, { ...opts, method, headers });
+  // fetch 超时封装（15s）：弱网不无限等待
+  const fetchT = (u, o) => {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 15000);
+    return fetch(u, { ...o, signal: c.signal }).finally(() => clearTimeout(t))
+      .catch(e => { if (e && e.name === 'AbortError') throw new Error('请求超时，请重试'); throw e; });
+  };
+  let r = await fetchT(API + path, { ...opts, method, headers });
   // 未登录 / 会话失效 → 弹登录框，成功后重试一次（演示模式免登录不弹）
   if (r.status === 401 && !state.demo && path !== '/login') {
     const ok = await showLogin();
     if (ok) {
       headers['X-Auth-Token'] = getToken();
-      r = await fetch(API + path, { ...opts, method, headers });
+      r = await fetchT(API + path, { ...opts, method, headers });
     }
   }
   if (!r.ok) { const e = await r.json().catch(() => ({ error: r.status })); throw new Error(e.error || r.status); }
@@ -188,8 +195,8 @@ async function renderSummary() {
 }
 // 输入防抖：连续修改只在停顿后提交一次
 const _db = {};
-function debounce(key, fn, ms) { clearTimeout(_db[key]); _db[key] = setTimeout(fn, ms || 300); }
-function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function debounce(key, fn, ms) { clearTimeout(_db[key]); _db[key] = setTimeout(() => { delete _db[key]; fn(); }, ms || 300); }
+function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function proj() { return state.projects.find(p => p.id === state.currentId); }
 function progress(p) {
   if (!p || !p.tasks.length) return 0;
