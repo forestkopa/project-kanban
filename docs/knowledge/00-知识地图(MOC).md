@@ -6,9 +6,9 @@ status: 已确认
 related: []
 ---
 
-# 知识地图 (MOC) — project-kanban
+# 知识地图 (MOC) — kanban project
 
-> 本目录是 project-kanban 看板项目的 **Obsidian 知识库**（原子笔记 + 双链）。
+> 本目录是 kanban project 看板项目的 **Obsidian 知识库**（原子笔记 + 双链）。
 > 用 Obsidian 直接打开 `docs/knowledge/` 即为 vault；图谱视图可看笔记关系。
 > AI 入口：仓库根 `llms.txt`（给 LLM 的目录索引）。
 
