@@ -1,22 +1,23 @@
 // =========================================================
-// 看板崩溃守护（watchdog）—— 本机开发调试版
-// 每 15 秒探测本地服务：挂了自动拉起 server.js。
+// 看板崩溃守护（watchdog）—— 本机模式（生产切换回本机）
+// 每 15 秒探测：本地服务 + cloudflared 隧道，挂了自动拉起。
 // 双实例：5180 = 演示版(--demo, 脱敏数据) ；5181 = 正式版(真实数据)
-//
-// 注意：本机已不再是生产环境（生产 = 极空间 NAS + systemd）。
-//   - 公网隧道由 NAS 上的 cloudflared.service 负责，本机不再起隧道
-//     （避免两条 cloudflared 抢同一条 Named Tunnel）
-//   - 本机仅用于开发调试；日常访问请用 https://kanban.forestkopa.top
-//   - NAS 部署文件见 deploy/ 目录（README-NAS.md 有完整步骤）
+// 公网隧道：本机跑 cloudflared Named Tunnel（kanban.forestkopa.top → 5180）
+//   曾切到 NAS 部署（deploy/README-NAS.md），因 NAS 暂不支持 Ubuntu VM，
+//   恢复本机负责隧道；NAS Docker 方案就绪后可按 deploy/ 迁移。
 // =========================================================
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 
 const ROOT = __dirname;
 const NODE = process.execPath;
 const SERVER = path.join(ROOT, 'server.js');
 const INTERVAL = 15000;
+const CLOUDFLARED = 'C:/Users/Administrator/.cloudflared/cloudflared.exe';
+const TUNNEL_CONFIG = path.join(ROOT, 'config.yml');
+const TUNNEL_URL = 'https://kanban.forestkopa.top';
 
 // 守护的实例：演示版(--demo 免令牌脱敏数据) + 正式版(真实数据需令牌)
 const SERVERS = [
@@ -43,6 +44,23 @@ async function ensureServer() {
   }
 }
 
-log('守护已启动（本机开发调试版，每 ' + INTERVAL / 1000 + ' 秒检测；隧道由 NAS 负责，公网地址 https://kanban.forestkopa.top）');
-setInterval(ensureServer, INTERVAL);
+/* ---- 隧道守护：公网健康探测（进程存在 ≠ 隧道健康，曾有僵死进程骗过检测） ---- */
+function isTunnelUp() {
+  return new Promise(resolve => {
+    const req = https.get(TUNNEL_URL, { timeout: 6000 }, r => { r.resume(); resolve(r.statusCode >= 200 && r.statusCode < 500); });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+async function ensureTunnel() {
+  if (await isTunnelUp()) return;
+  log('公网不可达，清理残留并重启 Named Tunnel（' + TUNNEL_URL + '）');
+  try { spawnSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { timeout: 5000, stdio: 'ignore' }); } catch (e) {}
+  try { spawn(CLOUDFLARED, ['tunnel', '--config', TUNNEL_CONFIG, 'run'], { detached: true, stdio: 'ignore' }).unref(); }
+  catch (e) { log('隧道拉起失败: ' + e.message); }
+}
+
+log('守护已启动（本机模式，每 ' + INTERVAL / 1000 + ' 秒检测；本机负责公网隧道 ' + TUNNEL_URL + '）');
+setInterval(() => { ensureServer(); ensureTunnel(); }, INTERVAL);
 ensureServer();
+ensureTunnel();
