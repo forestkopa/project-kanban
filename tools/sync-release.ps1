@@ -1,18 +1,19 @@
 # tools/sync-release.ps1
 # 用法（powershell）：
 #   $env:GH_PAT = "ghp_xxxx"                      # 需 contents:write 权限的 PAT
-#   .\tools\sync-release.ps1                       # 仅滚动 rolling（每次普通 push）
-#   .\tools\sync-release.ps1 -Version v1.1          # 发版：在滚动 rolling 之外，额外打不可变版本号 v1.1
-# 功能：推送 main，并把 rolling 标签同步到最新提交 + 刷新 Rolling (main) Release 元数据；可选 -Version 追加一个固定版本号标签 + Release。
-# 版本约定：
-#   - `rolling` 标签 = 手动滚动指针（始终指向 main 最新提交），对应 `Rolling (main)` Release
-#   - `vX.Y` 标签 = 不可变里程碑（一次创建、永久保留），对应同名 GitHub Release
-#   - **最新**的 `vX.Y` 会被 GitHub 自动标为 Latest 徽标（无需手动管理）
-#   - 之所以用 `rolling` 而非 `latest`：`latest` 是 GitHub 保留词，与内置"Latest release"概念冲突，会导致自定义 release 被 GitHub 自动删除
-# 注意：push 直接走带 PAT 的远端 URL；git 路径显式解析（先 Get-Command，失败回退常见路径），
+#   .\tools\sync-release.ps1                       # 仅推送 main（普通 push，不改版本/标签）
+#   .\tools\sync-release.ps1 -Version v1.2          # 发版：打不可变版本号 v1.2 + 把 latest 标签滚动到该提交
+# 版本约定（2026-08-25 确定，用户要求）：
+#   - `latest` 标签 = 移动指针，始终指向「当前最大版本号」对应的提交（如当前 v1.1）。
+#     发布更高版本（如 v1.2）后，`latest` 标签移动到新提交，旧版本（v1.1）即不再带 latest。
+#   - `vX.Y` 标签 = 不可变里程碑（一次创建、永久保留），对应同名 GitHub Release（含变更说明）。
+#   - GitHub 的 "Latest" 徽标：被 GitHub 自动赋予「最新发布的 release」，即当前最大版本号
+#     （v1.1 -> 发布 v1.2 后自动切换），无需手动管理。
+#   - 不使用单独的「rolling」release；latest 即最大版本号，概念统一、避免与 GitHub 保留词冲突。
+# 注意：push 走带 PAT 的远端 URL；git 路径显式解析（先 Get-Command，失败回退常见路径），
 #       避免 PowerShell 子进程下 git 不在 PATH 导致静默 no-op。
 param(
-    [string]$Version = ''   # 形如 v1.1；为空则只滚动 rolling，不打版本号
+    [string]$Version = ''   # 形如 v1.2；为空则只推送 main，不动版本号/latest
 )
 
 $ErrorActionPreference = 'Continue'
@@ -67,52 +68,27 @@ try {
     $msg = (Invoke-Git log -1 --pretty='%s').Trim()
     Log "  最新提交 $sha : $msg"
 
-    # 3) 移动 rolling 标签到该提交（滚动指针；target_commitish=main 始终解析到最新）
-    Invoke-Git tag -f rolling $sha
-    Log '> git push -f origin refs/tags/rolling'
-    Invoke-Git push -q -f $remote refs/tags/rolling
-
-    # 4) 更新 Rolling (main) Release 元数据（GitHub REST API）
-    #    GitHub 把 `latest` 视为保留词会删除同名 release，故改用 rolling 标签名
-    $rels = Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases?per_page=20" -Method Get
-    $rel  = $rels | Where-Object { $_.name -eq 'Rolling (main)' } | Select-Object -First 1
-    if (-not $rel) { throw "找不到 'Rolling (main)' Release，请先手动创建或检查权限" }
-    $verLine = if ($Version) { "当前版本：**$Version**`n`n" } else { '' }
-    $rollingNotes = @"
-🚀 本 Release 由 tools/sync-release.ps1 自动同步自 `main` 最新提交。
-
-$verLine- 提交：$sha
-- 信息：$msg
-- 变更：https://github.com/$repo/commits/main
-
-> `rolling` 标签始终指向 main 最新提交，便于一键获取最新可用代码；各里程碑另有不可变版本号（v1.0、v1.1…）保留历史版本。
-> 最新可发布的代码会被 GitHub 自动标为 Latest 徽标（无需手动管理）。
-"@
-    $rollingBody = @{
-        tag_name   = 'rolling'
-        name       = 'Rolling (main)'
-        body       = $rollingNotes
-        target_commitish = 'main'
-        prerelease = $false
-    } | ConvertTo-Json -Compress
-    Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases/$($rel.id)" -Method Patch -Body $rollingBody -ContentType 'application/json'
-    Log "✅ Rolling (main) release 已同步到 $sha"
-
-    # 5) 可选：打不可变版本号（里程碑）
     if ($Version) {
-        if ($Version -notmatch '^v\d+\.\d+(\.\d+)?$') { throw "版本号格式应为 vX.Y（如 v1.1），收到: $Version" }
+        if ($Version -notmatch '^v\d+\.\d+(\.\d+)?$') { throw "版本号格式应为 vX.Y（如 v1.2），收到: $Version" }
 
-        # 5a) 不可变标签（已存在则跳过，不覆盖历史里程碑）
+        # 3) 不可变版本标签（已存在则跳过，不覆盖历史里程碑）
         $tagExists = (Invoke-Git tag -l $Version).Trim()
         if (-not $tagExists) {
             Invoke-Git tag $Version $sha
             Log "> git push origin refs/tags/$Version"
             Invoke-Git push -q $remote "refs/tags/$Version"
+            Log "✅ 已打不可变标签 $Version ($sha)"
         } else {
             Log "⚠ 标签 $Version 已存在，跳过（不可变里程碑不被覆盖）"
         }
 
-        # 5b) 创建/更新该版本 Release
+        # 4) 移动 latest 标签到该提交（latest = 当前最大版本号）
+        Invoke-Git tag -f latest $sha
+        Log '> git push -f origin refs/tags/latest'
+        Invoke-Git push -q -f $remote refs/tags/latest
+        Log "✅ latest 标签已滚动到 $Version ($sha)；旧版本不再带 latest"
+
+        # 5) 创建/更新该版本 Release（含变更说明模板）
         $verNotes = @"
 ## 版本 $Version
 
@@ -120,8 +96,10 @@ $verLine- 提交：$sha
 - 提交信息：$msg
 - 变更明细：https://github.com/$repo/commits/$sha
 
-> 本版本为**不可变里程碑**；最新可用代码见 `rolling` 标签 / `Rolling (main)` Release。
-> 注意：**最新发布**的版本会被 GitHub 自动标为 Latest 徽标（无需手动管理）。
+### 本版本主要更新
+> 请在本发布页补充相对上一版本（如 v1.1）的主要变更说明。
+
+> 本版本为**不可变里程碑**；`latest` 标签已自动滚动到本版本，GitHub 也会将本 release 标为 Latest。
 "@
         $verBody = @{
             tag_name   = $Version
@@ -137,6 +115,8 @@ $verLine- 提交：$sha
             Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases" -Method Post -Body $verBody -ContentType 'application/json'
             Log "✅ 版本 Release $Version 已创建"
         }
+    } else {
+        Log '（普通 push：未指定 -Version，版本号与 latest 标签保持不变）'
     }
 
     Log '=== sync-release 完成 ==='
