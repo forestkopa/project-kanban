@@ -20,6 +20,8 @@ const ICON = {
   tag: '<svg aria-hidden="true" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7l1 3H4z"/><circle cx="16.5" cy="14.5" r="3.5"/></svg>',
   download: '<svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M8 10l4 4 4-4"/><path d="M4 20h16"/></svg>'
 };
+const AVA_COLORS = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#ff453a', '#64d2ff', '#5e5ce6', '#ff375f', '#00c7be', '#a2845e'];
+function avaColor(n) { let h = 0; const s = String(n || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return AVA_COLORS[h % AVA_COLORS.length]; }
 let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null };
 try { const u = localStorage.getItem('kb-user'); if (u) state.user = JSON.parse(u); } catch (e) {}
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
@@ -172,7 +174,7 @@ async function renderSummary() {
     wrap.innerHTML = `
       <div class="rpt-head">
         <h3>项目聚合报告 · 按人汇总 <span class="muted" style="font-weight:400;font-size:12px">（${state.user && state.user.role === 'member' ? '仅显示你的统计' : '全量成员'}）</span></h3>
-        <button id="rptExport" class="btn">📄 导出 xlsx</button>
+        <button id="rptExport" class="btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></svg>导出 xlsx</button>
       </div>
       <div class="rpt-wrap">
         <table class="rpt-table">
@@ -274,7 +276,7 @@ function applyReadOnly() {
   document.body.classList.toggle('ro', ro);
   const b = $('#roBanner'); if (b) b.classList.toggle('hidden', !ro);
   const nb = $('#newProjectBtn'); if (nb) nb.disabled = ro;
-  const rb = $('#roBtn'); if (rb) rb.textContent = ro ? '🔓 解除只读' : '🔒 开启只读';
+  const rl = $('#roLabel'); if (rl) rl.textContent = ro ? '解除只读' : '只读模式';
 }
 
 function projCard(p, dim) {
@@ -290,8 +292,7 @@ function projCard(p, dim) {
   const lc = levelColor(p.level);
   const ptc = productTypeColor(p.productType);
   el.innerHTML = `<div class="proj-top"><span class="dot" style="background:${p.color}"></span><span class="pname">${esc(p.name)}</span><span class="type-pill" style="background:${c}">${p.type || ''}</span><span class="level-pill" style="background:${lc}">${p.level || ''}</span>${p.productType ? `<span class="ptype-pill" style="color:${ptc}">${esc(p.productType)}</span>` : ''}</div>
-    <div class="bar"><div class="bar-fill" style="width:${pc}%;background:${p.color}"></div></div>
-    <div class="pmeta">${pc}% · ${p.tasks.filter(t => t.done).length}/${p.tasks.length}${p.cert ? `<span class="cert-tag">${esc(p.cert)}</span>` : ''}${dim ? ' · ' + ICON.box + '已归档' : ''}</div>
+    <div class="prow"><div class="bar"><div class="bar-fill" style="width:${pc}%;background:${p.color}"></div></div><span class="pmeta">${pc}%${dim ? ' · ' + ICON.box + '已归档' : ''}</span></div>
     <button class="proj-edit" title="编辑项目信息">${ICON.edit}</button>`;
   el.querySelector('.proj-edit').onclick = e => {
     e.stopPropagation();
@@ -381,12 +382,13 @@ function renderBoard(p) {
 
 function taskCard(p, t, ph) {
   const el = document.createElement('div'); el.className = 'card' + (t.done ? ' done' : '');
+  el.style.setProperty('--cc', ph.color || '#999');
   el.draggable = !state.readonly;
   el.ondragstart = e => e.dataTransfer.setData('text/plain', t.id);
   el.innerHTML = `
     <label class="chk"><input type="checkbox" ${t.done ? 'checked' : ''} ${state.readonly ? 'disabled' : ''}><span class="ctitle">${esc(t.title)}</span></label>
     ${t.note ? `<div class="cnote">${esc(t.note)}</div>` : ''}
-    <div class="cmeta"><span class="phase" style="color:${ph.color}">${esc(ph.name)}</span>${t.assignee ? `<span class="who">@${esc(t.assignee)}</span>` : ''}${t.estimateDays ? `<span class="days">${t.estimateDays}d</span>` : ''}</div>
+    <div class="cmeta"><span class="phase" style="color:${ph.color}">${esc(ph.name)}</span>${t.assignee ? `<span class="who-ava" style="--acc:${avaColor(t.assignee)}" title="${esc(t.assignee)}">${esc(t.assignee[0] || '?')}</span>` : ''}${t.estimateDays ? `<span class="days">${t.estimateDays}d</span>` : ''}</div>
     <div class="cacts"><button class="mini" data-edit title="编辑">${ICON.edit}</button><button class="mini del" data-del title="删除">${ICON.del}</button></div>`;
   el.querySelector('input').onchange = async e => {
     try { await api(`/projects/${p.id}/tasks/${t.id}`, { method: 'PUT', body: JSON.stringify({ done: e.target.checked }) }); t.done = e.target.checked; render(); }
@@ -898,7 +900,7 @@ function updateIOState() {
   const at = $('#addTaskBtn'), dp = $('#delProjectBtn'), ab = $('#archiveBtn');
   if (at) at.disabled = !has;
   if (dp) dp.disabled = !has;
-  if (ab) { ab.disabled = !has; if (has) ab.textContent = ((p.status || 'active') === 'archived') ? '↩ 取消归档' : '📦 完成归档'; }
+  if (ab) { ab.disabled = !has; const al = $('#archiveLabel'); if (al) al.textContent = ((p.status || 'active') === 'archived') ? '取消归档' : '完成归档'; }
 }
 function bufToBase64(buf) {
   const bytes = new Uint8Array(buf); let bin = ''; const chunk = 0x8000;
@@ -914,9 +916,53 @@ function exportPlan(type) {
 }
 $('#exportBtn').onclick = (e) => { e.stopPropagation(); $('#exportMenu').classList.toggle('open'); };
 $$('#exportMenu button').forEach(b => b.onclick = () => { const x = b.dataset.x; $('#exportMenu').classList.remove('open'); exportPlan(x); });
+const moreBtn = $('#moreBtn');
+if (moreBtn) moreBtn.onclick = (e) => { e.stopPropagation(); $('#moreMenu').classList.toggle('open'); };
 document.addEventListener('click', e => {
   const m = $('#exportMenu'); if (m && !$('#exportBtn').contains(e.target) && !m.contains(e.target)) m.classList.remove('open');
+  const mm = $('#moreMenu'); if (mm && moreBtn && !moreBtn.contains(e.target) && !mm.contains(e.target)) mm.classList.remove('open');
 });
+
+/* ---------- 全局搜索（⌘K） ---------- */
+const sInput = $('#searchInput'), sRes = $('#searchRes');
+if (sInput && sRes) {
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); sInput.focus(); sInput.select(); }
+    if (e.key === 'Escape') { sRes.classList.remove('open'); sInput.blur(); }
+  });
+  sInput.addEventListener('input', () => {
+    const q = sInput.value.trim().toLowerCase();
+    if (!q) { sRes.classList.remove('open'); return; }
+    const items = [];
+    state.projects.forEach(p => {
+      if ((p.name || '').toLowerCase().includes(q)) items.push({ kind: '项目', pid: p.id, name: p.name, color: p.color, task: null });
+      (p.tasks || []).forEach(t => {
+        if ((t.title || '').toLowerCase().includes(q)) items.push({ kind: '任务', pid: p.id, name: t.title, color: p.color, task: t });
+      });
+    });
+    if (!items.length) {
+      sRes.innerHTML = '<div class="sr-empty">没有匹配「' + esc(sInput.value.trim()) + '」的结果</div>';
+      sRes.classList.add('open'); sRes._items = [];
+      return;
+    }
+    sRes._items = items.slice(0, 12);
+    sRes.innerHTML = sRes._items.map((it, i) =>
+      `<div class="sr-item" data-i="${i}"><span class="sr-dot" style="background:${it.color || '#888'}"></span><span class="sr-name">${esc(it.name)}</span><span class="sr-kind">${it.kind}</span></div>`).join('');
+    sRes.classList.add('open');
+  });
+  sRes.addEventListener('click', e => {
+    const el = e.target.closest('.sr-item'); if (!el || !sRes._items) return;
+    const item = sRes._items[+el.dataset.i]; if (!item) return;
+    state.currentId = item.pid;
+    sRes.classList.remove('open'); sInput.value = '';
+    render();
+    if (item.task) { const p = proj(); const t = (p && p.tasks || []).find(x => x.id === item.task.id); if (t) openTaskModal(p, t); }
+  });
+  document.addEventListener('click', e => {
+    const sb = $('#searchBox');
+    if (sb && !sb.contains(e.target)) sRes.classList.remove('open');
+  });
+}
 $('#importFile').onchange = async e => {
   const file = e.target.files[0]; if (!file) return;
   try {

@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/style.css?v=@VER@">
 </head>
 <body>
-<div id="roBanner" class="hidden">🔒 只读模式：当前仅可查看，修改已锁定</div>
+<div id="roBanner" class="hidden">只读模式：当前仅可查看，修改已锁定</div>
 <aside id="sidebar">
   <div class="brand"><img id="brandLogo" class="logo" src="/wb-logo.png" alt="WorkBuddy" title="点击更换看板图标"><span id="appName" title="点击编辑看板名称">项目看板</span></div>
   <button id="newProjectBtn" class="btn primary">+ 新建项目</button>
@@ -22,32 +22,46 @@
     <div id="projTitle"></div>
       <div id="projMeta"></div>
       <span id="demoBadge" class="demo-badge hidden">演示模式 · 免令牌</span>
+      <div class="search" id="searchBox">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="searchInput" placeholder="搜索任务、项目…" autocomplete="off">
+        <span class="kbd">⌘K</span>
+        <div class="search-res" id="searchRes"></div>
+      </div>
       <div class="top-actions">
         <button id="addTaskBtn" class="btn">+ 任务</button>
-      <button id="archiveBtn" class="btn" title="项目完成后归档">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg> 完成归档</button>
-      <button id="delProjectBtn" class="btn ghost">删除项目</button>
       <div class="export-wrap">
         <button id="exportBtn" class="btn" title="导出计划表">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 20h16"/></svg> 导出 ▾</button>
         <div id="exportMenu" class="export-menu">
-          <button data-x="initial"><span class="em-ico">📄</span>初版计划</button>
-          <button data-x="latest"><span class="em-ico">📄</span>最新计划</button>
-          <button data-x="diff"><span class="em-ico">📊</span>差异对比</button>
+          <button data-x="initial"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></svg></span>初版计划</button>
+          <button data-x="latest"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></svg></span>最新计划</button>
+          <button data-x="diff"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h12"/><path d="M16 4l4 4-4 4"/><path d="M16 16H4"/><path d="M8 12l-4 4 4 4"/></svg></span>差异对比</button>
         </div>
       </div>
       <button id="aiBtn" class="btn primary" title="AI 助手：描述需求自动生成任务清单">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2l1.9 5.3L19 9l-5.1 1.7L12 16l-1.9-5.3L5 9l5.1-1.7z"/><circle cx="18.6" cy="17.4" r="1.5"/><circle cx="5.4" cy="15.8" r="1.1"/></svg> AI 助手</button>
       <button id="themeToggle" class="btn" title="切换浅色 / 深色">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6 6 0 0021 12.8z"/></svg></button>
-      <button id="roBtn" class="btn" title="只读模式开关（分享前开启，防止他人修改）">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> 只读</button>
+      <div class="more-wrap">
+        <button id="moreBtn" class="btn more-icon" title="更多操作">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+        <div id="moreMenu">
+          <button id="archiveBtn" title="项目完成后归档">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l1 13h16l1-13H3z"/><path d="M3 7h18"/><path d="M10 7V4h4v3"/></svg> <span id="archiveLabel">完成归档</span></button>
+          <button id="roBtn" title="只读模式开关（分享前开启，防止他人修改）">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> <span id="roLabel">只读模式</span></button>
+          <div class="mm-sep"></div>
+          <button id="delProjectBtn" class="danger">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg> 删除项目</button>
+        </div>
+      </div>
       <div class="user-wrap">
-        <button id="userBtn" class="btn" title="账户菜单">👤 <span id="userName"></span> ▾</button>
+        <button id="userBtn" class="btn" title="账户菜单"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:3px"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg><span id="userName"></span> ▾</button>
         <div id="userMenu" class="export-menu">
-          <button id="userMenuUsers" data-u="users"><span class="em-ico">👥</span>用户管理</button>
-          <button data-u="password"><span class="em-ico">🔑</span>修改密码</button>
-          <button data-u="logout"><span class="em-ico">🚪</span>退出登录</button>
+          <button id="userMenuUsers" data-u="users"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 015.5 4.5"/></svg></span>用户管理</button>
+          <button data-u="password"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span>修改密码</button>
+          <button data-u="logout"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>退出登录</button>
         </div>
       </div>
     </div>
@@ -62,7 +76,7 @@
       <button class="tab" data-view="daily">日报</button>
       <button class="tab" data-view="weekly">周报</button>
       <button class="tab" data-view="monthly">月度计划</button>
-      <button class="tab" data-view="summary">📊 报告</button>
+      <button class="tab" data-view="summary"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16l3-3 3 3 5-6"/></svg>报告</button>
     </div>
     <div id="viewActions" class="view-actions"></div>
   </div>
@@ -79,20 +93,20 @@
 <!-- 登录 -->
 <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(380px,92vw)">
-    <div class="modal-head"><h3>🔐 登录</h3><span class="pi-sub" style="margin:0" id="loginSub"></span></div>
+    <div class="modal-head"><h3><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:6px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>登录</h3><span class="pi-sub" style="margin:0" id="loginSub"></span></div>
     <input id="loginName" class="inp" placeholder="用户名" autocomplete="username">
     <input id="loginPass" class="inp" type="password" placeholder="密码" autocomplete="current-password">
     <label class="remember-row"><input type="checkbox" id="loginRemember"> 记住密码（仅本机保存）</label>
     <div id="loginErr" class="pi-sub" style="color:#E0241B;min-height:18px"></div>
     <button id="loginBtn" class="btn primary" style="width:100%">登 录</button>
-    <button id="guestBtn" class="btn" style="width:100%;margin-top:8px">👀 以游客身份登录（只读）</button>
+    <button id="guestBtn" class="btn" style="width:100%;margin-top:8px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>以游客身份登录（只读）</button>
   </div>
 </div>
 
 <!-- 用户管理（admin） -->
 <div id="usersModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(560px,94vw)">
-    <div class="modal-head"><h3>👥 用户管理</h3><button class="x" data-close>×</button></div>
+    <div class="modal-head"><h3><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:5px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 015.5 4.5"/></svg>用户管理</h3><button class="x" data-close>×</button></div>
     <div class="pi-sub">新建用户（密码 ≥ 6 位；成员可自行修改密码）</div>
     <div class="nu-row">
       <input id="nuName" class="inp" placeholder="用户名">
@@ -112,7 +126,7 @@
 <!-- 修改密码 -->
 <div id="passwordModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box" style="width:min(380px,92vw)">
-    <div class="modal-head"><h3>🔑 修改密码</h3><button class="x" data-close>×</button></div>
+    <div class="modal-head"><h3><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:5px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>修改密码</h3><button class="x" data-close>×</button></div>
     <input id="pwOld" class="inp" type="password" placeholder="当前密码" autocomplete="current-password">
     <input id="pwNew" class="inp" type="password" placeholder="新密码（≥6 位）" autocomplete="new-password">
     <div id="pwErr" class="pi-sub" style="color:#E0241B;min-height:18px"></div>
@@ -126,12 +140,12 @@
     <div class="modal-head"><h3>新建项目</h3><button class="x" data-close>×</button></div>
     <div class="np-options">
       <button class="np-opt" id="npFromTpl">
-        <div class="np-ico">📋</div>
+        <div class="np-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>
         <div class="np-t">从模版导入</div>
         <div class="np-s">用内置智能硬件产品模板快速搭建</div>
       </button>
       <button class="np-opt" id="npFromXlsx">
-        <div class="np-ico">📥</div>
+        <div class="np-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></div>
         <div class="np-t">从 xlsx 导入</div>
         <div class="np-s">导入已有计划表 / 项目文件（.xlsx / .json）</div>
       </button>
@@ -274,14 +288,14 @@
     <input id="aiBase" class="inp" placeholder="Base URL（云 API 或本地服务，如 http://127.0.0.1:11434/v1）">
     <input id="aiModel" class="inp" placeholder="模型名（如 gpt-4o-mini / llama3）">
     <input id="aiKey" class="inp" type="password" placeholder="API Key（本地模型无需填写）">
-    <label class="remember-row"><input type="checkbox" id="aiLocal"> 🖥 本地大模型（无需 API Key，需 OpenAI 兼容服务：Ollama / LM Studio / vLLM）</label>
+    <label class="remember-row"><input type="checkbox" id="aiLocal"> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:2px"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M9 20h6"/><path d="M12 16v4"/></svg> 本地大模型（无需 API Key，需 OpenAI 兼容服务：Ollama / LM Studio / vLLM）</label>
     <div class="nu-row" style="margin:6px 0">
-      <button class="btn" id="aiDetectOllama">🔍 检测本机 Ollama</button>
+      <button class="btn" id="aiDetectOllama"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>检测本机 Ollama</button>
       <select id="aiLocalModel" class="inp" style="display:none;margin:0"></select>
       <span id="aiOllamaMsg" class="pi-sub" style="margin:0"></span>
     </div>
     <div style="display:flex;gap:10px;margin-top:4px">
-      <button class="btn" id="aiKeyClear" style="display:none">🗑 清除 Key</button>
+      <button class="btn" id="aiKeyClear" style="display:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>清除 Key</button>
       <button class="btn primary" id="aiSaveBtn" style="flex:1">保存设置</button>
     </div>
     <div id="aiSettingsMsg" class="pi-sub" style="margin-top:8px"></div>
