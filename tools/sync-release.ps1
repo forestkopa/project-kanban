@@ -1,14 +1,18 @@
 # tools/sync-release.ps1
 # 用法（powershell）：
 #   $env:GH_PAT = "ghp_xxxx"                      # 需 contents:write 权限的 PAT
-#   .\tools\sync-release.ps1                       # 仅滚动 latest（每次普通 push）
-#   .\tools\sync-release.ps1 -Version v1.1          # 发版：在滚动 latest 之外，额外打不可变版本号 v1.1
-# 功能：推送 main，并把 latest Release 同步到最新提交；可选 -Version 追加一个固定版本号标签 + Release。
-# 版本约定：latest 始终滚动指向 main 最新提交；vX.Y 为不可变里程碑（如 v1.0、v1.1），每次发版显式传 -Version。
+#   .\tools\sync-release.ps1                       # 仅滚动 rolling（每次普通 push）
+#   .\tools\sync-release.ps1 -Version v1.1          # 发版：在滚动 rolling 之外，额外打不可变版本号 v1.1
+# 功能：推送 main，并把 rolling 标签同步到最新提交 + 刷新 Rolling (main) Release 元数据；可选 -Version 追加一个固定版本号标签 + Release。
+# 版本约定：
+#   - `rolling` 标签 = 手动滚动指针（始终指向 main 最新提交），对应 `Rolling (main)` Release
+#   - `vX.Y` 标签 = 不可变里程碑（一次创建、永久保留），对应同名 GitHub Release
+#   - **最新**的 `vX.Y` 会被 GitHub 自动标为 Latest 徽标（无需手动管理）
+#   - 之所以用 `rolling` 而非 `latest`：`latest` 是 GitHub 保留词，与内置"Latest release"概念冲突，会导致自定义 release 被 GitHub 自动删除
 # 注意：push 直接走带 PAT 的远端 URL；git 路径显式解析（先 Get-Command，失败回退常见路径），
 #       避免 PowerShell 子进程下 git 不在 PATH 导致静默 no-op。
 param(
-    [string]$Version = ''   # 形如 v1.1；为空则只滚动 latest，不打版本号
+    [string]$Version = ''   # 形如 v1.1；为空则只滚动 rolling，不打版本号
 )
 
 $ErrorActionPreference = 'Continue'
@@ -63,31 +67,36 @@ try {
     $msg = (Invoke-Git log -1 --pretty='%s').Trim()
     Log "  最新提交 $sha : $msg"
 
-    # 3) 移动 latest 标签到该提交（滚动）
-    Invoke-Git tag -f latest $sha
-    Log '> git push -f origin refs/tags/latest'
-    Invoke-Git push -q -f $remote refs/tags/latest
+    # 3) 移动 rolling 标签到该提交（滚动指针；target_commitish=main 始终解析到最新）
+    Invoke-Git tag -f rolling $sha
+    Log '> git push -f origin refs/tags/rolling'
+    Invoke-Git push -q -f $remote refs/tags/rolling
 
-    # 4) 更新 Latest (main) Release 元数据（GitHub REST API）
-    $rel   = Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases/tags/latest" -Method Get
+    # 4) 更新 Rolling (main) Release 元数据（GitHub REST API）
+    #    GitHub 把 `latest` 视为保留词会删除同名 release，故改用 rolling 标签名
+    $rels = Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases?per_page=20" -Method Get
+    $rel  = $rels | Where-Object { $_.name -eq 'Rolling (main)' } | Select-Object -First 1
+    if (-not $rel) { throw "找不到 'Rolling (main)' Release，请先手动创建或检查权限" }
     $verLine = if ($Version) { "当前版本：**$Version**`n`n" } else { '' }
-    $latestNotes = @"
+    $rollingNotes = @"
 🚀 本 Release 由 tools/sync-release.ps1 自动同步自 `main` 最新提交。
 
 $verLine- 提交：$sha
 - 信息：$msg
 - 变更：https://github.com/$repo/commits/main
 
-> `latest` 始终指向 main 最新提交，便于一键获取最新可用代码；各里程碑另有不可变版本号（v1.0、v1.1…）保留历史版本。
+> `rolling` 标签始终指向 main 最新提交，便于一键获取最新可用代码；各里程碑另有不可变版本号（v1.0、v1.1…）保留历史版本。
+> 最新可发布的代码会被 GitHub 自动标为 Latest 徽标（无需手动管理）。
 "@
-    $latestBody = @{
-        tag_name   = 'latest'
-        name       = 'Latest (main)'
-        body       = $latestNotes
+    $rollingBody = @{
+        tag_name   = 'rolling'
+        name       = 'Rolling (main)'
+        body       = $rollingNotes
+        target_commitish = 'main'
         prerelease = $false
     } | ConvertTo-Json -Compress
-    Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases/$($rel.id)" -Method Patch -Body $latestBody -ContentType 'application/json'
-    Log "✅ latest release 已同步到 $sha"
+    Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases/$($rel.id)" -Method Patch -Body $rollingBody -ContentType 'application/json'
+    Log "✅ Rolling (main) release 已同步到 $sha"
 
     # 5) 可选：打不可变版本号（里程碑）
     if ($Version) {
@@ -111,7 +120,8 @@ $verLine- 提交：$sha
 - 提交信息：$msg
 - 变更明细：https://github.com/$repo/commits/$sha
 
-> 本版本为**不可变里程碑**；最新可用代码见 `latest` 标签 / `Latest (main)` Release。
+> 本版本为**不可变里程碑**；最新可用代码见 `rolling` 标签 / `Rolling (main)` Release。
+> 注意：**最新发布**的版本会被 GitHub 自动标为 Latest 徽标（无需手动管理）。
 "@
         $verBody = @{
             tag_name   = $Version

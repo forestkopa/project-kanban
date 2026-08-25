@@ -145,5 +145,5 @@ install-watchdog-service.bat
 - GitHub 私有仓库：https://github.com/forestkopa/project-kanban（分支 main）
 - 推送用 HTTPS + PAT；敏感文件绝不入库。
 - 知识库：`docs/knowledge/`（Obsidian 原子笔记 + MOC），仓库根 `llms.txt` 为 AI 索引；每次功能迭代 push 前同步更新（约定见 `docs/开发备忘.md`）。
-- **版本号方案**：`latest` 滚动指向 main 最新提交（GitHub Releases 页挂 `Latest` 徽标，便于一键取最新）；每个版本另打**不可变版本号**作为里程碑——`v1.0`（旧里程碑）→ **当前 `v1.1`** → 后续 `v1.2`…（功能迭代 v1.x / 重大重构 v2.0）。每次 push 用 `tools/sync-release.ps1` 自动同步；发版时 `.\tools\sync-release.ps1 -Version v1.1` 追加不可变版本标签与 Release。
-- 最新可用代码：https://github.com/forestkopa/project-kanban/releases/tag/latest ；历史版本（带版本号）：Releases 列表中的 `v1.0` / `v1.1` …。
+- **版本号方案**：`rolling` 标签 = 手动滚动指针（始终指向 main 最新提交，对应 `Rolling (main)` Release）；`vX.Y` 标签 = 不可变里程碑（一次创建、永久保留，对应同名 GitHub Release）。**最新发布**的版本会被 GitHub 自动标为 `Latest` 徽标（无需手动管理——`latest` 是 GitHub 保留词，不要再用作自定义 tag 名）。版本：旧里程碑 `v1.0` → **当前 `v1.1`** → 后续 `v1.2`…（功能迭代 v1.x / 重大重构 v2.0）。每次 push 用 `tools/sync-release.ps1` 自动同步；发版时 `.\tools\sync-release.ps1 -Version v1.1` 追加不可变版本标签与 Release。
+- 最新可用代码：https://github.com/forestkopa/project-kanban/releases/tag/rolling ；历史版本（带版本号）：Releases 列表中的 `v1.0` / `v1.1` …。
