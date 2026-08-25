@@ -181,10 +181,11 @@ function cleanupExpiredTokens() {
 }
 
 /* ---------------- 项目（单项目粒度保存） ---------------- */
-function rowToProj(r) {
-  const phases = db.prepare('SELECT * FROM phases WHERE project_id=? ORDER BY seq').all(r.id)
+// rowToProj 支持预加载的 phases/tasks（列表场景批量查一次，避免 N+1：每项目 2 条 SQL → 全列表 2 条）
+function rowToProj(r, prePhases, preTasks) {
+  const phases = (prePhases !== undefined ? prePhases : db.prepare('SELECT * FROM phases WHERE project_id=? ORDER BY seq').all(r.id))
     .map(p => ({ id: p.id, name: p.name, color: p.color }));
-  const tasks = db.prepare('SELECT * FROM tasks WHERE project_id=? ORDER BY seq').all(r.id).map(t => ({
+  const tasks = (preTasks !== undefined ? preTasks : db.prepare('SELECT * FROM tasks WHERE project_id=? ORDER BY seq').all(r.id)).map(t => ({
     id: t.id, title: t.title, phaseId: t.phase_id, note: t.note, estimateDays: t.estimate_days,
     assignee: t.assignee, done: !!t.done, isMilestone: !!t.is_milestone,
     startDate: t.start_date, dueDate: t.due_date,
@@ -243,7 +244,14 @@ function listProjects(userId, isAdmin) {
   const rows = (isAdmin || !userId)
     ? db.prepare('SELECT * FROM projects ORDER BY sort, created_at').all()
     : db.prepare('SELECT * FROM projects WHERE owner_id=? ORDER BY sort, created_at').all(userId);
-  return rows.map(rowToProj);
+  if (!rows.length) return [];
+  const ids = rows.map(r => r.id);
+  const ph = db.prepare(`SELECT * FROM phases WHERE project_id IN (${ids.map(() => '?').join(',')}) ORDER BY seq`).all(...ids);
+  const tk = db.prepare(`SELECT * FROM tasks WHERE project_id IN (${ids.map(() => '?').join(',')}) ORDER BY seq`).all(...ids);
+  const phMap = {}, tkMap = {};
+  ph.forEach(p => (phMap[p.project_id] = phMap[p.project_id] || []).push(p));
+  tk.forEach(t => (tkMap[t.project_id] = tkMap[t.project_id] || []).push(t));
+  return rows.map(r => rowToProj(r, phMap[r.id] || [], tkMap[r.id] || []));
 }
 function getProject(id, userId, isAdmin) {
   const row = isAdmin
@@ -268,40 +276,36 @@ function setOrder(ids, userId, isAdmin) {
   } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
 }
 
-/* ---------------- 按人聚合报告 ---------------- */
+/* ---------------- 按人聚合报告（2026-08-25 口径调整：按负责人 assignee 归属，空/未匹配负责人回退项目 owner） ---------------- */
 function reportByUser() {
-  const rows = db.prepare(`
-    SELECT u.id uid, u.name uname, u.role,
-      COUNT(DISTINCT p.id) proj_cnt,
-      COUNT(t.id) task_cnt,
-      COALESCE(SUM(t.done),0) done_cnt,
-      COALESCE(SUM(CASE WHEN t.done=0 AND t.due_date IS NOT NULL AND t.due_date < date('now','localtime') THEN 1 ELSE 0 END),0) overdue_cnt
-    FROM users u
-    LEFT JOIN projects p ON p.owner_id=u.id
-    LEFT JOIN tasks t ON t.project_id=p.id
-    WHERE u.name != 'guest'  -- 排除系统游客账号（guest 无项目，不参与聚合）
-    GROUP BY u.id ORDER BY proj_cnt DESC, uname
-  `).all();
-  const phRows = db.prepare(`
-    SELECT u.name uname, ph.name pname, COUNT(t.id) total, COALESCE(SUM(t.done),0) done
-    FROM users u
-    JOIN projects p ON p.owner_id=u.id
-    JOIN phases ph ON ph.project_id=p.id
-    LEFT JOIN tasks t ON t.project_id=p.id AND t.phase_id=ph.id
-    WHERE u.name != 'guest'
-    GROUP BY u.id, ph.id ORDER BY u.name, ph.seq
-  `).all();
-  const byUser = {};
-  phRows.forEach(r => {
-    if (!byUser[r.uname]) byUser[r.uname] = {};
-    byUser[r.uname][r.pname] = { total: r.total, done: r.done };
+  const users = db.prepare("SELECT id,name,role FROM users WHERE name != 'guest' ORDER BY created_at").all();
+  const projs = db.prepare('SELECT id, owner_id FROM projects').all();
+  const tasks = db.prepare('SELECT project_id, phase_id, done, due_date, assignee FROM tasks').all();
+  const phases = db.prepare('SELECT id, name FROM phases').all();
+  const ownerOf = new Map(projs.map(p => [p.id, p.owner_id]));
+  const phaseName = new Map(phases.map(p => [p.id, p.name]));
+  const nameId = new Map();
+  users.forEach(u => nameId.set(String(u.name).toLowerCase(), u.id));
+  const stats = new Map(users.map(u => [u.id, { uid: u.id, uname: u.name, role: u.role, proj: 0, task: 0, done: 0, overdue: 0, phases: {} }]));
+  projs.forEach(p => { const s = stats.get(p.owner_id); if (s) s.proj++; });
+  const n = new Date();
+  const todayStr = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+  tasks.forEach(t => {
+    const a = String(t.assignee || '').trim();
+    let uid = a ? nameId.get(a.toLowerCase()) : null;   // 负责人匹配用户
+    if (!uid) uid = ownerOf.get(t.project_id);          // 空/未匹配 → 项目 owner 兜底
+    const s = stats.get(uid); if (!s) return;
+    s.task++;
+    if (t.done) s.done++;
+    else if (t.due_date && t.due_date < todayStr) s.overdue++;
+    const pn = phaseName.get(t.phase_id) || '未分组';
+    const ps = s.phases[pn] || (s.phases[pn] = { total: 0, done: 0 });
+    ps.total++; if (t.done) ps.done++;
   });
-  return rows.map(r => ({
-    user: { id: r.uid, name: r.uname, role: r.role },
-    projects: r.proj_cnt, tasks: r.task_cnt, done: r.done_cnt, overdue: r.overdue_cnt,
-    rate: r.task_cnt ? Math.round(r.done_cnt / r.task_cnt * 100) : 0,
-    phases: byUser[r.uname] || {}
-  }));
+  return users.map(u => {
+    const s = stats.get(u.id);
+    return { user: { id: u.id, name: u.name, role: u.role }, projects: s.proj, tasks: s.task, done: s.done, overdue: s.overdue, rate: s.task ? Math.round(s.done / s.task * 100) : 0, phases: s.phases };
+  }).sort((a, b) => (b.projects - a.projects) || a.user.name.localeCompare(b.user.name, 'zh'));
 }
 
 /* ---------------- 引导：建默认用户 + 存量 JSON 迁移 ---------------- */

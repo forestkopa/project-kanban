@@ -305,9 +305,21 @@ function resolveRef(proj, ref) {
   if (!m) return null;
   const col = m[1].toUpperCase(), row = parseInt(m[2]);
   if (proj.startCell && ref === proj.startCell.toUpperCase()) return proj.startDate || null;
-  if (col === 'F') { const t = (proj.tasks || []).find(x => x.excelRow === row); return t ? (Number(t.estimateDays) || 0) : null; }
-  if (col === 'D' || col === 'E') { const t = (proj.tasks || []).find(x => x.excelRow === row); return t ? (col === 'D' ? t.startDate : t.dueDate) : null; }
+  // 优先用预建的行号索引（recalcProject 拓扑排序时构建），避免线性 find（O(tasks²) → O(1)）
+  const t = proj._rowMap ? proj._rowMap.get(row) : (proj.tasks || []).find(x => x.excelRow === row);
+  if (!t) return null;
+  if (col === 'F') return Number(t.estimateDays) || 0;
+  if (col === 'D') return t.startDate;
+  if (col === 'E') return t.dueDate;
   return null;
+}
+// 收集规则树中的所有单元格引用（供依赖图构建）
+function collectRuleRefs(rule, out) {
+  if (!rule) return;
+  if (rule.t === 'ref') { out.push(rule.ref); return; }
+  if (rule.t === 'off') { collectRuleRefs(rule.base, out); collectRuleRefs(rule.days, out); }
+  else if (rule.t === 'arith') { (rule.parts || []).forEach(p => { if (p.t !== 'n') collectRuleRefs(p, out); }); }
+  else if (rule.t === 'wd') { collectRuleRefs(rule.base, out); collectRuleRefs(rule.days, out); }
 }
 function evalRule(proj, rule, depth) {
   if (!rule || depth > 20) return null;
@@ -337,17 +349,55 @@ function evalRule(proj, rule, depth) {
   }
   return null;
 }
+// 公式级联重算（2026-08-25 优化）：先按依赖图拓扑排序单次线性传递（O(V+E)），
+// 仅对成环任务子集保留原 60 轮迭代兜底（大项目从 O(60×N²) 降到近线性）
 function recalcProject(proj) {
-  for (let pass = 0; pass < 60; pass++) {
-    let changed = false;
-    (proj.tasks || []).forEach(t => {
-      if (t.startRule) { const v = evalRule(proj, t.startRule, 0); if (v && v !== t.startDate) { t.startDate = v; changed = true; } }
-      if (t.dueRule) { const v = evalRule(proj, t.dueRule, 0); if (v && v !== t.dueDate) { t.dueDate = v; changed = true; } }
+  const tasks = proj.tasks || [];
+  if (!tasks.length) return true;
+  const rowMap = new Map();
+  tasks.forEach(t => { if (t.excelRow != null) rowMap.set(t.excelRow, t); });
+  proj._rowMap = rowMap;
+  try {
+    const byId = new Map(); tasks.forEach(t => byId.set(t.id, t));
+    const deps = new Map(), indeg = new Map();
+    tasks.forEach(t => { deps.set(t.id, new Set()); indeg.set(t.id, 0); });
+    const refsOf = t => { const out = []; if (t.startRule) collectRuleRefs(t.startRule, out); if (t.dueRule) collectRuleRefs(t.dueRule, out); return out; };
+    tasks.forEach(t => {
+      const set = deps.get(t.id);
+      for (const ref of refsOf(t)) {
+        const m = ref.match(/^([A-Z]+)(\d+)$/); if (!m) continue;
+        if (proj.startCell && ref.toUpperCase() === proj.startCell.toUpperCase()) continue; // 项目开始格非任务依赖
+        const dep = rowMap.get(parseInt(m[2]));
+        if (dep && dep.id !== t.id && !set.has(dep.id)) set.add(dep.id);
+      }
     });
-    if (!changed) return true;
-  }
-  console.warn('[公式环检测] 依赖超过 60 轮未收敛，疑似公式成环:', proj.name);
-  return false;
+    deps.forEach(set => set.forEach(d => indeg.set(d, indeg.get(d) + 1)));
+    const q = tasks.filter(t => indeg.get(t.id) === 0).map(t => t.id);
+    const order = [];
+    while (q.length) {
+      const id = q.shift(); order.push(id);
+      deps.get(id).forEach(d => { indeg.set(d, indeg.get(d) - 1); if (indeg.get(d) === 0) q.push(d); });
+    }
+    const apply = t => {
+      if (t.startRule) { const v = evalRule(proj, t.startRule, 0); if (v) t.startDate = v; }
+      if (t.dueRule) { const v = evalRule(proj, t.dueRule, 0); if (v) t.dueDate = v; }
+    };
+    order.forEach(id => apply(byId.get(id)));
+    const cyclic = tasks.filter(t => indeg.get(t.id) > 0); // 成环子集（未入拓扑序）
+    if (cyclic.length) {
+      for (let pass = 0; pass < 60; pass++) {
+        let changed = false;
+        cyclic.forEach(t => {
+          if (t.startRule) { const v = evalRule(proj, t.startRule, 0); if (v && v !== t.startDate) { t.startDate = v; changed = true; } }
+          if (t.dueRule) { const v = evalRule(proj, t.dueRule, 0); if (v && v !== t.dueDate) { t.dueDate = v; changed = true; } }
+        });
+        if (!changed) return true;
+      }
+      console.warn('[公式环检测] 依赖超过 60 轮未收敛，疑似公式成环:', proj.name);
+      return false;
+    }
+    return true;
+  } finally { delete proj._rowMap; }
 }
 
 const DEFAULT_MAPPING = {
@@ -533,6 +583,17 @@ function rateLimit(key, max, windowMs) {
   return b.n <= max;
 }
 setInterval(() => { const now = Date.now(); for (const [k, b] of rateBuckets) if (now - b.t > 3600000) rateBuckets.delete(k); }, 600000).unref();
+// 资源版本号（静态缓存策略）：取 app.js/style.css 的 mtime 和（5s 缓存）；文件一变 → 版本号变 → ?v= 换新 → 浏览器拉新
+let _assetVer = { t: 0, v: '' };
+async function assetVer() {
+  const now = Date.now();
+  if (_assetVer.v && now - _assetVer.t < 5000) return _assetVer.v;
+  try {
+    const [a, s] = await Promise.all([fsp.stat(path.join(PUBLIC, 'app.js')), fsp.stat(path.join(PUBLIC, 'style.css'))]);
+    _assetVer = { t: now, v: 'r' + Math.round(a.mtimeMs + s.mtimeMs).toString(36) };
+    return _assetVer.v;
+  } catch (e) { return 'v1'; }
+}
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let d = '';
@@ -1104,10 +1165,22 @@ const server = http.createServer(async (req, res) => {
   const base = path.resolve(PUBLIC).toLowerCase();
   const full = filepath.toLowerCase();
   if (full !== base && !full.startsWith(base + path.sep)) return send(res, 403, { error: 'forbidden' });
+  const ext = path.extname(filepath).toLowerCase();
+  // 静态缓存策略（2026-08-25）：index.html 注入资源版本号；带 ?v= 的 app.js/style.css 长缓存 immutable（发布后版本号变→自动拉新）
+  if (rel === '/index.html') {
+    const ver = await assetVer();
+    fs.readFile(filepath, (err, buf) => {
+      if (err) return send(res, 404, { error: 'not found' });
+      res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }, SEC_HEADERS));
+      res.end(buf.toString().replace(/@VER@/g, ver));
+    });
+    return;
+  }
+  const hasVer = url.searchParams.has('v');
+  const cache = (rel === '/app.js' || rel === '/style.css') && hasVer ? 'public, max-age=31536000, immutable' : 'no-cache';
   fs.readFile(filepath, (err, buf) => {
     if (err) return send(res, 404, { error: 'not found' });
-    const ext = path.extname(filepath).toLowerCase();
-    res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' }, SEC_HEADERS));
+    res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache }, SEC_HEADERS));
     res.end(buf);
   });
   } catch (e) {
