@@ -20,3 +20,5 @@ data/admin.password
 public/brand-logo.png
 # xlsx 离线依赖包不入库（仅本地 vendor 使用，防 CDN 供应链风险）
 vendor/*.tgz
+# Obsidian vault 本地配置（主题/插件/偏好，不入库；内容笔记已由 docs/knowledge 管理）
+.obsidian/
