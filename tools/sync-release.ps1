@@ -1,9 +1,10 @@
-# tools/sync-release.ps1
+﻿# tools/sync-release.ps1
 # 用法（powershell）：
-#   $env:GH_PAT = "ghp_xxxx"                      # 需 contents:write 权限的 PAT
 #   .\tools\sync-release.ps1                       # 仅推送 main（普通 push，不改版本/标签）
 #   .\tools\sync-release.ps1 -Version v1.2          # 发版：打不可变版本号 v1.2 + 把 latest 标签滚动到该提交
 #   .\tools\sync-release.ps1 -Force                  # 跳过交互确认（仅当用户已明确批准推送时使用）
+# 鉴权：无需手动设 GH_PAT。脚本优先用 $env:GH_PAT，缺省时自动读取
+#       ~/.git-credentials（credential.helper=store 已缓存的 PAT）；push 走 git 自带凭据，最稳。
 # 版本约定（2026-08-25 确定，用户要求）：
 #   - `latest` 标签 = 移动指针，始终指向「当前最大版本号」对应的提交（如当前 v1.1）。
 #     发布更高版本（如 v1.2）后，`latest` 标签移动到新提交，旧版本（v1.1）即不再带 latest。
@@ -11,8 +12,8 @@
 #   - GitHub 的 "Latest" 徽标：被 GitHub 自动赋予「最新发布的 release」，即当前最大版本号
 #     （v1.1 -> 发布 v1.2 后自动切换），无需手动管理。
 #   - 不使用单独的「rolling」release；latest 即最大版本号，概念统一、避免与 GitHub 保留词冲突。
-# 注意：push 走带 PAT 的远端 URL；git 路径显式解析（先 Get-Command，失败回退常见路径），
-#       避免 PowerShell 子进程下 git 不在 PATH 导致静默 no-op。
+# 注意：push 默认走 git 自带凭据（credential.helper=store 已缓存的 PAT），不再把 PAT 拼进远端 URL，最稳；
+#       git 路径显式解析（先 Get-Command，失败回退常见路径），避免 PowerShell 子进程下 git 不在 PATH 导致静默 no-op。
 param(
     [string]$Version = '',  # 形如 v1.2；为空则只推送 main，不动版本号/latest
     [switch]$Force          # 跳过交互确认（仅当用户已明确批准推送后、由脚本/自动化显式传入）
@@ -33,12 +34,25 @@ if (-not $gitExe) {
 if (-not $gitExe) { Write-Error '找不到 git 可执行文件，请确认已安装 Git 并在 PATH 中'; exit 1 }
 
 $repo    = 'forestkopa/project-kanban'
-$pat     = $env:GH_PAT
-if (-not $pat) { Write-Error '缺少环境变量 GH_PAT（需 contents:write 权限的 Personal Access Token）'; exit 1 }
-
 $repoRoot = Split-Path -Parent $PSScriptRoot   # 项目根目录（tools 的父目录）
-$remote   = "https://$pat@github.com/$repo.git"
 $log      = Join-Path $repoRoot 'data/_sync.log'
+
+# 解析 GitHub token（仅用于 Release API；push 默认走 git 自带凭据 store，最稳）。
+# 优先级：$env:GH_PAT → ~/.git-credentials（credential.helper=store 已缓存的 PAT）。
+$pat = $env:GH_PAT
+if (-not $pat) {
+    $storeFile = Join-Path $env:USERPROFILE '.git-credentials'
+    if (Test-Path $storeFile) {
+        $line = Select-String -Path $storeFile -Pattern 'github\.com' | Select-Object -First 1
+        if ($line) {
+            $m = [regex]::Match($line.Line, 'https://[^:]+:([^@\r\n]+)@github\.com')
+            if ($m.Success) { $pat = $m.Groups[1].Value.Trim() }
+        }
+    }
+}
+if (-not $pat) {
+    Log '⚠ 未找到 GH_PAT（环境变量或 git store），Release 创建将跳过；push 依赖 git 自带凭据'
+}
 
 function Log($m) {
     $s = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $m"
@@ -46,14 +60,53 @@ function Log($m) {
     try { Add-Content -Path $log -Value $s -Encoding utf8 } catch {}
 }
 function Invoke-Git {
-    param([string[]]$GitArgs)
-    $out = & $gitExe @GitArgs 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') 失败（exit $LASTEXITCODE）" }
-    return $out
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$GitArgs)
+    # 用 Process 对象分离 stdout/stderr，避免 PowerShell 把 git 的 stderr（如
+    # "Everything up-to-date"）当成 NativeCommandError 喷屏，也避免混流污染提取结果。
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $gitExe
+    $psi.Arguments = ($GitArgs | ForEach-Object {
+        if ($_ -match '[\s"]') { '"{0}"' -f ($_ -replace '"', '\"') } else { $_ }
+    }) -join ' '
+    $psi.UseShellExecute = $false
+    $psi.WorkingDirectory = $repoRoot
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $p.StandardOutput.ReadToEnd()
+    $stderr = $p.StandardError.ReadToEnd()
+    $p.WaitForExit()
+    if ($p.ExitCode -ne 0) {
+        $err = $stderr.Trim()
+        throw "git $($GitArgs -join ' ') 失败（exit $($p.ExitCode)）: $err"
+    }
+    return $stdout
+}
+
+# git push：优先走 git 自带凭据（store / credential helper），失败再用 PAT 拼 URL 兜底
+function Invoke-GitPush {
+    param([string]$Ref, [switch]$Force)
+    $base = @('push')
+    if ($Force) { $base += '-f' }
+    $base += 'origin'
+    $base += $Ref
+    try {
+        Invoke-Git @base
+    } catch {
+        if (-not $pat) { throw "git push origin $Ref 失败且无可用的 PAT 兜底：$($_.Exception.Message)" }
+        $url = "https://$($pat.Trim())@github.com/$repo.git"
+        $fb = @('push')
+        if ($Force) { $fb += '-f' }
+        $fb += $url
+        $fb += $Ref
+        Log '  push 走 git 自带凭据失败，改用 PAT 兜底 URL'
+        Invoke-Git @fb
+    }
 }
 
 $apiHdr = @{
-    Authorization          = "Bearer $pat"
     Accept                 = 'application/vnd.github+json'
     'X-GitHub-Api-Version' = '2022-11-28'
 }
@@ -75,13 +128,13 @@ try {
         Log '✅ 用户已确认推送'
     }
 
-    # 1) 推送代码（带 PAT 的 URL，PowerShell 下也能鉴权）
+    # 1) 推送代码（走 git 自带凭据，无需手动设 GH_PAT）
     Log '> git push origin main'
-    Invoke-Git push -q $remote main
+    Invoke-GitPush -Ref main
 
     # 2) 取最新提交信息
     $sha = (Invoke-Git rev-parse HEAD).Trim()
-    $msg = (Invoke-Git log -1 --pretty='%s').Trim()
+    $msg = (Invoke-Git log -1 --pretty=%s).Trim()
     Log "  最新提交 $sha : $msg"
 
     if ($Version) {
@@ -92,7 +145,7 @@ try {
         if (-not $tagExists) {
             Invoke-Git tag $Version $sha
             Log "> git push origin refs/tags/$Version"
-            Invoke-Git push -q $remote "refs/tags/$Version"
+            Invoke-GitPush -Ref "refs/tags/$Version"
             Log "✅ 已打不可变标签 $Version ($sha)"
         } else {
             Log "⚠ 标签 $Version 已存在，跳过（不可变里程碑不被覆盖）"
@@ -101,7 +154,7 @@ try {
         # 4) 移动 latest 标签到该提交（latest = 当前最大版本号）
         Invoke-Git tag -f latest $sha
         Log '> git push -f origin refs/tags/latest'
-        Invoke-Git push -q -f $remote refs/tags/latest
+        Invoke-GitPush -Ref refs/tags/latest -Force
         Log "✅ latest 标签已滚动到 $Version ($sha)；旧版本不再带 latest"
 
         # 5) 创建/更新该版本 Release（含变更说明模板）
@@ -123,13 +176,19 @@ try {
             body       = $verNotes
             prerelease = $false
         } | ConvertTo-Json -Compress
-        try {
-            $vrel = Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases/tags/$Version" -Method Get
-            Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases/$($vrel.id)" -Method Patch -Body $verBody -ContentType 'application/json'
-            Log "✅ 版本 Release $Version 已更新"
-        } catch {
-            Invoke-RestMethod -Headers $apiHdr -Uri "https://api.github.com/repos/$repo/releases" -Method Post -Body $verBody -ContentType 'application/json'
-            Log "✅ 版本 Release $Version 已创建"
+        if ($pat) {
+            $relHdr = $apiHdr.Clone()
+            $relHdr['Authorization'] = "Bearer $($pat.Trim())"
+            try {
+                $vrel = Invoke-RestMethod -Headers $relHdr -Uri "https://api.github.com/repos/$repo/releases/tags/$Version" -Method Get
+                Invoke-RestMethod -Headers $relHdr -Uri "https://api.github.com/repos/$repo/releases/$($vrel.id)" -Method Patch -Body $verBody -ContentType 'application/json'
+                Log "✅ 版本 Release $Version 已更新"
+            } catch {
+                Invoke-RestMethod -Headers $relHdr -Uri "https://api.github.com/repos/$repo/releases" -Method Post -Body $verBody -ContentType 'application/json'
+                Log "✅ 版本 Release $Version 已创建"
+            }
+        } else {
+            Log "⚠ 无可用 token，跳过 GitHub Release $Version 创建（请手动在 GitHub 页面补发）"
         }
     } else {
         Log '（普通 push：未指定 -Version，版本号与 latest 标签保持不变）'
