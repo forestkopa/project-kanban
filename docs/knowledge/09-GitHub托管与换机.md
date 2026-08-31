@@ -1,6 +1,8 @@
 ---
 title: GitHub 托管与换机
-tags: [看板, git, 运维, 安全]
+tags:
+category: skills
+summary: 私有仓库托管、敏感文件 gitignore 清单、换机重配项、遗留死文件与常用 git 命令。 [看板, git, 运维, 安全]
 date: 2026-08-21
 status: 已确认
 related: [[00-知识地图(MOC)], [01-部署与双实例]]

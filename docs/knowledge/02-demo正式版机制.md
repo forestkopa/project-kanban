@@ -1,6 +1,8 @@
 ---
 title: demo / 正式版代码区分机制
-tags: [看板, 架构, demo]
+tags:
+category: concepts
+summary: DEMO_MODE 开关的识别与 8 处代码分支，前端经 /api/readonly 感知模式，watchdog 双实例分工。 [看板, 架构, demo]
 date: 2026-08-21
 status: 已确认
 related: [[00-知识地图(MOC)], [01-部署与双实例]]

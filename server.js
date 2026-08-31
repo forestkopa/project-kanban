@@ -8,23 +8,29 @@ const crypto = require('crypto');
 const FE = require('./lib/formula-engine.js');
 const { isoDate, addDays, normDate, colName, parseTerm, parseFormula, resolveRef, collectRuleRefs, evalRule, recalcProject } = FE;
 // 公式引擎已抽取到 lib/formula-engine.js（2026-08-25）
-const XLSX = require('xlsx');
-const XLSXS = require('xlsx-js-style'); // 支持单元格样式（周报待办导出用）
+const XLSX = require('xlsx'); // 参考模版生成 + 上传 xlsx 解析（buildTemplateXlsx / XLSX.read 仍在本文件使用）
+// 单元格样式导出与重复任务逻辑已抽到 lib/（xlsx-export.js / recurrence.js），减少主文件体积、便于单测
+const { buildPlanXlsx, buildDiffXlsx, buildTodoXlsx, buildReportXlsx } = require('./lib/xlsx-export.js');
+const { RECUR, RECUR_NAME, shiftByRecurrence, spawnNextRecurrence } = require('./lib/recurrence.js');
 
 const PORT = process.env.PORT || 5180;
 const DEMO_MODE = process.argv.includes('--demo');
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
-const DATA = path.join(ROOT, 'data');
+// 数据目录可经环境变量 KB_DATA_DIR 覆盖（默认 ROOT/data），用于测试隔离实例 / 异地部署指定数据盘
+const DATA = process.env.KB_DATA_DIR ? path.resolve(process.env.KB_DATA_DIR) : path.join(ROOT, 'data');
 // 演示模式：加载脱敏数据集 projects.demo.json（真实 projects.json 不受影响），且免令牌鉴权
 const PROJECTS_FILE = path.join(DATA, DEMO_MODE ? 'projects.demo.json' : 'projects.json');
-const TEMPLATES_FILE = path.join(ROOT, 'templates.json');
+const TEMPLATES_FILE = path.join(ROOT, DEMO_MODE ? 'templates.demo.json' : 'templates.json');
 const OPTIONS_FILE = path.join(DATA, 'options.json');
 const RO_FLAG = path.join(DATA, 'readonly.flag');
 const AI_FILE = path.join(DATA, 'ai.json');
 // SQLite 数据层（node:sqlite 内置模块）：正式版 app.db / 演示版 demo.db；存量 JSON 仅作首次迁移种子
 const db = require('./db.js');
 const DB_FILE = path.join(DATA, DEMO_MODE ? 'demo.db' : 'app.db');
+// demo 模式：templates 写独立文件，避免公网匿名写污染正式版（首次运行从正式 templates.json 复制种子）
+const BRAND_LOGO_FILE = path.join(PUBLIC, DEMO_MODE ? 'brand-logo.demo.png' : 'brand-logo.png');
+if (DEMO_MODE) { try { if (!fs.existsSync(TEMPLATES_FILE) && fs.existsSync(path.join(ROOT, 'templates.json'))) fs.copyFileSync(path.join(ROOT, 'templates.json'), TEMPLATES_FILE); } catch (e) { console.error('复制 demo 模版失败:', (e && e.message) || e); } }
 
 async function loadJSON(file, fallback) { try { return JSON.parse(await fsp.readFile(file, 'utf8')); } catch (e) { return fallback; } }
 // 写队列：所有落盘串行化，杜绝并发覆盖；原子写：临时文件→rename，崩溃不损坏原文件
@@ -36,7 +42,7 @@ function saveJSON(file, data) {
     await fsp.writeFile(tmp, json, 'utf8');
     await fsp.rename(tmp, file);
     gitAutoCommit(file);
-  }).catch(e => { try { fs.unlinkSync(tmp); } catch (_) {} console.error('保存失败:', file, e.message); });
+  }).catch(e => { try { fs.unlinkSync(tmp); } catch (_) {} const msg = '保存失败: ' + file + ' ' + ((e && e.stack) || (e && e.message) || e); console.error(msg); try { fs.writeFileSync(path.join(DATA, '.save-error.log'), new Date().toISOString() + ' ' + msg + '\n', { flag: 'a' }); } catch (_) {} });
   return writeQ;
 }
 // data 目录 git 自动提交（静默失败：未初始化 git 或无可提交变更时忽略；2s 防抖合并高频写入，单进程串行执行）
@@ -53,7 +59,7 @@ function gitAutoCommit(file) {
     const files = [...gitPending]; gitPending = new Set();
     if (!files.length) return;
     const args = files.map(f => '-- ' + JSON.stringify(f)).join(' ');
-    cp.exec('git add ' + args + ' && git commit -m "data: ' + files.length + ' file(s) ' + new Date().toISOString() + '" --no-verify', { cwd: ROOT, stdio: 'ignore' }, () => {});
+    cp.exec('git add ' + args + ' && git commit -m "data: ' + files.length + ' file(s) ' + new Date().toISOString() + '" --no-verify', { cwd: ROOT, stdio: 'ignore' }, (err) => { if (err) console.error('git 自动提交失败:', files.join(','), err.message); });
   }, 2000);
 }
 function uid() { return 'id_' + crypto.randomUUID().replace(/-/g, ''); }
@@ -83,135 +89,10 @@ function scheduleTasks(phases, tasks, startStr) {
 }
 
 const PHASE_COLORS = ['#8b5cf6', '#0a84ff', '#30d158', '#ff9f0a', '#ff453a', '#bf5af2', '#64d2ff', '#ffd60a'];
-function buildPlanXlsx(proj, tasks) {
-  const phaseName = {}; (proj.phases || []).forEach(p => phaseName[p.id] = p.name || p.id);
-  const rows = [['序号', '阶段', '任务', '负责人', '开始日期', '截止日期', '工期(天)', '状态', '备注']];
-  tasks.forEach((t, i) => {
-    rows.push([i + 1, phaseName[t.phaseId] || t.phaseId || '', t.title || '', t.assignee || '', t.startDate || '', t.dueDate || '', t.estimateDays || 0, t.done ? '已完成' : '未完成', t.note || '']);
-  });
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 9 }, { wch: 30 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '计划表');
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-}
-function buildDiffXlsx(proj) {
-  const phaseName = {}; (proj.phases || []).forEach(p => phaseName[p.id] = p.name || p.id);
-  const baseMap = {}; (proj.baseline || []).forEach(t => baseMap[t.id] = t);
-  const nowMap = {}; (proj.tasks || []).forEach(t => nowMap[t.id] = t);
-  const allIds = [...new Set([...Object.keys(baseMap), ...Object.keys(nowMap)])];
-  const rows = [['序号', '阶段', '任务', '负责人', '初版开始', '初版截止', '最新开始', '最新截止', '工期(天)', '状态', '变动说明']];
-  let i = 0;
-  allIds.forEach(id => {
-    const b = baseMap[id], n = nowMap[id];
-    const ph = (n || b).phaseId;
-    const title = (n && n.title) || (b && b.title) || '';
-    const who = (n && n.assignee) || (b && b.assignee) || '';
-    const bStart = b ? b.startDate || '' : '', bDue = b ? b.dueDate || '' : '';
-    const nStart = n ? n.startDate || '' : '', nDue = n ? n.dueDate || '' : '';
-    const days = n ? n.estimateDays : (b ? b.estimateDays : 0);
-    const nDone = n ? !!n.done : false, bDone = b ? !!b.done : false;
-    const status = nDone ? '已完成' : '未完成';
-    const parts = [];
-    if (!n && b) parts.push('已删除');
-    else if (n && !b) parts.push('新增');
-    else {
-      if (bStart !== nStart || bDue !== nDue) parts.push('日期调整');
-      if (days !== (b ? b.estimateDays : days)) parts.push('工期变更');
-      if (nDone && !bDone) parts.push('已完成');
-      else if (!nDone && bDone) parts.push('退回未完成');
-    }
-    const change = parts.length ? parts.join('、') : '—';
-    rows.push([++i, phaseName[ph] || ph || '', title, who, bStart, bDue, nStart, nDue, days, status, change]);
-  });
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 9 }, { wch: 18 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '差异对比');
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-}
-/* 周报待办清单导出：生成带样式的 xlsx（矢车菊蓝·着色1·深度50% 标题/表头 + 标准 Excel 网格） */
-function buildTodoXlsx(projects, monIso, sunIso) {
-  const fmt = s => s ? s.slice(5).replace('-', '/') : '';
-  const groups = [];
-  (projects || []).forEach(p => {
-    const list = (p.tasks || []).filter(t => {
-      if (t.done) return false;
-      return (!t.startDate || t.startDate <= sunIso) && (!t.dueDate || t.dueDate >= monIso);
-    }).map(t => ({ ...t, overdue: !!t.dueDate && t.dueDate < monIso }));
-    if (list.length) groups.push({ p, list });
-  });
-  groups.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
-  // 矢车菊蓝 着色1 深度50%（Excel 主题色 #1F3864）；表头同色，数据隔行浅蓝
-  const ACCENT1_50 = '1F3864', ZEBRA = 'F2F7FD';
-  const THIN = { style: 'thin', color: { rgb: 'B4C7E7' } };
-  const BD = { top: THIN, bottom: THIN, left: THIN, right: THIN };
-  const FONT = { name: '微软雅黑' };
-  const rows = [[`项目周报 · 待办清单（${fmt(monIso)} — ${fmt(sunIso)}）`], ['项目', '任务', '里程碑', '工期(天)', '开始日期', '截止日期', '状态']];
-  groups.forEach(({ p, list }) => list.forEach((t, ti) => {
-    rows.push([ti === 0 ? p.name : '', t.title + (t.isMilestone ? ' ⚑' : ''), t.isMilestone ? '⚑' : '', t.estimateDays || '', fmt(t.startDate), fmt(t.dueDate), t.overdue ? '⚠ 逾期' : '本周待办']);
-  }));
-  const ws = XLSXS.utils.aoa_to_sheet(rows);
-  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
-  let rr = 2;
-  groups.forEach(({ list }) => { if (list.length > 1) merges.push({ s: { r: rr, c: 0 }, e: { r: rr + list.length - 1, c: 0 } }); rr += list.length; });
-  ws['!merges'] = merges;
-  ws['!cols'] = [{ wch: 20 }, { wch: 36 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
-  ws['!rows'] = [{ hpt: 34 }, { hpt: 26 }];
-  const setCell = (r, c, s) => { const a = XLSXS.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].s = s; };
-  const titleS = { font: { ...FONT, bold: true, sz: 16, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
-  for (let c = 0; c < 7; c++) setCell(0, c, titleS);
-  const headS = { font: { ...FONT, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
-  for (let c = 0; c < 7; c++) setCell(1, c, headS);
-  let r = 2;
-  groups.forEach(({ p, list }, gi) => {
-    const zebra = gi % 2 === 0 ? 'FFFFFF' : ZEBRA;
-    list.forEach((t, ti) => {
-      const ov = t.overdue;
-      for (let c = 0; c < 7; c++) {
-        setCell(r, c, {
-          font: { ...FONT, color: { rgb: ov && c === 6 ? 'E0241B' : '000000' }, bold: !!(ov && c === 6) },
-          fill: { fgColor: { rgb: ti === 0 && c === 0 ? ZEBRA : zebra } },
-          alignment: { horizontal: c === 0 || c === 1 ? 'left' : 'center', vertical: 'center' },
-          border: BD
-        });
-      }
-      r++;
-    });
-  });
-  const wb = XLSXS.utils.book_new();
-  XLSXS.utils.book_append_sheet(wb, ws, '待办清单');
-  return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
-}
-/* 聚合报告导出：按人汇总（样式同周报：矢车菊蓝表头 + 隔行浅蓝） */
-function buildReportXlsx(rows) {
-  const ACCENT1_50 = '1F3864', ZEBRA = 'F2F7FD';
-  const THIN = { style: 'thin', color: { rgb: 'B4C7E7' } };
-  const BD = { top: THIN, bottom: THIN, left: THIN, right: THIN };
-  const FONT = { name: '微软雅黑' };
-  const header = ['成员', '角色', '项目数', '任务数', '已完成', '逾期', '完成率'];
-  const aoa = [['项目聚合报告'], header];
-  (rows || []).forEach(r => aoa.push([r.user.name, r.user.role, r.projects, r.tasks, r.done, r.overdue, r.rate + '%']));
-  const ws = XLSXS.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }]; // 标题行跨列合并居中
-  const setCell = (r, c, s) => { const a = XLSXS.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].s = s; };
-  const titleS = { font: { ...FONT, bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
-  for (let c = 0; c < 7; c++) setCell(0, c, titleS);
-  const headS = { font: { ...FONT, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: ACCENT1_50 } }, alignment: { horizontal: 'center', vertical: 'center' }, border: BD };
-  for (let c = 0; c < 7; c++) setCell(1, c, headS);
-  (rows || []).forEach((r, i) => {
-    for (let c = 0; c < 7; c++) setCell(i + 2, c, {
-      font: { ...FONT, color: { rgb: '000000' } },
-      fill: { fgColor: { rgb: i % 2 === 0 ? 'FFFFFF' : ZEBRA } },
-      alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center' },
-      border: BD
-    });
-  });
-  const wb = XLSXS.utils.book_new();
-  XLSXS.utils.book_append_sheet(wb, ws, '聚合报告');
-  return XLSXS.write(wb, { type: 'buffer', bookType: 'xlsx' });
-}
+// 计划表导出（buildPlanXlsx）/ 差异对比导出（buildDiffXlsx）已移至 lib/xlsx-export.js
+
+// 周报待办导出（buildTodoXlsx）/ 聚合报告导出（buildReportXlsx）已移至 lib/xlsx-export.js
+
 /* ---------- 参考模版：由内置模版生成甘特方言 Excel（开始/截止带公式 → 导入后级联） ---------- */
 function workdayAdd(baseStr, n) {
   const wk = [0, 6]; // weekend=1：周六日休息
@@ -384,7 +265,7 @@ async function saveAI(cfg) {
     const out = Object.assign({}, cfg);
     if ((process.env.KB_AI_API_KEY || '').trim()) out.api_key = ''; // 有环境变量时密钥不写盘
     await fsp.writeFile(AI_FILE, JSON.stringify(out, null, 2));
-  } catch (e) {}
+  } catch (e) { console.error('保存 AI 配置失败:', (e && e.message) || e); }
   return cfg;
 }
 // 已配置判定：云 Key 或本地模型（local 标志）任一即可
@@ -417,20 +298,42 @@ function chatCompletions(cfg, messages, temperature) {
   });
 }
 
+const zlib = require('zlib');
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png'
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png', '.webmanifest': 'application/manifest+json'
 };
 // 安全响应头（防 XSS/点击劫持/MIME 嗅探；HSTS 仅 HTTPS 生效，浏览器对 http://localhost 自动忽略）
+// CSP 改为每请求 nonce：script-src 去除 'unsafe-inline'，仅允许 'self' + nonce；style-src 保留 unsafe-inline（内联 style 属性）
 const SEC_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
 };
-function send(res, status, body) { res.writeHead(status, Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, SEC_HEADERS)); res.end(typeof body === 'string' ? body : JSON.stringify(body)); }
+function cspHeader(nonce) {
+  return "default-src 'self'; script-src 'self' 'nonce-" + nonce + "'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
+}
+// 统一响应写出：按 Accept-Encoding 透明 gzip 压缩（API/静态文本均走此路）
+function endBody(res, status, buf, headers) {
+  const accept = res._acceptEnc || '';
+  if (res._canGzip && /\bgzip\b/.test(accept) && Buffer.isBuffer(buf) && buf.length > 256) {
+    try {
+      const gz = zlib.gzipSync(buf);
+      res.writeHead(status, Object.assign({}, headers, { 'Content-Encoding': 'gzip', 'Content-Length': gz.length }));
+      res.end(gz); return;
+    } catch (e) { /* 压缩失败则原样返回 */ }
+  }
+  res.writeHead(status, Object.assign({}, headers, { 'Content-Length': buf.length }));
+  res.end(buf);
+}
+function send(res, status, body) {
+  const data = typeof body === 'string' ? body : JSON.stringify(body);
+  const headers = Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, SEC_HEADERS);
+  if (res._csp) headers['Content-Security-Policy'] = res._csp;
+  endBody(res, status, Buffer.from(data, 'utf8'), headers);
+}
 const BODY_LIMIT = 10 * 1024 * 1024; // 请求体上限 10MB
 // 内存速率限制（登录防爆破 / AI 防额度滥用；过期桶定时清理，防 Map 无限增长）
 const rateBuckets = new Map();
@@ -476,14 +379,122 @@ function ensureToken() {
 }
 const AUTH_TOKEN = ensureToken();
 function resolveUser(req) {
-  if (DEMO_MODE) return { id: 'demo', name: 'demo', role: 'admin' }; // 演示版免登录，全量可见
+  if (DEMO_MODE) { const du = db.listUsers().find(u => u.name === 'demo'); return { id: du ? du.id : 'demo', name: 'demo', role: 'admin' }; } // 演示版免登录，全量可见；用真实 demo 用户 id 避免 owner_id 外键失败
   const h = req.headers['x-auth-token'] || req.headers.authorization;
   const uid = db.tokenUserId(h);
   if (uid) { const u = db.getUserById(uid); if (u) return u; }
-  if (h === AUTH_TOKEN) { const a = db.getUserByName('admin'); if (a) return { id: a.id, name: a.name, role: a.role }; } // 旧 token 兼容 = admin
+  // 旧 token 兼容 = admin（不安全：data/auth.token 明文即 admin 钥匙）。默认关闭，需显式 KB_LEGACY_TOKEN=1 才启用；DB token 体系已取代它
+  if (h === AUTH_TOKEN && process.env.KB_LEGACY_TOKEN === '1') { const a = db.getUserByName('admin'); if (a) return { id: a.id, name: a.name, role: a.role }; }
   return null;
 }
 function authorized(req) { return !!req.user; }
+/* 鉴权契约统一：避免散落的数组字面量/三元导致越权 bug（P1-11） */
+const CAN_ALL = ['admin', 'manager', 'viewer'];   // 可读全量项目/任务（含 viewer 只读全量）
+const FULL_REPORT = ['admin', 'manager'];          // 报告聚合全量（viewer 仅看自己，防数据越界）
+const MANAGERS = ['admin', 'manager'];
+function canAllRole(role) { return CAN_ALL.includes(role); }
+function isManagerRole(role) { return MANAGERS.includes(role); }
+function fullReportRole(role) { return FULL_REPORT.includes(role); }
+
+// 重复任务逻辑（shiftByRecurrence / spawnNextRecurrence / RECUR / RECUR_NAME）已移至 lib/recurrence.js
+
+
+/* AI 助手路由（原巨石路由内联块抽取，缩小主函数；Node 原生 https，支持本地大模型） */
+async function handleAi(p, req, res) {
+    if (p === '/api/ai/config') {
+      if (req.method === 'GET') { const c = await loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local }); }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const c = await loadAI();
+        if (body.base_url !== undefined) c.base_url = String(body.base_url).trim() || 'https://api.openai.com/v1';
+        if (body.model !== undefined) c.model = String(body.model).trim() || 'gpt-4o-mini';
+        if (body.local !== undefined) c.local = !!body.local;
+        // Key：留空/未传 = 保持不变（修复：旧逻辑空串会清掉已配置 Key）；显式 clear_key 才清除
+        if (body.clear_key === true) c.api_key = '';
+        else if (body.api_key !== undefined && body.api_key !== null && String(body.api_key).trim() !== '') c.api_key = String(body.api_key).trim();
+        saveAI(c);
+        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local });
+      }
+      return send(res, 405, { error: '方法不允许' });
+    }
+    // 本地大模型：探测本机 Ollama（OpenAI 兼容本地服务），返回可用模型列表
+    if (p === '/api/ai/ollama-models' && req.method === 'GET') {
+      try {
+        const body = await new Promise((resolve, reject) => {
+          const rq = http.get('http://127.0.0.1:11434/api/tags', { timeout: 2000 }, resp => { let b = ''; resp.on('data', d => b += d); resp.on('end', () => resolve(b)); });
+          rq.on('error', reject); rq.on('timeout', () => rq.destroy(new Error('timeout')));
+        });
+        const j = JSON.parse(body);
+        const models = ((j.models || []).map(m => m.name)).filter(Boolean);
+        return send(res, 200, { online: true, models });
+      } catch (e) { return send(res, 200, { online: false, models: [] }); }
+    }
+    if (p === '/api/ai/chat' && req.method === 'POST') {
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
+      const body = await readBody(req);
+      const c = await loadAI();
+      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      if (!messages.length) return send(res, 400, { error: 'messages 为空' });
+      try { const text = await chatCompletions(c, messages, body.temperature); return send(res, 200, { text }); }
+      catch (e) { console.error('AI chat 失败:', e); return send(res, 502, { error: 'AI 服务暂时不可用，请稍后重试' }); }
+    }
+    if (p === '/api/ai/generate-tasks' && req.method === 'POST') {
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
+      const body = await readBody(req);
+      const desc = String(body.description || '').trim();
+      if (!desc) return send(res, 400, { error: '请描述项目' });
+      const c = await loadAI();
+      if (!aiConfigured(c)) {
+        // 离线兜底：基于内置模板的规则建议（非 LLM，界面会明确标注）
+        const tpls = await loadJSON(TEMPLATES_FILE, []);
+        const tpl = tpls.find(t => /音箱|语音|speaker/i.test(t.name)) || tpls[0];
+        const nameMap = {}; (tpl ? tpl.phases || [] : []).forEach(ph => nameMap[ph.id] = ph.name);
+        const tasks = (tpl ? tpl.tasks : []).map(t => ({ title: t.title, phase: nameMap[t.phaseId] || '', estimateDays: t.estimateDays || 3, assignee: t.assignee || '' }));
+        return send(res, 200, { source: 'template', tasks, note: '未配置 AI：已用内置模板智能建议（规则生成，非大模型）' });
+      }
+      const sys = '你是智能硬件 NPI 项目经理。根据用户描述，仅输出一个 JSON 数组（不要任何解释文字、不要 markdown 代码块），每项结构：{title:任务名, phase:所属阶段(只能从"需求立项/设计开发/打样试制/测试验证/量产导入/上市运营"中选), estimateDays:工期天数(数字), assignee:建议负责角色}。';
+      try {
+        const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: desc }], 0.6);
+        const m = text.match(/\[[\s\S]*\]/);
+        const tasks = m ? JSON.parse(m[0]) : [];
+        if (!Array.isArray(tasks) || !tasks.length) return send(res, 502, { error: 'AI 未返回有效任务清单' });
+        return send(res, 200, { source: 'ai', tasks });
+      } catch (e) { console.error('AI 生成失败:', e); return send(res, 502, { error: 'AI 服务暂时不可用，请稍后重试' }); }
+    }
+    if (p === '/api/ai/summarize' && req.method === 'POST') {
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
+      const body = await readBody(req);
+      const c = await loadAI();
+      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
+      const projects = Array.isArray(body.projects) ? body.projects : (body.project ? [body.project] : null);
+      if (!projects || !projects.length) return send(res, 400, { error: '缺少项目数据' });
+      const modeLabel = body.mode === 'daily' ? '日报' : body.mode === 'weekly' ? '周报' : '月报';
+      // 单项目 → 详细复盘；多项目（全局汇报）→ 组合概览
+      if (projects.length === 1) {
+        const proj = projects[0];
+        const total = (proj.tasks || []).length, done = (proj.tasks || []).filter(t => t.done).length;
+        const overdue = (proj.tasks || []).filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
+        const phaseStat = (proj.phases || []).map(ph => { const ts = (proj.tasks || []).filter(t => t.phaseId === ph.id); return ph.name + '：' + ts.filter(t => t.done).length + '/' + ts.length + ' 完成'; }).join('；');
+        const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文写一段 120 字以内的项目总结，突出进度、风险与下一步。';
+        const user = `项目：${proj.name}\n整体进度：${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）\n逾期节点：${overdue}\n各阶段：${phaseStat}`;
+        try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
+        catch (e) { console.error('AI 总结失败:', e); return send(res, 502, { error: 'AI 服务暂时不可用，请稍后重试' }); }
+      }
+      const lines = projects.map(proj => {
+        const ts = proj.tasks || []; const total = ts.length, done = ts.filter(t => t.done).length;
+        const overdue = ts.filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
+        const cur = (proj.phases || []).find(ph => ts.some(t => t.phaseId === ph.id && !t.done));
+        const arch = (proj.status || 'active') === 'archived' ? '（已归档）' : '';
+        return `「${proj.name}」进度${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）${overdue ? '，逾期' + overdue + '项' : ''}${cur ? '，当前阶段：' + cur.name : ''}${arch}`;
+      }).join('\n');
+      const sys = '你是项目组合复盘助手。根据以下所有项目的结构化摘要，用简洁中文写一段 160 字以内的全局' + modeLabel + '，归纳整体进展、点名风险项目、给出下一步建议。';
+      const user = `共 ${projects.length} 个项目：\n${lines}`;
+      try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
+      catch (e) { console.error('AI 总结失败:', e); return send(res, 502, { error: 'AI 服务暂时不可用，请稍后重试' }); }
+    }
+    return send(res, 404, { error: '接口不存在' });
+}
 
 function createFromTemplate(tpl, name, opts) {
   opts = opts || {};
@@ -524,17 +535,33 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   // 请求日志（响应结束打印：方法 路径 状态 耗时）
   const t0 = Date.now();
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res._nonce = nonce;
+  res._csp = cspHeader(nonce);
+  res._acceptEnc = req.headers['accept-encoding'] || '';
+  res._canGzip = true;
   res.on('finish', () => console.log(`${new Date().toISOString()} ${req.method} ${p} ${res.statusCode} ${Date.now() - t0}ms`));
   if (p.startsWith('/api/')) {
     req.user = resolveUser(req); // 每请求解析当前用户（demo 模式恒为 admin 视角）
     // 登录接口（免鉴权，放最前）
     if (p === '/api/login' && req.method === 'POST') {
-      const ip = req.socket.remoteAddress || '?';
+      // 仅当直接 peer 是受信代理（cloudflared 连 localhost）才信任 X-Forwarded-For；
+      // 否则（如绕过隧道直连）直接用真实 socket IP，防止客户端伪造 XFF 轮转登录限流键
+      const peer = req.socket.remoteAddress;
+      const trustedProxy = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+      const ip = trustedProxy ? ((req.headers['x-forwarded-for'] || '').split(',')[0].trim() || peer) : peer;
       if (!rateLimit('login:' + ip, 10, 15 * 60 * 1000)) return send(res, 429, { error: '登录尝试过于频繁，请 15 分钟后再试' });
       const body = await readBody(req);
       const name = String(body.name || '').trim();
       const u = db.verifyUser(name, String(body.password || ''));
-      if (!u) return send(res, 401, { error: '用户名或密码错误' });
+      if (!u) {
+        // 按账号失败计数锁定（防爆破）：连续 8 次失败临时锁定 15 分钟
+        const k = 'lf:' + name.toLowerCase();
+        const b = rateBuckets.get(k) || { n: 0, t: Date.now() }; b.n++; b.t = Date.now(); rateBuckets.set(k, b);
+        if (b.n >= 8) return send(res, 429, { error: '该账号登录失败过多，已临时锁定 15 分钟' });
+        return send(res, 401, { error: '用户名或密码错误' });
+      }
+      rateBuckets.delete('lf:' + name.toLowerCase());
       const token = db.issueToken(u.id);
       return send(res, 200, { token, user: { id: u.id, name: u.name, role: u.role }, mustChange: !!u.mustChange });
     }
@@ -562,6 +589,11 @@ const server = http.createServer(async (req, res) => {
     // viewer 只读：任何写操作一律拒绝（含项目/任务/选项/AI/用户）
     if (req.method !== 'GET' && req.user && req.user.role === 'viewer') {
       return send(res, 403, { error: '只读访客，无修改权限' });
+    }
+    // P1-8 强制改密闸门：仍在用初始密码的账号，除改密外禁止任何写操作（服务端强制，不依赖前端弹窗）
+    // 例外：demo 模式（免登录演示）、viewer 游客（系统只读账号，本就无写权限）
+    if (req.method !== 'GET' && !DEMO_MODE && req.user && req.user.role !== 'viewer' && db.usesDefaultPassword(req.user.id)) {
+      return send(res, 403, { error: '您仍在使用初始密码，请先修改密码后再操作', code: 'MUST_CHANGE_PASSWORD' });
     }
     // 用户管理（admin）：列出 / 新建 / 改角色
     if (p === '/api/users') {
@@ -604,14 +636,14 @@ const server = http.createServer(async (req, res) => {
     // 按人聚合报告：admin/manager/viewer 全量；member 仅自己的统计
     if (p === '/api/report' && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const full = DEMO_MODE || ['admin', 'manager', 'viewer'].includes(req.user.role);
+      const full = DEMO_MODE || fullReportRole(req.user.role);
       const data = db.reportByUser();
       return send(res, 200, full ? data : data.filter(r => r.user.id === req.user.id));
     }
     // 聚合报告导出 xlsx（权限同 /api/report）
     if (p === '/api/report/export' && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const full = DEMO_MODE || ['admin', 'manager', 'viewer'].includes(req.user.role);
+      const full = DEMO_MODE || fullReportRole(req.user.role);
       const data = db.reportByUser();
       const rows = full ? data : data.filter(r => r.user.id === req.user.id);
       const buf = buildReportXlsx(rows);
@@ -688,99 +720,8 @@ const server = http.createServer(async (req, res) => {
       return res.end(buf);
     }
 
-    // ---- AI 助手（OpenAI 兼容） ----
-    if (p === '/api/ai/config') {
-      if (req.method === 'GET') { const c = await loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local }); }
-      if (req.method === 'POST') {
-        const body = await readBody(req);
-        const c = await loadAI();
-        if (body.base_url !== undefined) c.base_url = String(body.base_url).trim() || 'https://api.openai.com/v1';
-        if (body.model !== undefined) c.model = String(body.model).trim() || 'gpt-4o-mini';
-        if (body.local !== undefined) c.local = !!body.local;
-        // Key：留空/未传 = 保持不变（修复：旧逻辑空串会清掉已配置 Key）；显式 clear_key 才清除
-        if (body.clear_key === true) c.api_key = '';
-        else if (body.api_key !== undefined && body.api_key !== null && String(body.api_key).trim() !== '') c.api_key = String(body.api_key).trim();
-        saveAI(c);
-        return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local });
-      }
-      return send(res, 405, { error: '方法不允许' });
-    }
-    // 本地大模型：探测本机 Ollama（OpenAI 兼容本地服务），返回可用模型列表
-    if (p === '/api/ai/ollama-models' && req.method === 'GET') {
-      try {
-        const body = await new Promise((resolve, reject) => {
-          const rq = http.get('http://127.0.0.1:11434/api/tags', { timeout: 2000 }, resp => { let b = ''; resp.on('data', d => b += d); resp.on('end', () => resolve(b)); });
-          rq.on('error', reject); rq.on('timeout', () => rq.destroy(new Error('timeout')));
-        });
-        const j = JSON.parse(body);
-        const models = ((j.models || []).map(m => m.name)).filter(Boolean);
-        return send(res, 200, { online: true, models });
-      } catch (e) { return send(res, 200, { online: false, models: [] }); }
-    }
-    if (p === '/api/ai/chat' && req.method === 'POST') {
-      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
-      const body = await readBody(req);
-      const c = await loadAI();
-      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
-      const messages = Array.isArray(body.messages) ? body.messages : [];
-      if (!messages.length) return send(res, 400, { error: 'messages 为空' });
-      try { const text = await chatCompletions(c, messages, body.temperature); return send(res, 200, { text }); }
-      catch (e) { return send(res, 502, { error: 'AI 调用失败: ' + e.message }); }
-    }
-    if (p === '/api/ai/generate-tasks' && req.method === 'POST') {
-      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
-      const body = await readBody(req);
-      const desc = String(body.description || '').trim();
-      if (!desc) return send(res, 400, { error: '请描述项目' });
-      const c = await loadAI();
-      if (!aiConfigured(c)) {
-        // 离线兜底：基于内置模板的规则建议（非 LLM，界面会明确标注）
-        const tpls = await loadJSON(TEMPLATES_FILE, []);
-        const tpl = tpls.find(t => /音箱|语音|speaker/i.test(t.name)) || tpls[0];
-        const nameMap = {}; (tpl ? tpl.phases || [] : []).forEach(ph => nameMap[ph.id] = ph.name);
-        const tasks = (tpl ? tpl.tasks : []).map(t => ({ title: t.title, phase: nameMap[t.phaseId] || '', estimateDays: t.estimateDays || 3, assignee: t.assignee || '' }));
-        return send(res, 200, { source: 'template', tasks, note: '未配置 AI：已用内置模板智能建议（规则生成，非大模型）' });
-      }
-      const sys = '你是智能硬件 NPI 项目经理。根据用户描述，仅输出一个 JSON 数组（不要任何解释文字、不要 markdown 代码块），每项结构：{title:任务名, phase:所属阶段(只能从"需求立项/设计开发/打样试制/测试验证/量产导入/上市运营"中选), estimateDays:工期天数(数字), assignee:建议负责角色}。';
-      try {
-        const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: desc }], 0.6);
-        const m = text.match(/\[[\s\S]*\]/);
-        const tasks = m ? JSON.parse(m[0]) : [];
-        if (!Array.isArray(tasks) || !tasks.length) return send(res, 502, { error: 'AI 未返回有效任务清单' });
-        return send(res, 200, { source: 'ai', tasks });
-      } catch (e) { return send(res, 502, { error: 'AI 生成失败: ' + e.message }); }
-    }
-    if (p === '/api/ai/summarize' && req.method === 'POST') {
-      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
-      const body = await readBody(req);
-      const c = await loadAI();
-      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key' });
-      const projects = Array.isArray(body.projects) ? body.projects : (body.project ? [body.project] : null);
-      if (!projects || !projects.length) return send(res, 400, { error: '缺少项目数据' });
-      const modeLabel = body.mode === 'daily' ? '日报' : body.mode === 'weekly' ? '周报' : '月报';
-      // 单项目 → 详细复盘；多项目（全局汇报）→ 组合概览
-      if (projects.length === 1) {
-        const proj = projects[0];
-        const total = (proj.tasks || []).length, done = (proj.tasks || []).filter(t => t.done).length;
-        const overdue = (proj.tasks || []).filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
-        const phaseStat = (proj.phases || []).map(ph => { const ts = (proj.tasks || []).filter(t => t.phaseId === ph.id); return ph.name + '：' + ts.filter(t => t.done).length + '/' + ts.length + ' 完成'; }).join('；');
-        const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文写一段 120 字以内的项目总结，突出进度、风险与下一步。';
-        const user = `项目：${proj.name}\n整体进度：${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）\n逾期节点：${overdue}\n各阶段：${phaseStat}`;
-        try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
-        catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
-      }
-      const lines = projects.map(proj => {
-        const ts = proj.tasks || []; const total = ts.length, done = ts.filter(t => t.done).length;
-        const overdue = ts.filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
-        const cur = (proj.phases || []).find(ph => ts.some(t => t.phaseId === ph.id && !t.done));
-        const arch = (proj.status || 'active') === 'archived' ? '（已归档）' : '';
-        return `「${proj.name}」进度${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）${overdue ? '，逾期' + overdue + '项' : ''}${cur ? '，当前阶段：' + cur.name : ''}${arch}`;
-      }).join('\n');
-      const sys = '你是项目组合复盘助手。根据以下所有项目的结构化摘要，用简洁中文写一段 160 字以内的全局' + modeLabel + '，归纳整体进展、点名风险项目、给出下一步建议。';
-      const user = `共 ${projects.length} 个项目：\n${lines}`;
-      try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
-      catch (e) { return send(res, 502, { error: 'AI 总结失败: ' + e.message }); }
-    }
+    // ---- AI 助手（OpenAI 兼容）：逻辑已抽取到模块级 handleAi()，此处仅做分发 ----
+    if (p.startsWith('/api/ai')) { await handleAi(p, req, res); return; }
 
     // ---- 模板共创：导入参考模版 Excel 新建模板 ----
     if (p === '/api/templates/import' && req.method === 'POST') {
@@ -822,7 +763,7 @@ const server = http.createServer(async (req, res) => {
     const ex = p.match(/^\/api\/projects\/([^/]+)\/export$/);
     if (ex && req.method === 'GET') {
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const proj = db.getProject(ex[1], req.user.id, ['admin', 'manager', 'viewer'].includes(req.user.role));
+      const proj = db.getProject(ex[1], req.user.id, canAllRole(req.user.role));
       if (!proj) return send(res, 404, { error: '项目不存在' });
       const type = url.searchParams.get('type') || 'latest';
       const date = isoDate(new Date()).replace(/-/g, '');
@@ -873,8 +814,43 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, np);
     }
 
+    /* ---------- 回收站（P0-4）：列表 / 恢复 / 彻底删除 ---------- */
+    if (p === '/api/trash' && req.method === 'GET') {
+      return send(res, 200, db.trashList(req.user.id, canAllRole(req.user.role)));
+    }
+    const trRestore = p.match(/^\/api\/trash\/([^/]+)\/restore$/);
+    if (trRestore && req.method === 'POST') {
+      const item = db.trashGet(trRestore[1], req.user.id, isManagerRole(req.user.role));
+      if (!item) return send(res, 404, { error: '回收站条目不存在或无权访问' });
+      if (item.kind === 'project') {
+        const pj = item.payload;
+        if (db.getProject(pj.id, item.userId, true)) return send(res, 409, { error: '同 ID 项目已存在，无法恢复' });
+        db.saveProject(pj, item.userId);
+        db.trashDrop(item.id, req.user.id, isManagerRole(req.user.role));
+        return send(res, 200, { ok: true, kind: 'project', project: pj });
+      }
+      // 任务：写回原项目（项目已被删则拒绝，提示先恢复项目）
+      const host = db.getProject(item.projectId, item.userId, true);
+      if (!host) return send(res, 409, { error: '所属项目已删除，请先恢复项目' });
+      const t = item.payload.task || item.payload;
+      if ((host.tasks || []).some(x => x.id === t.id)) return send(res, 409, { error: '该任务已存在' });
+      const at = Math.min(Math.max(0, item.payload.seq || 0), (host.tasks || []).length);
+      host.tasks.splice(at, 0, t);
+      recalcProject(host);
+      db.saveProject(host, item.userId);
+      db.trashDrop(item.id, req.user.id, isManagerRole(req.user.role));
+      return send(res, 200, { ok: true, kind: 'task', task: t, projectId: host.id });
+    }
+    const trDel = p.match(/^\/api\/trash\/([^/]+)$/);
+    if (trDel && req.method === 'DELETE') {
+      const ok = db.trashDrop(trDel[1], req.user.id, isManagerRole(req.user.role));
+      if (!ok) return send(res, 404, { error: '条目不存在或无权删除' });
+      return send(res, 200, { ok: true });
+    }
+
     // 保存看板图标（上传 + 裁剪后的图片）
     if (p === '/api/brand-logo' && req.method === 'POST') {
+      if (!['admin', 'manager'].includes(req.user.role)) return send(res, 403, { error: '仅管理员/副管理员可更换看板图标' });
       const body = await readBody(req);
       if (!body || !body.data) return send(res, 400, { error: '缺少图片数据' });
       try {
@@ -891,7 +867,7 @@ const server = http.createServer(async (req, res) => {
           || magic.startsWith('47494638')        // GIF
           || magic.startsWith('52494646');       // WebP (RIFF....WEBP)
         if (!ok || imgBuf.length < 8 || imgBuf.length > 8 * 1024 * 1024) return send(res, 400, { error: '文件内容不是有效图片' });
-        fs.writeFileSync(path.join(PUBLIC, 'brand-logo.png'), imgBuf);
+        fs.writeFileSync(BRAND_LOGO_FILE, imgBuf);
         return send(res, 200, { ok: true });
       } catch (e) { return send(res, 400, { error: '图片数据无效' }); }
     }
@@ -900,18 +876,19 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/projects/order' && req.method === 'PUT') {
       const body = await readBody(req);
       if (!Array.isArray(body.ids) || !body.ids.length) return send(res, 400, { error: '缺少 ids 数组' });
-      const mine = db.listProjects(req.user.id, req.user.role === 'admin').map(x => x.id);
+      const canAll = canAllRole(req.user.role);
+      const mine = db.listProjects(req.user.id, canAll).map(x => x.id);
       if (body.ids.some(id => !mine.includes(id))) return send(res, 400, { error: '包含未知项目 id' });
-      db.setOrder(body.ids, req.user.id, req.user.role === 'admin');
+      db.setOrder(body.ids, req.user.id, canAll);
       return send(res, 200, { ok: true });
     }
 
-    const m = p.match(/^\/api\/projects(?:\/([^/]+)(?:\/tasks(?:\/([^/]+))?|\/reschedule)?)?$/);
+    const m = p.match(/^\/api\/projects(?:\/([^/]+)(?:\/tasks(?:\/([^/]+))?)?)?$/);
     if (m) {
       const pid = m[1]; const tid = m[2];
       if (!req.user) return send(res, 401, { error: '请先登录' });
-      const isAdmin = req.user.role === 'admin' || req.user.role === 'manager'; // admin/副管理员：全量项目权限
-      const canAll = isAdmin || req.user.role === 'viewer'; // + viewer 只读全量
+      const isAdmin = isManagerRole(req.user.role); // admin/副管理员：全量项目权限
+      const canAll = canAllRole(req.user.role); // + viewer 只读全量
       if (!pid) {
         if (req.method === 'GET') return send(res, 200, db.listProjects(req.user.id, canAll));
         if (req.method === 'POST') {
@@ -938,13 +915,6 @@ const server = http.createServer(async (req, res) => {
       }
       const proj = db.getProject(pid, req.user.id, canAll);
       if (!proj) return send(res, 404, { error: '项目不存在' });
-      if (m[0].endsWith('/reschedule') && req.method === 'POST') {
-        // 保留公式：有公式 → 按公式全量重算一遍；无公式 → 顺序排期兜底
-        const hasRules = (proj.tasks || []).some(t => t.startRule || t.dueRule);
-        if (hasRules) recalcProject(proj);
-        else scheduleTasks(proj.phases, proj.tasks, proj.startDate || isoDate(new Date()));
-        db.saveProject(proj, req.user.id); return send(res, 200, proj);
-      }
       if (!tid) {
         if (req.method === 'GET') return send(res, 200, proj);
         if (req.method === 'POST') {
@@ -957,7 +927,8 @@ const server = http.createServer(async (req, res) => {
             note: body.note || '', estimateDays: body.estimateDays || 0,
             assignee: body.assignee || '', done: false,
             startDate: body.startDate || start,
-            dueDate: body.dueDate || isoDate(addDays(new Date(start), days))
+            dueDate: body.dueDate || isoDate(addDays(new Date(start), days)),
+            recurrence: RECUR.includes(String(body.recurrence || '')) ? String(body.recurrence || '') : ''
           };
           proj.tasks.push(t); db.saveProject(proj, req.user.id); return send(res, 201, t);
         }
@@ -987,7 +958,14 @@ const server = http.createServer(async (req, res) => {
           }
           db.saveProject(proj, req.user.id); return send(res, 200, proj);
         }
-        if (req.method === 'DELETE') { db.deleteProject(pid, req.user.id, isAdmin); return send(res, 200, { ok: true }); }
+        if (req.method === 'DELETE') {
+          // 先落回收站快照再删（P0-4：可恢复，30 天后自动清理）
+          let trashId = null;
+          try { trashId = db.trashPush(req.user.id, 'project', proj.id, proj, { projectId: proj.id, projectName: proj.name, title: proj.name }); }
+          catch (e) { console.error('回收站写入失败（仍继续删除）:', e); }
+          db.deleteProject(pid, req.user.id, isAdmin);
+          return send(res, 200, { ok: true, trashId });
+        }
         return send(res, 405, { error: '方法不允许' });
       }
       const tIdx = proj.tasks.findIndex(t => t.id === tid);
@@ -997,7 +975,9 @@ const server = http.createServer(async (req, res) => {
         if (body.title !== undefined) t.title = body.title;
         if (body.note !== undefined) t.note = body.note;
         if (body.phaseId !== undefined) t.phaseId = body.phaseId;
+        const wasDone = !!t.done;
         if (body.done !== undefined) t.done = !!body.done;
+        if (body.recurrence !== undefined) t.recurrence = RECUR.includes(String(body.recurrence)) ? String(body.recurrence) : '';
         if (body.assignee !== undefined) t.assignee = body.assignee;
         if (body.estimateDays !== undefined) t.estimateDays = body.estimateDays;
         if (body.startDate) {
@@ -1007,16 +987,36 @@ const server = http.createServer(async (req, res) => {
         if (body.dueDate) { t.dueDate = body.dueDate; delete t.dueRule; delete t.dueF; }
         if (body.startFormula !== undefined) { const sf = String(body.startFormula || '').trim(); t.startF = sf; t.startRule = sf ? parseFormula(sf) : undefined; } // 改公式
         if (body.dueFormula !== undefined) { const df = String(body.dueFormula || '').trim(); t.dueF = df; t.dueRule = df ? parseFormula(df) : undefined; }
+        // P0-4 重复任务：从未完成→已完成，且设了重复周期 → 自动派生下一期（原任务保留为已完成记录）
+        let spawned = null;
+        if (!wasDone && t.done && t.recurrence && RECUR.includes(t.recurrence)) {
+          spawned = spawnNextRecurrence(t);
+          if (spawned) { proj.tasks.splice(tIdx + 1, 0, spawned); t.recurrence = ''; } // 重复归属转移到新任务，避免重复派生
+        }
         recalcProject(proj); // 级联重算依赖该任务的后继日期
-        db.saveProject(proj, req.user.id); return send(res, 200, t);
+        db.saveProject(proj, req.user.id); return send(res, 200, spawned ? Object.assign({}, t, { spawned }) : t);
       }
       if (req.method === 'DELETE') {
         if (tIdx < 0) return send(res, 404, { error: '任务不存在' });
-        proj.tasks.splice(tIdx, 1); db.saveProject(proj, req.user.id); return send(res, 200, { ok: true });
+        const removed = proj.tasks[tIdx];
+        let trashId = null;
+        try { trashId = db.trashPush(req.user.id, 'task', removed.id, { task: removed, seq: tIdx }, { projectId: proj.id, projectName: proj.name, title: removed.title }); }
+        catch (e) { console.error('回收站写入失败（仍继续删除）:', e); }
+        proj.tasks.splice(tIdx, 1); db.saveProject(proj, req.user.id);
+        return send(res, 200, { ok: true, trashId });
       }
       return send(res, 405, { error: '方法不允许' });
     }
     return send(res, 404, { error: '接口不存在' });
+  }
+  // 看板图标：按运行模式返回对应文件（demo/真实隔离），不走静态目录避免污染
+  if (p === '/brand-logo.png' && req.method === 'GET') {
+    return fs.readFile(BRAND_LOGO_FILE, (err, buf) => {
+      if (err) return send(res, 404, { error: 'not found' });
+      const headers = Object.assign({ 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' }, SEC_HEADERS);
+      if (res._csp) headers['Content-Security-Policy'] = res._csp;
+      endBody(res, 200, buf, headers);
+    });
   }
   let rel = p === '/' ? '/index.html' : p;
   // 路径遍历加固：path.resolve 归一后做「大小写无关 + 分隔符感知」前缀校验（Windows 大小写/短名绕过防护）
@@ -1030,8 +1030,11 @@ const server = http.createServer(async (req, res) => {
     const ver = await assetVer();
     fs.readFile(filepath, (err, buf) => {
       if (err) return send(res, 404, { error: 'not found' });
-      res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }, SEC_HEADERS));
-      res.end(buf.toString().replace(/@VER@/g, ver));
+      const headers = Object.assign({ 'Content-Type': MIME[ext] || 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }, SEC_HEADERS);
+      if (res._csp) headers['Content-Security-Policy'] = res._csp;
+      // CSP nonce 注入：index.html 内联脚本靠 @NONCE@ 占位符获得每请求随机 nonce（去掉 unsafe-inline 后必需）
+      const html = buf.toString().replace(/@VER@/g, ver).replace(/@NONCE@/g, res._nonce || '');
+      endBody(res, 200, Buffer.from(html, 'utf8'), headers);
     });
     return;
   }
@@ -1039,8 +1042,9 @@ const server = http.createServer(async (req, res) => {
   const cache = (rel === '/app.js' || rel === '/style.css') && hasVer ? 'public, max-age=31536000, immutable' : 'no-cache';
   fs.readFile(filepath, (err, buf) => {
     if (err) return send(res, 404, { error: 'not found' });
-    res.writeHead(200, Object.assign({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache }, SEC_HEADERS));
-    res.end(buf);
+    const headers = Object.assign({ 'Content-Type': MIME[ext] || (ext === '.webmanifest' ? 'application/manifest+json' : 'application/octet-stream'), 'Cache-Control': cache }, SEC_HEADERS);
+    if (res._csp) headers['Content-Security-Policy'] = res._csp;
+    endBody(res, 200, buf, headers);
   });
   } catch (e) {
     if (e && e.code === 'INVALID_JSON') return send(res, 400, { error: '请求体不是合法 JSON' });

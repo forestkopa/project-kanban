@@ -32,6 +32,21 @@
   --btn-primary-fg:#0d0d0d;
   --info:#64d2ff;
 }
+/* 跟随系统深色（P1-13）：仅在用户未手动指定 data-theme 时生效；双击主题按钮可回到跟随 */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme]){
+    --bg:#0d0d0d; --surface:#1c1c1e; --bg-2:#2a2a2c; --border:#2c2c2e; --border-strong:#3a3a3c;
+    --text:#f5f5f5; --text-2:#a1a1a6; --text-3:#6e6e73; --accent:#19c37d;
+    --accent-weak:#11342a; --dark:#f5f5f5; --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.5);
+    --btn-primary-bg:#f5f5f5;
+    --btn-primary-fg:#0d0d0d;
+    --info:#64d2ff;
+  }
+}
+/* 尊重「减少动效」偏好（a11y） */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 body {
@@ -135,7 +150,17 @@ body {
 .who-ava { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--acc, var(--accent)); color: #fff; font-size: 10px; font-weight: 700; flex: none; }
 .days { background: var(--bg-2); border-radius: 6px; padding: 1px 7px; }
 .cacts { position: absolute; top: 9px; right: 9px; display: none; gap: 5px; }
-.card:hover .cacts { display: flex; }
+.card:hover .cacts, .card:focus-within .cacts, .card:focus .cacts { display: flex; }
+/* 键盘可达（P0-1）：卡片聚焦态清晰可见 */
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: var(--shadow); }
+/* 到期高亮（P0-4 到期提醒的看板侧呈现） */
+.card.overdue { border-color: var(--danger); background: linear-gradient(0deg, rgba(224,36,27,.06), rgba(224,36,27,.06)), var(--surface); }
+.card.soon { border-color: #d98600; }
+.due-tag { border-radius: 6px; padding: 1px 7px; font-weight: 700; font-size: 10.5px; }
+.due-tag.overdue { background: rgba(224,36,27,.14); color: var(--danger); }
+.due-tag.soon { background: rgba(217,134,0,.16); color: #b06f00; }
+:root[data-theme="dark"] .due-tag.soon { color: #ffb84d; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme]) .due-tag.soon { color: #ffb84d; } }
 .mini { background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 7px; width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
 .mini:hover { background: var(--border); }
 .mini.del:hover { background: rgba(224,36,27,.12); color: var(--danger); }
@@ -575,3 +600,18 @@ body.viewer .proj .bar-fill { opacity: .85; }
 .del-user-btn { padding: 4px 10px; font-size: 12px; color: var(--danger); background: none; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
 .del-user-btn:hover:not(:disabled) { background: rgba(224,36,27,.08); }
 .del-user-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* 使用引导弹窗（P1-12） */
+.guide-list { margin: 4px 0 0 4px; padding-left: 20px; display: flex; flex-direction: column; gap: 11px; }
+.guide-list li { font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+.guide-list li b { color: var(--text); }
+.guide-list kbd { background: var(--bg-2); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; font-size: 11px; font-family: inherit; color: var(--text); }
+.guide-tip { margin-top: 16px; padding: 10px 13px; background: var(--accent-weak); border-radius: 11px; font-size: 12.5px; color: var(--text-2); }
+.modal-acts { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.guide-skip { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-3); cursor: pointer; user-select: none; }
+.guide-skip input { accent-color: var(--accent); width: 14px; height: 14px; }
+
+/* 重复任务标记 + toast 撤销按钮（P0-4） */
+.recur-tag { background: var(--bg-2); border-radius: 6px; padding: 1px 7px; color: var(--text-2); font-weight: 600; }
+.toast-undo { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 7px; padding: 2px 10px; margin-left: 8px; cursor: pointer; font-size: 12px; font-weight: 700; font-family: inherit; }
+.toast-undo:hover { background: rgba(255,255,255,.16); }

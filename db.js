@@ -75,14 +75,29 @@ function init(file) {
       start_date TEXT, due_date TEXT,
       excel_row INTEGER, start_f TEXT, due_f TEXT,
       start_rule_json TEXT, due_rule_json TEXT,
+      recurrence TEXT DEFAULT '',
       seq INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS trash (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      ref_id TEXT NOT NULL,
+      project_id TEXT,
+      project_name TEXT,
+      title TEXT,
+      payload_json TEXT NOT NULL,
+      deleted_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id, sort);
     CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
     CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_trash_user ON trash(user_id, deleted_at);
   `);
-  // 兼容旧库：tokens 表补充 expires_at 列（新建表已含该列，此处幂等，重复执行报错被忽略）
+  // 兼容旧库：幂等补列（新建表已含，重复执行的报错按「列已存在」忽略）
   try { db.exec('ALTER TABLE tokens ADD COLUMN expires_at TEXT'); } catch (e) { /* 列已存在 */ }
+  try { db.exec("ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT ''"); } catch (e) { /* 列已存在 */ }
+  purgeTrash(30); // 回收站保留 30 天，启动即清理过期项
   cleanupExpiredTokens(); // 启动即清理过期 token
 }
 
@@ -143,12 +158,19 @@ function verifyUser(name, password) {
   if (!u || !verifyPassword(password, u.pass_hash)) return null;
   return { id: u.id, name: u.name, role: u.role, mustChange: password === DEFAULT_PASSWORD };
 }
+// 该用户是否仍在使用初始密码（P1-8：服务端强制改密的判定依据，不依赖前端）
+function usesDefaultPassword(userId) {
+  const u = db.prepare('SELECT pass_hash FROM users WHERE id=?').get(userId);
+  if (!u) return false;
+  return verifyPassword(DEFAULT_PASSWORD, u.pass_hash);
+}
 // 自助改密：校验旧密码后更新（返回错误原因或 null）
 function changePassword(userId, oldPw, newPw) {
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(userId);
   if (!u) return '用户不存在';
   if (!verifyPassword(oldPw, u.pass_hash)) return '旧密码错误';
   if (String(newPw || '').length < 6) return '新密码至少 6 位';
+  if (newPw === DEFAULT_PASSWORD) return '新密码不能与初始密码相同';
   db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(hashPassword(newPw), userId);
   return null;
 }
@@ -178,7 +200,7 @@ function tokenUserId(token) {
   return r.user_id;
 }
 function cleanupExpiredTokens() {
-  try { db.prepare('DELETE FROM tokens WHERE expires_at IS NOT NULL AND expires_at < ?').run(new Date().toISOString()); } catch (e) {}
+  try { db.prepare('DELETE FROM tokens WHERE expires_at IS NOT NULL AND expires_at < ?').run(new Date().toISOString()); } catch (e) { console.error('清理过期 token 失败:', (e && e.message) || e); }
 }
 
 /* ---------------- 项目（单项目粒度保存） ---------------- */
@@ -192,7 +214,8 @@ function rowToProj(r, prePhases, preTasks) {
     startDate: t.start_date, dueDate: t.due_date,
     excelRow: t.excel_row ?? undefined, startF: t.start_f ?? undefined, dueF: t.due_f ?? undefined,
     startRule: t.start_rule_json ? JSON.parse(t.start_rule_json) : undefined,
-    dueRule: t.due_rule_json ? JSON.parse(t.due_rule_json) : undefined
+    dueRule: t.due_rule_json ? JSON.parse(t.due_rule_json) : undefined,
+    recurrence: t.recurrence || ''
   }));
   return {
     id: r.id, name: r.name, templateId: r.template_id, icon: r.icon, color: r.color,
@@ -227,13 +250,14 @@ function saveProject(proj, userId) {
     db.prepare('DELETE FROM tasks WHERE project_id=?').run(proj.id);
     (proj.phases || []).forEach((ph, i) => db.prepare('INSERT INTO phases (project_id,id,name,color,seq) VALUES (?,?,?,?,?)')
       .run(proj.id, ph.id, ph.name || ('阶段' + (i + 1)), ph.color || '#0a84ff', i));
-    const insT = db.prepare(`INSERT INTO tasks (id,project_id,title,phase_id,note,estimate_days,assignee,done,is_milestone,start_date,due_date,excel_row,start_f,due_f,start_rule_json,due_rule_json,seq)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const insT = db.prepare(`INSERT INTO tasks (id,project_id,title,phase_id,note,estimate_days,assignee,done,is_milestone,start_date,due_date,excel_row,start_f,due_f,start_rule_json,due_rule_json,recurrence,seq)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     (proj.tasks || []).forEach((t, i) => insT.run(
       t.id, proj.id, t.title || '', t.phaseId || null, t.note || '', t.estimateDays || 0, t.assignee || '',
       t.done ? 1 : 0, t.isMilestone ? 1 : 0, t.startDate || null, t.dueDate || null,
       t.excelRow ?? null, t.startF || null, t.dueF || null,
-      t.startRule ? JSON.stringify(t.startRule) : null, t.dueRule ? JSON.stringify(t.dueRule) : null, i));
+      t.startRule ? JSON.stringify(t.startRule) : null, t.dueRule ? JSON.stringify(t.dueRule) : null,
+      t.recurrence || '', i));
     db.exec('COMMIT');
   } catch (e) {
     try { db.exec('ROLLBACK'); } catch (_) {}
@@ -275,6 +299,45 @@ function setOrder(ids, userId, isAdmin) {
     });
     db.exec('COMMIT');
   } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
+}
+
+/* ---------------- 回收站（P0-4）：删除即快照，可恢复，保留 N 天 ----------------
+   设计：不在 projects/tasks 上加 deleted_at 软删列。原因是 saveProject 采用
+   「事务内整表重写该项目的 phases/tasks」策略，软删行会在下一次保存时被清空。
+   改为把被删对象的完整 JSON 快照落到独立 trash 表，恢复时再写回，互不干扰。 */
+function trashPush(userId, kind, refId, payload, meta) {
+  const id = 'tr_' + crypto.randomBytes(8).toString('hex');
+  db.prepare('INSERT INTO trash (id,user_id,kind,ref_id,project_id,project_name,title,payload_json,deleted_at) VALUES (?,?,?,?,?,?,?,?,?)')
+    .run(id, userId, kind, refId, (meta && meta.projectId) || null, (meta && meta.projectName) || null,
+      (meta && meta.title) || '', JSON.stringify(payload), new Date().toISOString());
+  return id;
+}
+function trashList(userId, isAdmin) {
+  const rows = isAdmin
+    ? db.prepare('SELECT id,user_id,kind,ref_id,project_id,project_name,title,deleted_at FROM trash ORDER BY deleted_at DESC LIMIT 200').all()
+    : db.prepare('SELECT id,user_id,kind,ref_id,project_id,project_name,title,deleted_at FROM trash WHERE user_id=? ORDER BY deleted_at DESC LIMIT 200').all(userId);
+  return rows.map(r => ({ id: r.id, kind: r.kind, refId: r.ref_id, projectId: r.project_id, projectName: r.project_name, title: r.title, deletedAt: r.deleted_at }));
+}
+function trashGet(id, userId, isAdmin) {
+  const r = isAdmin
+    ? db.prepare('SELECT * FROM trash WHERE id=?').get(id)
+    : db.prepare('SELECT * FROM trash WHERE id=? AND user_id=?').get(id, userId);
+  if (!r) return null;
+  return { id: r.id, userId: r.user_id, kind: r.kind, refId: r.ref_id, projectId: r.project_id, projectName: r.project_name, title: r.title, payload: JSON.parse(r.payload_json), deletedAt: r.deleted_at };
+}
+function trashDrop(id, userId, isAdmin) {
+  const r = isAdmin
+    ? db.prepare('DELETE FROM trash WHERE id=?').run(id)
+    : db.prepare('DELETE FROM trash WHERE id=? AND user_id=?').run(id, userId);
+  return r.changes > 0;
+}
+// 保留 days 天，过期条目物理删除
+function purgeTrash(days) {
+  try {
+    const cut = new Date(Date.now() - (days || 30) * 86400000).toISOString();
+    const r = db.prepare('DELETE FROM trash WHERE deleted_at < ?').run(cut);
+    return r.changes;
+  } catch (e) { console.error('清理回收站失败:', (e && e.message) || e); return 0; }
 }
 
 /* ---------------- 按人聚合报告（2026-08-25 口径调整：按负责人 assignee 归属，空/未匹配负责人回退项目 owner） ---------------- */
@@ -360,4 +423,5 @@ function migrateJson(seedFilePath, ownerId) {
   return n;
 }
 
-module.exports = { init, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, changePassword, resetPassword, issueToken, tokenUserId, cleanupExpiredTokens, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };
+module.exports = { init, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, usesDefaultPassword, changePassword, resetPassword, issueToken, tokenUserId, cleanupExpiredTokens, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser,
+  trashPush, trashList, trashGet, trashDrop, purgeTrash, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };

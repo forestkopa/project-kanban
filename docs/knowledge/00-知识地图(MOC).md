@@ -1,6 +1,8 @@
 ---
 title: 知识地图 (MOC)
-tags: [看板, MOC, 索引]
+tags:
+category: references
+summary: 知识库总索引，按主题列出所有原子笔记的双链入口，是浏览与检索的起点。 [看板, MOC, 索引]
 date: 2026-08-21
 status: 已确认
 related: []
@@ -24,6 +26,9 @@ related: []
 - [[08-Excel导出]] — xlsx-js-style 周报待办导出、矢车菊蓝配色表
 - [[09-GitHub托管与换机]] — 私有仓库、敏感文件清单、换机重配、遗留项、常用命令
 - [[10-多用户与SQLite数据层]] — node:sqlite 五表、三角色权限、登录/游客/记住密码、db 运维坑
+- [[11-服务器部署实战与知识库接入]] — 服务器一键部署实战(NSSM 幂等/隧道蓝绿切换)与 Obsidian 知识库接入 + wiki-lint/wiki-update 技能
+- [[12-大赛投递与工作台模板链接]] — 用资料库 page 发布工作台模板展示页并生成公开分享链接(import_html+publish_page),用于共创大赛投递
+- [[13-测试隔离与KB_DATA_DIR]] — KB_DATA_DIR 隔离实例 + P1-8 强制改密闸门测试绕过(零污染真实部署)
 
 ## 总文档
 

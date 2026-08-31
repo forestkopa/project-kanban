@@ -1,6 +1,8 @@
 ---
 title: 多用户与 SQLite 数据层
-tags: [看板, 多用户, SQLite, 权限, 登录]
+tags:
+category: concepts
+summary: node:sqlite 五表、单项目粒度事务、三角色权限、登录/游客/记住密码与默认密码 000000、db 运维坑。 [看板, 多用户, SQLite, 权限, 登录]
 date: 2026-08-24
 status: 已确认
 related: ["02-demo正式版机制", "09-GitHub托管与换机"]

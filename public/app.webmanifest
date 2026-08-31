@@ -1,0 +1,15 @@
+{
+  "name": "多项目管理看板",
+  "short_name": "项目看板",
+  "description": "多项目管理个人看板：阶段看板 / 甘特公式联动 / 日历 / 报告导出",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f8",
+  "theme_color": "#10a37f",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/wb-logo.png", "sizes": "114x89", "type": "image/png", "purpose": "any" }
+  ]
+}

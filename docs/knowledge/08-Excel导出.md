@@ -1,6 +1,8 @@
 ---
 title: Excel 导出
-tags: [看板, Excel, 导出]
+tags:
+category: skills
+summary: xlsx-js-style 周报待办导出流程与矢车菊蓝配色表(#1F3864/#B4C7E7/#F2F7FD)。 [看板, Excel, 导出]
 date: 2026-08-21
 status: 已确认
 related: [[00-知识地图(MOC)], [04-汇报与AI总结], [07-甘特公式引擎]]

@@ -17,6 +17,9 @@
 - docs/knowledge/08-Excel导出.md — xlsx-js-style 周报待办导出、矢车菊蓝配色表(#1F3864/#B4C7E7/#F2F7FD)
 - docs/knowledge/09-GitHub托管与换机.md — 私有仓库、敏感文件清单(gitignore)、换机重配项、遗留(mappings.json死文件/projects.json入库)、常用命令
 - docs/knowledge/10-多用户与SQLite数据层.md — node:sqlite 五表、单项目粒度事务、三角色(admin/member/viewer)权限、登录/游客/记住密码、默认密码 000000、db 运维坑(删库需先停实例)
+- docs/knowledge/11-服务器部署实战与知识库接入.md — 服务器一键部署实战(NSSM 幂等/隧道蓝绿切换)与 Obsidian 知识库接入 + wiki-lint/wiki-update 技能适配
+- docs/knowledge/12-大赛投递与工作台模板链接.md — 用 WorkBuddy 资料库 page 发布工作台模板展示页、生成公开分享链接(import_html+publish_page)的方法,用于大赛投递
+- docs/knowledge/13-测试隔离与KB_DATA_DIR.md — KB_DATA_DIR 环境变量让 server 指向独立临时数据目录；测试自起隔离实例绕过 P1-8 强制改密闸门，零污染真实部署
 
 ## 其它文档
 

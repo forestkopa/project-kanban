@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>多项目管理看板</title>
+<meta name="theme-color" content="#10a37f">
+<meta name="description" content="多项目管理个人看板：阶段看板 / 甘特公式联动 / 日历 / 报告导出">
+<link rel="manifest" href="/app.webmanifest">
+<link rel="icon" href="/wb-logo.png" type="image/png" sizes="114x89">
+<link rel="apple-touch-icon" href="/wb-logo.png">
 <link rel="stylesheet" href="/style.css?v=@VER@">
 </head>
 <body>
@@ -61,6 +66,8 @@
         <div id="userMenu" class="export-menu">
           <button id="userMenuUsers" data-u="users"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 015.5 4.5"/></svg></span>用户管理</button>
           <button data-u="password"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span>修改密码</button>
+          <button data-u="guide"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 114 2c-.9.7-1.5 1.2-1.5 2.3"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></span>使用引导</button>
+          <button data-u="trash"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg></span>回收站</button>
           <button data-u="logout"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>退出登录</button>
         </div>
       </div>
@@ -131,6 +138,25 @@
     <input id="pwNew" class="inp" type="password" placeholder="新密码（≥6 位）" autocomplete="new-password">
     <div id="pwErr" class="pi-sub" style="color:#E0241B;min-height:18px"></div>
     <button id="pwSave" class="btn primary" style="width:100%">保存</button>
+  </div>
+</div>
+
+<!-- 使用引导（首次登录自动弹，用户菜单可重看） -->
+<div id="guideModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-box" style="width:min(560px,94vw)">
+    <div class="modal-head"><h3>快速上手</h3><button class="x" data-close>×</button></div>
+    <ol class="guide-list">
+      <li><b>建项目</b>：左侧「+ 新建项目」→ 可从模版导入（自动生成阶段与任务），或空白起步。</li>
+      <li><b>排任务</b>：看板拖拽卡片换阶段；<kbd>←</kbd> <kbd>→</kbd> 也能移动（无需鼠标），<kbd>Enter</kbd> 编辑、<kbd>Delete</kbd> 删除。</li>
+      <li><b>看进度</b>：顶部切「甘特图 / 日历 / 报告」；甘特支持公式联动（改一个日期，下游自动顺延）。</li>
+      <li><b>找东西</b>：按 <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> 全局搜索项目与任务。</li>
+      <li><b>出材料</b>：报告页可导出 Excel；AI 助手能按项目生成周报/月报总结。</li>
+    </ol>
+    <div class="guide-tip">逾期任务卡片会标红「逾期」，3 天内到期标「临期」。</div>
+    <div class="modal-acts">
+      <label class="guide-skip"><input type="checkbox" id="guideNoMore"> 不再自动显示</label>
+      <button class="btn primary" id="guideDone">开始使用</button>
+    </div>
   </div>
 </div>
 
@@ -253,7 +279,23 @@
       <input id="taskAssignee" class="inp" placeholder="负责人（可选）">
       <input id="taskEst" type="number" class="inp" placeholder="工期(天)" min="0">
     </div>
+    <select id="taskRecur" class="inp" title="重复周期：勾选完成后自动生成下一期">
+      <option value="">不重复</option>
+      <option value="daily">每天重复</option>
+      <option value="weekly">每周重复</option>
+      <option value="biweekly">每两周重复</option>
+      <option value="monthly">每月重复</option>
+    </select>
     <button id="taskSave" class="btn primary">保存</button>
+  </div>
+</div>
+
+<!-- 回收站（P0-4）：删除的项目/任务可恢复，保留 30 天 -->
+<div id="trashModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-box" style="width:min(680px,94vw)">
+    <div class="modal-head"><h3>回收站</h3><button class="x" data-close>×</button></div>
+    <div class="muted" style="margin-bottom:12px">删除的项目与任务在此保留 30 天，可随时恢复。</div>
+    <div id="trashList"></div>
   </div>
 </div>
 
@@ -316,24 +358,40 @@
 </div>
 
 <script src="/app.js?v=@VER@"></script>
-<script>
+<script nonce="@NONCE@">
 (function(){
   var root = document.documentElement;
   var btn = document.getElementById('themeToggle');
   if(!btn) return;
   var MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6 6 0 0021 12.8z"/></svg>';
   var SUN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19 12a7 7 0 00-7-7"/></svg>';
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  /* 三态主题：auto(跟随系统) / light / dark。auto 时不写 data-theme，交给 CSS prefers-color-scheme */
+  function label(effDark, auto){
+    btn.innerHTML = effDark ? SUN + ' 浅色' : MOON + ' 深色';
+    btn.title = auto ? '当前跟随系统（点击切换，长按/双击恢复跟随）' : '当前手动指定主题';
+    btn.setAttribute('aria-label', (auto ? '主题跟随系统，' : '') + '切换为' + (effDark ? '浅色' : '深色') + '主题');
+  }
+  function applyAuto(){
+    root.removeAttribute('data-theme');
+    try{ localStorage.removeItem('kb-theme'); }catch(e){}
+    label(!!(mq && mq.matches), true);
+  }
   function apply(t){
     root.setAttribute('data-theme', t);
-    btn.innerHTML = (t === 'light') ? MOON + ' 深色' : SUN + ' 浅色';
     try{ localStorage.setItem('kb-theme', t); }catch(e){}
+    label(t === 'dark', false);
   }
-  var saved = 'light';
-  try{ saved = localStorage.getItem('kb-theme') || 'light'; }catch(e){}
-  apply(saved);
+  var saved = null;
+  try{ saved = localStorage.getItem('kb-theme'); }catch(e){}
+  if(saved === 'light' || saved === 'dark') apply(saved); else applyAuto();
+  if(mq && mq.addEventListener) mq.addEventListener('change', function(){ if(!root.hasAttribute('data-theme')) applyAuto(); });
   btn.addEventListener('click', function(){
-    apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    var effDark = root.hasAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : !!(mq && mq.matches);
+    apply(effDark ? 'light' : 'dark');
   });
+  /* 双击恢复「跟随系统」 */
+  btn.addEventListener('dblclick', function(){ applyAuto(); });
 })();
 </script>
 </body>

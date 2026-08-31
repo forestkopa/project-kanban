@@ -1,12 +1,15 @@
 {
   "name": "project-kanban",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "private": true,
   "description": "多项目管理个人看板（内置智能硬件产品模板）",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/formula-engine.test.js test/db-report.test.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test": "node test/run-all.cjs",
+    "test:unit": "node --test test/formula-engine.test.js test/db-report.test.js && node test/lib-recurrence.test.cjs && node test/lib-xlsx-export.test.cjs",
+    "lint": "node --check server.js && node --check db.js && node tools/lint-frontend.cjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "npm run lint && npm test"
   },
   "dependencies": {
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz",
