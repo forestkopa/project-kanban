@@ -41,7 +41,11 @@ async function api(path, opts = {}) {
     const t = setTimeout(() => c.abort(), ms);
     const { timeout: _drop, ...rest } = o || {};
     return fetch(u, { ...rest, signal: c.signal }).finally(() => clearTimeout(t))
-      .catch(e => { if (e && e.name === 'AbortError') throw new Error('请求超时，请重试'); throw e; });
+      .catch(e => {
+        if (e && e.name === 'AbortError') throw new Error('请求超时（' + ms + 'ms），请重试');
+        // 网络层失败（DNS/TCP/TLS/隧道断）：翻译成人话，避免原始 "TypeError: fetch failed" 让用户看不懂
+        throw new Error('无法连接到看板服务：' + (e && e.message ? e.message : '网络异常') + '。请检查：①公网隧道（Cloudflare）是否在线；②本地 DNS 解析是否正常；③浏览器是否禁用第三方请求');
+      });
   };
   let r = await fetchT(API + path, { ...opts, method, headers });
   // 未登录 / 会话失效 → 弹登录框，成功后重试一次（演示模式免登录不弹）
@@ -2472,7 +2476,9 @@ async function doUpgrade() {
     const r = await api('/admin/upgrade/confirm', { method: 'POST', body: JSON.stringify({ token: pre.token }) });
     if (!r || !r.ok || !r.taskId) {
       setBar(null);
-      setStatus('启动升级失败：' + ((r && r.error) || '未知错误'), '#E0241B');
+      // 后端 r.error 已自描述（含"升级失败"前缀），前端不再重复拼接
+      setStatus((r && r.error) || '启动升级失败（未知错误）', '#E0241B');
+      toast((r && r.error) || '启动升级失败');
       return;
     }
     const taskId = r.taskId;
@@ -2509,7 +2515,9 @@ async function doUpgrade() {
   } catch (e) {
     stopPoll();
     setBar(null);
-    setStatus('升级出错：' + ((e && e.message) || e), '#E0241B');
+    // 不重复「升级失败：」前缀；原始 e.message 已自描述（前端网络失败/api() 已翻译为可读中文）
+    setStatus('升级出错：' + ((e && e.message) || String(e)), '#E0241B');
+    toast('升级出错：' + ((e && e.message) || '请重试'));
   }
 }
 const _verUpgrade = document.getElementById('verUpgrade');
