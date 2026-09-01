@@ -30,13 +30,12 @@ ok('未知周期返回 null', shiftByRecurrence('2026-01-01', 'yearly') === null
 ok('null 返回 null', shiftByRecurrence(null, 'weekly') === null);
 
 // --- spawnNextRecurrence：字段继承 + 日期顺延 ---
-const base = { recurrence: 'weekly', title: '周报', phaseId: 'p1', note: 'n', estimateDays: 3, assignee: 'a', isMilestone: true, startDate: '2026-01-01', dueDate: '2026-01-07', done: true };
+const base = { recurrence: 'weekly', title: '周报', phaseId: 'p1', note: 'n', estimateDays: 3, assignee: 'a', startDate: '2026-01-01', dueDate: '2026-01-07', done: true };
 const sp = spawnNextRecurrence(base);
 ok('spawn 继承标题', sp && sp.title === '周报');
 ok('spawn 继承阶段', sp && sp.phaseId === 'p1');
 ok('spawn 继承负责人', sp && sp.assignee === 'a');
 ok('spawn 继承工期', sp && sp.estimateDays === 3);
-ok('spawn 继承里程碑', sp && sp.isMilestone === true);
 ok('spawn dueDate 顺延 7 天', sp && sp.dueDate === '2026-01-14', sp && sp.dueDate);
 ok('spawn startDate 顺延 7 天', sp && sp.startDate === '2026-01-08', sp && sp.startDate);
 ok('spawn done=false', sp && sp.done === false);

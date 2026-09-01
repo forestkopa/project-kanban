@@ -22,3 +22,5 @@ public/brand-logo.png
 vendor/*.tgz
 # Obsidian vault 本地配置（主题/插件/偏好，不入库；内容笔记已由 docs/knowledge 管理）
 .obsidian/
+# 服务启动包装脚本的诊断日志（NSSM AppStdout/AppStderr，运行时产生）
+logs/

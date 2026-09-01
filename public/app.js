@@ -22,7 +22,7 @@ const ICON = {
 };
 const AVA_COLORS = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#ff453a', '#64d2ff', '#5e5ce6', '#ff375f', '#00c7be', '#a2845e'];
 function avaColor(n) { let h = 0; const s = String(n || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return AVA_COLORS[h % AVA_COLORS.length]; }
-let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null };
+let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null, todoRange: 'today', todoFilter: { overdueOnly: false, q: '' }, _jumpTaskId: null };
 try { const u = localStorage.getItem('kb-user'); if (u) state.user = JSON.parse(u); } catch (e) {}
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
@@ -232,16 +232,34 @@ function dayDiff(a, b) { return Math.round((parseD(a) - parseD(b)) / 86400000); 
 function phaseColor(p, t) { const ph = p.phases.find(x => x.id === t.phaseId); return ph ? ph.color : '#888'; }
 function TODAY() { return isoDate(new Date()); }
 
+function hideSplash() {
+  const s = document.getElementById('splash');
+  if (!s) return;
+  s.classList.add('hide');
+  setTimeout(() => s.remove(), 400);
+}
 async function loadAll() {
   try {
-    state.templates = await api('/templates');
-    state.projects = await api('/projects');
-    try { state.options = await api('/options'); } catch (e) { state.options = null; }
-    try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
+    // 4 个初始化请求并行（原串行 4×RTT）：公网隧道下省掉明显等待
+    const [tpls, projs, opts, ro] = await Promise.all([
+      api('/templates'),
+      api('/projects'),
+      api('/options').catch(() => null),
+      api('/readonly').catch(() => null),
+    ]);
+    state.templates = tpls;
+    state.projects = projs;
+    state.options = opts;
+    if (ro) {
+      state.readonly = !!(ro && ro.on);
+      state.demo = !!(ro && ro.demo);
+      if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); }
+    }
     updateUserUI();
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
   render();
+  hideSplash();                              /* 首屏遮罩淡出（消除白屏等待感） */
   maybeAutoGuide();                          /* 首次使用引导（P1-12） */
   if (!state._remindShown) { state._remindShown = true; setTimeout(dueReminder, 1400); } /* 到期提醒（P0-4），只在本次会话首次加载提示 */
 }
@@ -250,11 +268,11 @@ function render() {
   renderSidebar();
   const p = proj();
   $$('.tab').forEach(b => { const on = b.dataset.view === state.view; b.classList.toggle('active', on); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
-  const secMap = { board: 'board', gantt: 'gantt', calendar: 'calendar', panorama: 'panorama', daily: 'report', weekly: 'report', monthly: 'monthly', summary: 'summary' };
-  ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly', 'summary'].forEach(id => $('#' + id).classList.add('hidden'));
+  const secMap = { board: 'board', gantt: 'gantt', calendar: 'calendar', panorama: 'panorama', daily: 'report', weekly: 'report', monthly: 'monthly', summary: 'summary', todos: 'todos' };
+  ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly', 'summary', 'todos'].forEach(id => $('#' + id).classList.add('hidden'));
   if (secMap[state.view]) $('#' + secMap[state.view]).classList.remove('hidden');
   $('#viewActions').innerHTML = '';
-  const globalViews = ['daily', 'weekly', 'monthly', 'panorama', 'summary'];
+  const globalViews = ['daily', 'weekly', 'monthly', 'panorama', 'summary', 'todos'];
   if (!p && !globalViews.includes(state.view)) {
     $('#projTitle').innerHTML = '<span class="muted">未选择项目</span>';
     $('#projMeta').innerHTML = '';
@@ -285,6 +303,7 @@ function render() {
   else if (state.view === 'panorama') renderPanorama();
   else if (state.view === 'monthly') renderMonthly();
   else if (state.view === 'summary') renderSummary();
+  else if (state.view === 'todos') buildTodos();
   else renderReport();
   $('#stats').style.display = (state.view === 'board') ? 'flex' : 'none';
   updateIOState();
@@ -453,6 +472,12 @@ function renderBoard(p) {
   });
   /* 移除已删除的阶段列 */
   [...board.querySelectorAll('.col')].forEach(col => { if (!keepCols.has(col.dataset.phase)) col.remove(); });
+  /* 待办页跳转过来的任务：滚动居中并高亮定位（P0-4 待办→看板） */
+  if (state._jumpTaskId) {
+    const je = board.querySelector(`.card[data-id="${cssEsc(state._jumpTaskId)}"]`);
+    if (je) { je.scrollIntoView({ block: 'center', behavior: 'smooth' }); je.classList.add('card-flash'); setTimeout(() => je.classList.remove('card-flash'), 1600); }
+    state._jumpTaskId = null;
+  }
 }
 
 /* CSS 选择器转义（id 里可能含特殊字符） */
@@ -1226,7 +1251,7 @@ function dueReminder() {
   if (firstPid) {
     const b = document.createElement('button');
     b.className = 'toast-undo'; b.textContent = '查看';
-    b.onclick = () => { state.currentId = firstPid; state.view = 'board'; render(); t.classList.add('hidden'); };
+    b.onclick = () => { state.view = 'todos'; render(); t.classList.add('hidden'); };
     t.appendChild(b);
   }
   t.classList.remove('hidden');
@@ -1616,10 +1641,9 @@ function emptyDonut() {
 function renderPanorama() {
   const active = state.projects.filter(p => (p.status || 'active') !== 'archived');
   const archived = state.projects.filter(p => (p.status || 'active') === 'archived');
-  let totDone = 0, totTasks = 0, overdue = 0, weekMs = 0;
+  let totDone = 0, totTasks = 0, overdue = 0;
   active.forEach(p => {
     const s = projStats(p); totDone += s.done; totTasks += s.total; overdue += s.overdue;
-    (p.tasks || []).forEach(t => { if (t.isMilestone && t.dueDate) { const dd = dayDiff(t.dueDate, TODAY()); if (dd >= 0 && dd <= 7) weekMs++; } });
   });
   const prog = totTasks ? Math.round(totDone / totTasks * 100) : (archived.length ? 100 : 0);
   $('#panorama').innerHTML = `
@@ -1633,7 +1657,6 @@ function renderPanorama() {
       <div class="kpi"><div class="kpi-l">进行中项目</div><div class="kpi-v">${active.length}</div></div>
       <div class="kpi"><div class="kpi-l">已归档项目</div><div class="kpi-v">${archived.length}</div></div>
       <div class="kpi"><div class="kpi-l">逾期节点</div><div class="kpi-v ${overdue ? 'warn' : 'good'}">${overdue}</div></div>
-      <div class="kpi"><div class="kpi-l">本周里程碑</div><div class="kpi-v">${weekMs}</div></div>
     </div>
     <div class="pano-grid">
       <div class="ptile span2" data-tile="pipe">
@@ -1884,7 +1907,6 @@ function buildPhaseSwim(box, mode) {
         if (mode === 'daily') n = phTasks.filter(t => t.dueDate === refD || (!t.done && t.startDate && t.startDate <= refD && (!t.dueDate || t.dueDate >= refD))).length;
         else n = phTasks.filter(t => t.dueDate && t.dueDate >= mI && t.dueDate <= sI).length;
         if (n) sub += ` · ${mode === 'daily' ? '今日' : '本周'} ${n}`;
-        if (phTasks.some(t => t.isMilestone)) sub += ' · ⚑';
         cells += `<div class="sw-col"><div class="sw-pos" style="background:${ph.color}"><b>${esc(p.name)}</b><small>${sub}</small></div></div>`;
       } else {
         const prog = phTasks.length ? Math.round(doneCnt / phTasks.length * 100) : 0;
@@ -1931,12 +1953,11 @@ function buildDaily(wrap) {
     </div>
     <div class="report-wrap">
       <div class="ptile span2" style="padding:20px 22px">
-        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 今日任务数 / 里程碑</span></h4>
+        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 今日任务数</span></h4>
         <div id="swimBox"></div>
         <div class="sw-legend">
           <span><i style="background:#0a84ff"></i>当前阶段色块（按阶段着色）</span>
           <span><i style="background:var(--accent)"></i>已完成项目</span>
-          <span>⚑ 里程碑</span>
         </div>
       </div>
     </div>`;
@@ -1949,30 +1970,11 @@ function buildWeekly(wrap) {
   const { mon, days } = weekRange(state.weekDate);
   const monIso = isoDate(mon), sunIso = isoDate(days[6]);
   const projs = reportProjects('weekly');
-  let wkTotal = 0, wkDone = 0, wkMs = 0;
+  let wkTotal = 0, wkDone = 0;
   projs.forEach(p => (p.tasks || []).forEach(t => {
-    if (t.dueDate && t.dueDate >= monIso && t.dueDate <= sunIso) { wkTotal++; if (t.done) wkDone++; if (t.isMilestone) wkMs++; }
+    if (t.dueDate && t.dueDate >= monIso && t.dueDate <= sunIso) { wkTotal++; if (t.done) wkDone++; }
   }));
-  // 待完成项目清单：本周内未完成的任务（与本周有交集），按项目分组、逾期优先
-  const fmtMD = s => s ? s.slice(5).replace('-', '/') : '';
-  const todoRows = [];
-  projs.forEach(p => {
-    const list = (p.tasks || []).filter(t => {
-      if (t.done) return false;
-      const s = t.startDate ? parseD(t.startDate) : null;
-      const d = t.dueDate ? parseD(t.dueDate) : null;
-      return (!s || s <= days[6]) && (!d || d >= mon);
-    }).map(t => ({ ...t, overdue: t.dueDate && t.dueDate < monIso }));
-    if (list.length) todoRows.push({ p, list });
-  });
-  todoRows.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
-  const todoTotal = todoRows.reduce((a, r) => a + r.list.length, 0);
-  const todoOverdue = todoRows.reduce((a, r) => a + r.list.filter(t => t.overdue).length, 0);
-  const todoHtml = todoRows.length ? todoRows.map(({ p, list }) => `
-      <div class="todo-proj">
-        <div class="todo-proj-h"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}<span class="todo-cnt">${list.length}</span></div>
-        ${list.map(t => `<div class="todo-t"><span class="todo-chk">□</span>${esc(t.title)}${t.isMilestone ? ' <span class="todo-ms">⚑</span>' : ''}${t.estimateDays ? `<span class="todo-days">${t.estimateDays}天</span>` : ''}<span class="todo-date">${fmtMD(t.startDate)} ~ ${fmtMD(t.dueDate)}${t.overdue ? ' <b class="todo-warn">⚠逾期</b>' : ''}</span></div>`).join('')}
-      </div>`).join('') : '<div class="todo-empty">🎉 本周没有待完成任务</div>';
+  // 待完成清单已迁至「待办」页（见 buildTodos）
   wrap.innerHTML = `
     <div class="report-hero">
       <div class="eyebrow">Weekly Report</div>
@@ -1990,50 +1992,210 @@ function buildWeekly(wrap) {
     <div class="pano-kpis">
       <div class="kpi"><div class="kpi-l">本周任务</div><div class="kpi-v">${wkTotal}</div></div>
       <div class="kpi"><div class="kpi-l">本周完成</div><div class="kpi-v good">${wkDone}</div></div>
-      <div class="kpi"><div class="kpi-l">本周里程碑</div><div class="kpi-v">${wkMs}</div></div>
       <div class="kpi"><div class="kpi-l">涉及项目</div><div class="kpi-v">${projs.length}</div></div>
     </div>
     <div class="report-wrap">
       <div class="ptile span2" style="padding:20px 22px">
-        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 本周任务数 / 里程碑</span></h4>
+        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 本周任务数</span></h4>
         <div id="swimBox"></div>
         <div class="sw-legend">
           <span><i style="background:#0a84ff"></i>当前阶段色块（按阶段着色）</span>
           <span><i style="background:var(--accent)"></i>已完成项目</span>
-          <span>⚑ 里程碑</span>
         </div>
       </div>
-      <div class="ptile span2" style="padding:20px 22px">
-        <h4 class="tile-head"><span>待完成项目清单 <em class="ted">本周内未完成的任务 · 按项目分组 · 逾期优先</em></span><button class="btn" id="todoExportBtn" title="导出本周待办清单为 Excel">${ICON.download} 导出 Excel</button></h4>
-        <div class="todo-list">
-          <div class="todo-kpis"><span>涉及项目 <b>${todoRows.length}</b></span><span>本周待完成 <b>${todoTotal}</b></span><span class="todo-warn">已逾期 <b>${todoOverdue}</b></span></div>
-          ${todoHtml}
-        </div>
-      </div>
+      <!-- 待完成清单已迁至「待办」页（buildTodos） -->
     </div>`;
   $('#wpPrev').onclick = () => { const x = new Date(state.weekDate); x.setDate(x.getDate() - 7); state.weekDate = x; renderReport(); };
   $('#wpNext').onclick = () => { const x = new Date(state.weekDate); x.setDate(x.getDate() + 7); state.weekDate = x; renderReport(); };
   $('#wpThis').onclick = () => { state.weekDate = new Date(); renderReport(); };
-  const eb = $('#todoExportBtn'); if (eb) eb.onclick = downloadTodoExcel;
+  // 本周待办导出已迁至「待办」页（buildTodos 内重新绑定 #todoExportBtn）
   buildPhaseSwim($('#swimBox'), 'weekly');
 }
-async function downloadTodoExcel() {
-  const { mon, days } = weekRange(state.weekDate);
-  const projs = reportProjects('weekly');
-  if (!projs.length) { toast('本周没有可导出的项目'); return; }
+// 待办导出：按 range 切日/周/月,带 X-Auth-Token,401 自动重登录
+async function downloadTodoExcel(range) {
+  const kind = range || 'week';
   try {
-    const r = await fetch('/api/reports/todo-export', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projects: projs, mon: isoDate(mon), sun: isoDate(days[6]) })
+    // 按 range 计算日期范围（前端用 collectTodos 已过滤的 tasks,故范围用于后端文件命名/二次过滤）
+    const today = TODAY();
+    let monIso = today, sunIso = today;
+    if (kind === 'week') { const { mon, days } = weekRange(state.weekDate || new Date()); monIso = isoDate(mon); sunIso = isoDate(days[6]); }
+    else if (kind === 'month') { const d = state.monthlyDate || new Date(); monIso = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); sunIso = isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+    // 前端按 collectTodos(kind) 预过滤（保持与待办页语义一致：逾期 + 周期内到期）
+    const rows = collectTodos(kind);
+    if (!rows.length) { toast((kind === 'today' ? '今天' : kind === 'week' ? '本周' : '本月') + '没有可导出的待办任务'); return; }
+    const projects = rows.map(({ p, list }) => ({ id: p.id, name: p.name, color: p.color, owner: p.owner, tasks: list.map(t => ({
+      id: t.id, title: t.title, done: !!t.done,
+      startDate: t.startDate, dueDate: t.dueDate, estimateDays: t.estimateDays || 0,
+      overdue: !!t.overdue, phaseId: t.phaseId, phaseName: t.phaseName || ''
+    })) }));
+    const r = await fetch(API + '/reports/todo-export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+      body: JSON.stringify({ kind, range: { mon: monIso, sun: sunIso }, projects })
     });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status); }
+    if (r.status === 401 && !state.demo) { const ok = await showLogin(); if (ok) return downloadTodoExcel(kind); throw new Error('未登录'); }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     const blob = await r.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = '周报待办清单.xlsx';
+    const nameMap = { today: '今日待办_', week: '周报待办清单_', month: '本月待办_' };
+    a.download = nameMap[kind] + today.replace(/-/g, '') + '.xlsx';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  } catch (err) { toast('导出失败：' + err.message); }
+    toast('已导出 ' + a.download);
+  } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
+}
+
+/* ---------- 待办页（P0-4）：今日 / 本周 / 本月未完成任务，按项目分组、逾期优先、点击直接编辑 ---------- */
+function collectTodos(range) {
+  const today = TODAY();
+  const f = state.todoFilter || {};
+  const q = (f.q || '').trim().toLowerCase();
+  const ref = { monIso: null, sunIso: null, moFirstIso: null, moEndIso: null };
+  if (range === 'week') {
+    const { mon, days } = weekRange(state.weekDate || new Date());
+    ref.monIso = isoDate(mon); ref.sunIso = isoDate(days[6]);
+  } else if (range === 'month') {
+    const d = state.monthlyDate || new Date();
+    const y = d.getFullYear(), mo = d.getMonth();
+    ref.moFirstIso = isoDate(new Date(y, mo, 1)); ref.moEndIso = isoDate(new Date(y, mo + 1, 0));
+  }
+  const base = range === 'today' ? today : (range === 'week' ? ref.monIso : ref.moFirstIso);
+  const rows = [];
+  activeProjects().forEach(p => {
+    let list = (p.tasks || []).filter(t => {
+      if (t.done || !t.dueDate) return false;
+      if (range === 'today') { if (!(t.dueDate <= today)) return false; }          // 逾期 + 今天到期
+      else if (range === 'week') { if (!(t.dueDate <= ref.sunIso)) return false; }   // 逾期 + 本周(周一~周日)内到期
+      else { if (!(t.dueDate <= ref.moEndIso)) return false; }                       // 逾期 + 本月内到期
+      // 过滤（C）：仅逾期 / 关键词（任务标题或项目名任一包含）
+      if (f.overdueOnly && !(t.dueDate < base)) return false;
+      if (q && !(t.title || '').toLowerCase().includes(q) && !(p.name || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+    if (!list.length) return;
+    list = list.map(t => ({ ...t, overdue: t.dueDate < base }))
+              .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));   // 项目内按到期日升序（逾期最早最前）（B）
+    rows.push({ p, list });
+  });
+  rows.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
+  return rows;
+}
+function buildTodos() {
+  const wrap = $('#todos');
+  const range = state.todoRange || 'today';
+  const f = state.todoFilter || {};
+  const titleMap = { today: '今日待办', week: '本周待办', month: '本月待办' };
+  const subMap = { today: '逾期 + 今天到期', week: '逾期 + 本周(周一~周日)内到期', month: '逾期 + 本月内到期' };
+  wrap.innerHTML = `
+    <div class="report-hero">
+      <div class="eyebrow">To-Do</div>
+      <h1 class="pano-title">我的待办</h1>
+      <p class="pano-sub">未完成任务 · 按项目分组 · 逾期优先 · 点击任务跳转至对应项目看板</p>
+    </div>
+    <div class="todo-bar">
+      <div class="todo-tabs">
+        <button class="todo-tab${range === 'today' ? ' active' : ''}" data-range="today">今日</button>
+        <button class="todo-tab${range === 'week' ? ' active' : ''}" data-range="week">本周</button>
+        <button class="todo-tab${range === 'month' ? ' active' : ''}" data-range="month">本月</button>
+      </div>
+      <div class="todo-filters">
+        <label class="tf"><input type="checkbox" id="tfOverdue"${f.overdueOnly ? ' checked' : ''}> 仅逾期</label>
+        <input class="tf-q" id="tfQ" placeholder="搜索项目 / 任务…" value="${esc(f.q || '')}">
+        <button class="btn todo-export" id="todoExportBtn" title="导出待办清单为 Excel（日/周/月可选）">${ICON.download} 导出</button>
+      </div>
+    </div>
+    <div class="report-wrap">
+      <div class="ptile span2" style="padding:20px 22px">
+        <h4 class="tile-head"><span>${titleMap[range]} <em class="ted">${subMap[range]}</em></span></h4>
+        <div class="todo-list" id="todoList"></div>
+      </div>
+    </div>`;
+  renderTodoList();
+  // 事件委托（wrap 元素持久，innerHTML 重建不影响绑定）
+  wrap.onclick = (e) => {
+    const tab = e.target.closest('.todo-tab');
+    if (tab) { state.todoRange = tab.dataset.range; buildTodos(); return; }   // 切换 tab（A）：只渲染当前段，去重
+    if (e.target.closest('#todoExportBtn')) { openExportModal(); return; }    // 独立导出功能键 → 弹模态框选范围
+    const ph = e.target.closest('.todo-proj-h');
+    if (ph) {                                                                 // 分组折叠（B）：持久化到 localStorage
+      const box = ph.closest('.todo-proj');
+      const on = box.classList.toggle('collapsed');
+      const ck = 'kb-todo-collapse-' + range + '-' + ph.dataset.toggle;
+      try { localStorage.setItem(ck, on ? '1' : '0'); } catch (err) {}
+      const caret = ph.querySelector('.todo-caret'); if (caret) caret.textContent = on ? '▸' : '▾';
+      return;
+    }
+    const tt = e.target.closest('.todo-t');                                    // 点击任务 -> 跳转对应项目看板并定位
+    if (tt) {
+      const p = state.projects.find(x => x.id === tt.dataset.pid);
+      const t = p && (p.tasks || []).find(x => x.id === tt.dataset.tid);
+      if (!p || !t) return;
+      state.currentId = p.id;          // 切到该任务所属项目
+      state._jumpTaskId = t.id;        // 看板打开后滚动居中并高亮该任务
+      state.view = 'board';            // 跳转至对应项目看板
+      render();
+    }
+  };
+  wrap.onchange = (e) => {                                                     // 过滤开关（C）：整体重渲
+    if (e.target.id === 'tfOverdue') { state.todoFilter.overdueOnly = e.target.checked; buildTodos(); }
+  };
+  wrap.oninput = (e) => {                                                      // 搜索（C）：仅局部刷新，保持搜索框焦点
+    if (e.target.id === 'tfQ') { state.todoFilter.q = e.target.value; renderTodoList(); }
+  };
+}
+// 导出模态框：日/周/月三选一,显示 preview(任务数/项目数),确认调 downloadTodoExcel
+function openExportModal() {
+  const counts = {};
+  let total = 0;
+  ['today', 'week', 'month'].forEach(k => {
+    const rows = collectTodos(k);
+    const n = rows.reduce((a, r) => a + r.list.length, 0);
+    counts[k] = { tasks: n, projs: rows.length };
+    total += n;
+  });
+  const titleMap = { today: '今日待办', week: '本周待办', month: '本月待办' };
+  const opt = (k) => `<label class="exp-opt"><input type="radio" name="expRange" value="${k}"${k === 'week' ? ' checked' : ''}><span class="exp-name">${titleMap[k]}</span><span class="exp-meta">${counts[k].tasks} 个任务 · 涉及 ${counts[k].projs} 个项目</span></label>`;
+  const m = $('#exportModal');
+  m.innerHTML = `
+    <div class="modal-box" style="width:min(420px,92vw)">
+      <div class="modal-head"><h3>${ICON.download} 导出待办清单</h3><button class="x" data-close>×</button></div>
+      <p class="pi-sub" style="margin:0 0 14px">选择导出的时间范围（共 ${total} 个未完成任务可导出）</p>
+      <div class="exp-opts">${opt('today')}${opt('week')}${opt('month')}</div>
+      <div class="modal-acts" style="margin-top:18px">
+        <button class="btn" data-close>取消</button>
+        <button class="btn primary" id="expOk">${ICON.download} 导出 Excel</button>
+      </div>
+    </div>`;
+  m.classList.remove('hidden');
+  m.querySelectorAll('[data-close]').forEach(el => el.onclick = () => m.classList.add('hidden'));
+  $('#expOk').onclick = () => {
+    const k = (m.querySelector('input[name="expRange"]:checked') || {}).value || 'week';
+    m.classList.add('hidden');
+    downloadTodoExcel(k);
+  };
+}
+function renderTodoList() {
+  const range = state.todoRange || 'today';
+  const el = $('#todoList'); if (!el) return;
+  const rows = collectTodos(range);
+  const fmtMD = s => s ? s.slice(5).replace('-', '/') : '';
+  const total = rows.reduce((a, r) => a + r.list.length, 0);
+  const over = rows.reduce((a, r) => a + r.list.filter(t => t.overdue).length, 0);
+  const listHtml = rows.length ? rows.map(({ p, list }) => {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem('kb-todo-collapse-' + range + '-' + p.id) === '1'; } catch (e) {}
+    return `
+      <div class="todo-proj${collapsed ? ' collapsed' : ''}" data-pid="${p.id}" style="--pc:${p.color}">
+        <div class="todo-proj-h" data-toggle="${p.id}"><span class="todo-caret">${collapsed ? '▸' : '▾'}</span><span class="dot" style="background:${p.color}"></span><span class="pname">${esc(p.name)}</span><span class="todo-cnt">${list.length}</span></div>
+        <div class="todo-tasks">
+          ${list.map(t => `<div class="todo-t${t.overdue ? ' over' : ''}" data-pid="${p.id}" data-tid="${t.id}"><span class="todo-dot ${t.overdue ? 'over' : ''}"></span><span class="todo-tt">${esc(t.title)}${t.estimateDays ? ` <span class="todo-days">${t.estimateDays}天</span>` : ''}</span><span class="todo-due">${fmtMD(t.startDate)} ~ ${fmtMD(t.dueDate)}${t.overdue ? ' ⚠' : ''}</span><span class="todo-go">看板↗</span></div>`).join('')}
+        </div>
+      </div>`;
+  }).join('') : '<div class="todo-empty">🎉 ' + (range === 'today' ? '今天没有待办' : '本' + (range === 'week' ? '周' : '月') + '没有待完成任务') + '</div>';
+  el.innerHTML = `
+    <div class="todo-kpis"><span>涉及项目 <b>${rows.length}</b></span><span>待完成 <b>${total}</b></span><span class="todo-warn">已逾期 <b>${over}</b></span></div>
+    ${listHtml}`;
 }
 
 /* ---------- 月度计划：本月内「试产发布」的项目 + 勾选纳入计划 ---------- */

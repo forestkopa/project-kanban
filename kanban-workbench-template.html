@@ -488,7 +488,6 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .todo-t { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 0; border-top: 1px dashed var(--border); overflow: hidden; }
 .todo-t:first-of-type { border-top: none; }
 .todo-chk { color: var(--text-3); flex: none; }
-.todo-ms { font-size: 10.5px; flex: none; }
 .todo-days { color: var(--text-3); font-size: 10.5px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 5px; flex: none; }
 .todo-date { color: var(--text-3); font-size: 11px; margin-left: auto; white-space: nowrap; flex: none; }
 .todo-warn { color: var(--danger-strong); }
@@ -931,7 +930,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
     return {
       id: id, title: title, note: '', phaseId: phaseId, done: !!done,
       startDate: start || '', dueDate: due || '', assignee: who || '',
-      estimateDays: est || 0, isMilestone: !!ms
+      estimateDays: est || 0
     };
   }
 
@@ -1132,7 +1131,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
       var name = (body && body.filename) || '导入项目';
       var arr = Array.isArray(data) ? data : [];
       var np = mkProject({ id: uid('prj'), name: name, tasks: arr.map(function (t, i) {
-        return task(uid('t'), t.title || ('任务' + (i + 1)), t.phaseId || 'p2', !!t.done, t.startDate || '', t.dueDate || '', t.assignee || '', Number(t.estimateDays) || 0, !!t.isMilestone);
+        return task(uid('t'), t.title || ('任务' + (i + 1)), t.phaseId || 'p2', !!t.done, t.startDate || '', t.dueDate || '', t.assignee || '', Number(t.estimateDays) || 0);
       }) });
       saveProjects(projects().concat([np])); return res(np);
     }
@@ -1144,7 +1143,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
       if (method === 'DELETE') { pj.tasks = pj.tasks.filter(function (x) { return x.id !== tmt[2]; }); saveProjects(arrT); return res({}, 204); }
       if (method === 'PUT') {
         var tk = pj.tasks.filter(function (x) { return x.id === tmt[2]; })[0]; if (!tk) return res({ error: 'task not found' }, 404);
-        ['title', 'note', 'phaseId', 'done', 'assignee', 'estimateDays', 'startDate', 'dueDate', 'isMilestone'].forEach(function (f) {
+        ['title', 'note', 'phaseId', 'done', 'assignee', 'estimateDays', 'startDate', 'dueDate'].forEach(function (f) {
           if (body && body[f] !== undefined) tk[f] = body[f];
         });
         saveProjects(arrT); return res(tk);

@@ -39,7 +39,7 @@ ok('buildPlanXlsx 转义 note 前导 +', f1.includes("'+note"), f1.slice(0, 120)
 const buf2 = buildDiffXlsx(proj);
 ok('buildDiffXlsx 返回 Buffer', Buffer.isBuffer(buf2) && buf2.length > 0);
 
-const buf3 = buildTodoXlsx([{ name: '=项目A', tasks: [{ title: '=x', isMilestone: false, done: false, startDate: '2026-01-01', dueDate: '2026-01-07' }] }], '2026-01-01', '2026-01-07');
+const buf3 = buildTodoXlsx([{ name: '=项目A', tasks: [{ title: '=x', done: false, startDate: '2026-01-01', dueDate: '2026-01-07' }] }], '2026-01-01', '2026-01-07');
 ok('buildTodoXlsx 返回 Buffer', Buffer.isBuffer(buf3) && buf3.length > 0);
 const f3 = flat(buf3);
 ok('buildTodoXlsx 转义 title 前导 =', f3.includes("'=x"), f3.slice(0, 120));

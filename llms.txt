@@ -20,6 +20,9 @@
 - docs/knowledge/11-服务器部署实战与知识库接入.md — 服务器一键部署实战(NSSM 幂等/隧道蓝绿切换)与 Obsidian 知识库接入 + wiki-lint/wiki-update 技能适配
 - docs/knowledge/12-大赛投递与工作台模板链接.md — 用 WorkBuddy 资料库 page 发布工作台模板展示页、生成公开分享链接(import_html+publish_page)的方法,用于大赛投递
 - docs/knowledge/13-测试隔离与KB_DATA_DIR.md — KB_DATA_DIR 环境变量让 server 指向独立临时数据目录；测试自起隔离实例绕过 P1-8 强制改密闸门，零污染真实部署
+- docs/knowledge/14-待办页与日期区间语义.md — 独立「待办」页：点击任务跳转对应项目看板并高亮定位、日期用到期日区间(非重叠区间避下月串入本周)；v1.4.3 优化：tab 去重切换 + 分组折叠(localStorage) + 项目内按到期日排序 + 过滤/搜索(局部刷新保焦点)；美观改版(项目色左条/状态点/到期胶囊/.card-flash)
+- docs/knowledge/15-首屏加载优化.md — 首屏白屏等待修复：index.html 内联 splash 遮罩(消除白屏)+ loadAll 串行改 Promise.all 并行省 3×RTT(公网隧道收益最大)；app.js script 须在 splash 之后否则 hideSplash 拿不到元素
+- docs/knowledge/16-待办导出独立功能键与鉴权坑.md — 导出独立成功能键(日/周/月模态框三选一)+ 顺手修 401 bug:裸 fetch 漏传 X-Auth-Token
 
 ## 其它文档
 

@@ -71,7 +71,6 @@ function init(file) {
       estimate_days INTEGER DEFAULT 0,
       assignee TEXT DEFAULT '',
       done INTEGER DEFAULT 0,
-      is_milestone INTEGER DEFAULT 0,
       start_date TEXT, due_date TEXT,
       excel_row INTEGER, start_f TEXT, due_f TEXT,
       start_rule_json TEXT, due_rule_json TEXT,
@@ -210,7 +209,7 @@ function rowToProj(r, prePhases, preTasks) {
     .map(p => ({ id: p.id, name: p.name, color: p.color }));
   const tasks = (preTasks !== undefined ? preTasks : db.prepare('SELECT * FROM tasks WHERE project_id=? ORDER BY seq').all(r.id)).map(t => ({
     id: t.id, title: t.title, phaseId: t.phase_id, note: t.note, estimateDays: t.estimate_days,
-    assignee: t.assignee, done: !!t.done, isMilestone: !!t.is_milestone,
+    assignee: t.assignee, done: !!t.done,
     startDate: t.start_date, dueDate: t.due_date,
     excelRow: t.excel_row ?? undefined, startF: t.start_f ?? undefined, dueF: t.due_f ?? undefined,
     startRule: t.start_rule_json ? JSON.parse(t.start_rule_json) : undefined,
@@ -250,11 +249,11 @@ function saveProject(proj, userId) {
     db.prepare('DELETE FROM tasks WHERE project_id=?').run(proj.id);
     (proj.phases || []).forEach((ph, i) => db.prepare('INSERT INTO phases (project_id,id,name,color,seq) VALUES (?,?,?,?,?)')
       .run(proj.id, ph.id, ph.name || ('阶段' + (i + 1)), ph.color || '#0a84ff', i));
-    const insT = db.prepare(`INSERT INTO tasks (id,project_id,title,phase_id,note,estimate_days,assignee,done,is_milestone,start_date,due_date,excel_row,start_f,due_f,start_rule_json,due_rule_json,recurrence,seq)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const insT = db.prepare(`INSERT INTO tasks (id,project_id,title,phase_id,note,estimate_days,assignee,done,start_date,due_date,excel_row,start_f,due_f,start_rule_json,due_rule_json,recurrence,seq)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     (proj.tasks || []).forEach((t, i) => insT.run(
       t.id, proj.id, t.title || '', t.phaseId || null, t.note || '', t.estimateDays || 0, t.assignee || '',
-      t.done ? 1 : 0, t.isMilestone ? 1 : 0, t.startDate || null, t.dueDate || null,
+      t.done ? 1 : 0, t.startDate || null, t.dueDate || null,
       t.excelRow ?? null, t.startF || null, t.dueF || null,
       t.startRule ? JSON.stringify(t.startRule) : null, t.dueRule ? JSON.stringify(t.dueRule) : null,
       t.recurrence || '', i));

@@ -584,7 +584,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     // 最小鉴权：写操作必须登录（GET 查询不受限，projects 列表在路由内另行校验登录）
-    if (req.method !== 'GET' && !authorized(req)) {
+    // 待办导出为「前端已算好的数据 → 服务端排版成 xlsx」的纯 transform，不读服务端数据/不写库，免鉴权（与 /api/readonly 同列）
+    const PUBLIC_POST = ['/api/reports/todo-export'];
+    if (req.method !== 'GET' && !PUBLIC_POST.includes(p) && !authorized(req)) {
       return send(res, 401, { error: '未授权：请先登录（X-Auth-Token）' });
     }
     // viewer 只读：任何写操作一律拒绝（含项目/任务/选项/AI/用户）
@@ -796,15 +798,22 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return send(res, 400, { error: '解析参考模版失败: ' + e.message }); }
     }
 
-    // 周报待办清单导出（带样式 xlsx）
+    // 待办清单导出（带样式 xlsx）：按 kind 区分文件名,projects 由前端按 range 预过滤
     if (p === '/api/reports/todo-export' && req.method === 'POST') {
       const body = await readBody(req);
       if (!Array.isArray(body.projects)) return send(res, 400, { error: '缺少项目数据' });
-      const monIso = body.mon || isoDate(new Date()), sunIso = body.sun || monIso;
-      const buf = buildTodoXlsx(body.projects, monIso, sunIso);
-      const date = isoDate(new Date()).replace(/-/g, '');
-      const ascii = 'weekly_todo_' + date + '.xlsx';
-      const utf8 = '周报待办清单_' + date + '.xlsx';
+      const kind = body.kind === 'today' ? 'today' : body.kind === 'month' ? 'month' : 'week';
+      const today = isoDate(new Date());
+      const range = body.range || {};
+      const monIso = range.mon || today, sunIso = range.sun || monIso;
+      const buf = buildTodoXlsx(body.projects, monIso, sunIso, kind);
+      const date = today.replace(/-/g, '');
+      const fileMap = {
+        today: { ascii: 'daily_todo_' + date + '.xlsx', utf8: '今日待办_' + date + '.xlsx' },
+        week:  { ascii: 'weekly_todo_' + date + '.xlsx', utf8: '周报待办清单_' + date + '.xlsx' },
+        month: { ascii: 'monthly_todo_' + date + '.xlsx', utf8: '本月待办_' + date + '.xlsx' }
+      };
+      const { ascii, utf8 } = fileMap[kind];
       res.writeHead(200, {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`

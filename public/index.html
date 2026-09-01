@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="/style.css?v=@VER@">
 </head>
 <body>
+<div id="splash" role="status" aria-live="polite"><div class="sp"></div><div class="st">看板加载中…</div></div>
 <div id="roBanner" class="hidden">只读模式：当前仅可查看，修改已锁定</div>
 <aside id="sidebar">
   <div class="brand"><img id="brandLogo" class="logo" src="/wb-logo.png" alt="WorkBuddy" title="点击更换看板图标"><span id="appName" title="点击编辑看板名称">项目看板</span></div>
@@ -83,6 +84,7 @@
       <button class="tab" data-view="daily">日报</button>
       <button class="tab" data-view="weekly">周报</button>
       <button class="tab" data-view="monthly">月度计划</button>
+      <button class="tab" data-view="todos">待办</button>
       <button class="tab" data-view="summary"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16l3-3 3 3 5-6"/></svg>报告</button>
     </div>
     <div id="viewActions" class="view-actions"></div>
@@ -95,6 +97,7 @@
   <section id="report" class="view hidden"></section>
   <section id="monthly" class="view hidden"></section>
   <section id="summary" class="view hidden"></section>
+  <section id="todos" class="view hidden"></section>
 </main>
 
 <!-- 登录 -->
@@ -194,6 +197,9 @@
     <div id="tplGrid" class="tpl-grid"></div>
   </div>
 </div>
+
+<!-- 导出待办清单：日 / 周 / 月三选一 -->
+<div id="exportModal" class="modal hidden" role="dialog" aria-modal="true"></div>
 
 <!-- 项目信息：工程师 + 类型（选项可配置，可新增/编辑/删除） -->
 <div id="projInfoModal" class="modal hidden" role="dialog" aria-modal="true">

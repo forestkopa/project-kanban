@@ -34,7 +34,7 @@
     return {
       id: id, title: title, note: '', phaseId: phaseId, done: !!done,
       startDate: start || '', dueDate: due || '', assignee: who || '',
-      estimateDays: est || 0, isMilestone: !!ms
+      estimateDays: est || 0
     };
   }
 
@@ -235,7 +235,7 @@
       var name = (body && body.filename) || '导入项目';
       var arr = Array.isArray(data) ? data : [];
       var np = mkProject({ id: uid('prj'), name: name, tasks: arr.map(function (t, i) {
-        return task(uid('t'), t.title || ('任务' + (i + 1)), t.phaseId || 'p2', !!t.done, t.startDate || '', t.dueDate || '', t.assignee || '', Number(t.estimateDays) || 0, !!t.isMilestone);
+        return task(uid('t'), t.title || ('任务' + (i + 1)), t.phaseId || 'p2', !!t.done, t.startDate || '', t.dueDate || '', t.assignee || '', Number(t.estimateDays) || 0);
       }) });
       saveProjects(projects().concat([np])); return res(np);
     }
@@ -247,7 +247,7 @@
       if (method === 'DELETE') { pj.tasks = pj.tasks.filter(function (x) { return x.id !== tmt[2]; }); saveProjects(arrT); return res({}, 204); }
       if (method === 'PUT') {
         var tk = pj.tasks.filter(function (x) { return x.id === tmt[2]; })[0]; if (!tk) return res({ error: 'task not found' }, 404);
-        ['title', 'note', 'phaseId', 'done', 'assignee', 'estimateDays', 'startDate', 'dueDate', 'isMilestone'].forEach(function (f) {
+        ['title', 'note', 'phaseId', 'done', 'assignee', 'estimateDays', 'startDate', 'dueDate'].forEach(function (f) {
           if (body && body[f] !== undefined) tk[f] = body[f];
         });
         saveProjects(arrT); return res(tk);
