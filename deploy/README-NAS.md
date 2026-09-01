@@ -78,7 +78,7 @@ Windows 上的 config.yml 里 `credentials-file` 是 Windows 路径，**必须�
 tunnel: 2bbff070-ae42-4d5b-b846-744c999a2dfc
 credentials-file: /home/kanban/.cloudflared/2bbff070-ae42-4d5b-b846-744c999a2dfc.json
 ingress:
-  - service: http://localhost:5180
+  - service: http://localhost:5181
 ```
 
 ## 5. 安装 cloudflared + 三个服务

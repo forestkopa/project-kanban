@@ -2229,4 +2229,48 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
   });
 }
 
+/* ---------- 版本查看：本地版本 ↔ GitHub 最新 Release ---------- */
+function cmpVer(a, b) {
+  const pa = ('' + a).split('.').map(x => parseInt(x, 10) || 0);
+  const pb = ('' + b).split('.').map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+async function refreshVersion() {
+  try {
+    const v = await api('/version');
+    const badge = document.getElementById('verBadge');
+    if (badge) badge.textContent = 'v' + (v.version || '?') + (v.demo ? ' · demo' : '');
+  } catch (e) { /* 版本接口不可用则忽略 */ }
+}
+async function checkUpdate() {
+  const status = document.getElementById('verStatus');
+  if (status) status.textContent = '检查中…';
+  let local = '0.0.0';
+  try { const v = await api('/version'); local = v.version || '0.0.0'; } catch (e) {}
+  try {
+    // 经服务端代理（/api/latest-release）规避浏览器 CSP 对 api.github.com 的限制
+    const d = await api('/latest-release');
+    if (!d || !d.ok) throw new Error((d && d.error) || '无法获取最新版本');
+    const latest = d.version;
+    const cmp = cmpVer(local, latest);
+    if (cmp < 0) {
+      if (status) { status.innerHTML = '有更新 <b>v' + latest + '</b>（当前 v' + local + '）— 在开发机打包 update.zip 并部署'; status.style.color = '#E0241B'; }
+      toast('发现新版本 v' + latest);
+    } else if (cmp > 0) {
+      if (status) { status.textContent = '本地 v' + local + ' 高于 GitHub v' + latest + '（未发布）'; status.style.color = '#888'; }
+    } else {
+      if (status) { status.textContent = '已是最新（v' + latest + '）✓'; status.style.color = '#2f855a'; }
+      toast('已是最新版本 v' + latest);
+    }
+  } catch (e) {
+    if (status) { status.textContent = '无法连接 GitHub（离线或限流）'; status.style.color = '#888'; }
+  }
+}
+const _verCheck = document.getElementById('verCheck');
+if (_verCheck) _verCheck.addEventListener('click', checkUpdate);
 loadAll();
+refreshVersion();

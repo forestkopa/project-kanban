@@ -16,7 +16,7 @@ $Name = 'project-kanban'
 
 # dirs/files to exclude from BOTH packages
 $ExcludeDirs = @('.git', '.workbuddy', 'backups', 'deploy', 'data-backup*')
-$ExcludeFiles = @('*.log', '*.tmp', '*.new')
+$ExcludeFiles = @('*.log', '*.tmp', '*.new', '*.patch', '*.zip', 'config.yml')
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $tmp = Join-Path $env:TEMP ("kb-pack-" + [guid]::NewGuid().ToString('N'))
@@ -28,7 +28,12 @@ function New-Package {
   $xd = $ExcludeDirs
   if (-not $IncludeData) { $xd += 'data' }
   # robocopy: /E copy subdirs incl empty; /XD exclude dirs; /XF exclude files; /NFL /NDL /NJH /NJS quiet
-  & robocopy $Root $stage /E /XD $xd /XF $ExcludeFiles /NFL /NDL /NJH /NJS | Out-Null
+  # 必须把排除数组展平成纯字符串序列再 splat，否则 PowerShell 把整个数组当单个参数传给 /XD /XF（排除全失效）
+  $rcArgs = @($Root, $stage, '/E')
+  $rcArgs += '/XD'; $rcArgs += $xd
+  $rcArgs += '/XF'; $rcArgs += $ExcludeFiles
+  $rcArgs += '/NFL', '/NDL', '/NJH', '/NJS'
+  & robocopy @rcArgs | Out-Null
   if ($LASTEXITCODE -ge 8) { throw "robocopy failed (code $LASTEXITCODE)" }
   $zip = Join-Path $OutDir "$Name-$Label.zip"
   # Compress-Archive keeps the top folder name = staging dir name; rename to project-kanban

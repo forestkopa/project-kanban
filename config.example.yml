@@ -5,5 +5,5 @@ tunnel: REPLACE_TUNNEL_UUID
 credentials-file: C:/Users/<用户名>/.cloudflared/REPLACE_TUNNEL_UUID.json
 ingress:
   - hostname: kanban.example.com
-    service: http://localhost:5180
-  - service: http://localhost:5180
+    service: http://localhost:5181
+  - service: http://localhost:5181

@@ -566,7 +566,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { token, user: { id: u.id, name: u.name, role: u.role }, mustChange: !!u.mustChange });
     }
     // GET 接口统一鉴权（2026-08-25 两轮评审）：除登录 / 只读状态 / 本机 Ollama 探测外，其余 GET 均需登录
-    const PUBLIC_GET = ['/api/readonly', '/api/ai/ollama-models'];
+    const PUBLIC_GET = ['/api/readonly', '/api/ai/ollama-models', '/api/version', '/api/latest-release'];
     if (req.method === 'GET' && !PUBLIC_GET.includes(p) && !req.user) {
       return send(res, 401, { error: '请先登录（X-Auth-Token）' });
     }
@@ -664,6 +664,36 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { on: !!(body && body.on) });
       }
       return send(res, 405, { error: '方法不允许' });
+    }
+    // 版本信息：本地版本（package.json）与 GitHub Release 对齐，用于确认 update.zip 升级是否成功
+    if (p === '/api/version' && req.method === 'GET') {
+      let ver = 'unknown';
+      try { ver = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch (e) {}
+      return send(res, 200, {
+        version: ver,
+        demo: DEMO_MODE,
+        port: PORT,
+        node: process.version,
+        uptime: Math.floor(process.uptime()),
+        repo: 'forestkopa/project-kanban'
+      });
+    }
+    // GitHub 最新 Release（服务端代理，规避浏览器 CSP connect-src 限制；用于版本对比）
+    if (p === '/api/latest-release' && req.method === 'GET') {
+      try {
+        const ac = new AbortController();
+        const to = setTimeout(() => ac.abort(), 8000);
+        const gh = await fetch('https://api.github.com/repos/forestkopa/project-kanban/releases/latest', {
+          headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'kanban-version-check' },
+          signal: ac.signal
+        });
+        clearTimeout(to);
+        if (!gh.ok) return send(res, 200, { ok: false, error: 'HTTP ' + gh.status });
+        const j = await gh.json();
+        return send(res, 200, { ok: true, tag: j.tag_name, version: (j.tag_name || '').replace(/^v/, ''), url: j.html_url });
+      } catch (e) {
+        return send(res, 200, { ok: false, error: (e && e.message) || 'fetch failed' });
+      }
     }
     // 只读模式：拦截所有非 GET 修改请求
     if (req.method !== 'GET' && await isRO()) {

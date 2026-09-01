@@ -106,6 +106,7 @@ function isTunnelUp() {
   });
 }
 async function ensureTunnel() {
+  if (process.env.KANBAN_NO_TUNNEL) { log('开发机模式：跳过公网隧道接管（KANBAN_NO_TUNNEL=1）'); return; }
   if (await isTunnelUp()) return;
   log('公网不可达，清理残留并重启 Named Tunnel（' + TUNNEL_URL + '）');
   try { spawnSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { timeout: 5000, stdio: 'ignore' }); } catch (e) {}
