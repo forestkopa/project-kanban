@@ -23,6 +23,7 @@
 - docs/knowledge/14-待办页与日期区间语义.md — 独立「待办」页：点击任务跳转对应项目看板并高亮定位、日期用到期日区间(非重叠区间避下月串入本周)；v1.4.3 优化：tab 去重切换 + 分组折叠(localStorage) + 项目内按到期日排序 + 过滤/搜索(局部刷新保焦点)；美观改版(项目色左条/状态点/到期胶囊/.card-flash)
 - docs/knowledge/15-首屏加载优化.md — 首屏白屏等待修复：index.html 内联 splash 遮罩(消除白屏)+ loadAll 串行改 Promise.all 并行省 3×RTT(公网隧道收益最大)；app.js script 须在 splash 之后否则 hideSplash 拿不到元素
 - docs/knowledge/16-待办导出独立功能键与鉴权坑.md — 导出独立成功能键(日/周/月模态框三选一)+ 顺手修 401 bug:裸 fetch 漏传 X-Auth-Token
+- docs/knowledge/17-一键升级异步化与进度条设计.md — 升级链路核心重构(v1.4.5):服务端 startUpgrade 立即返 taskId(<200ms) + 后台分阶段状态机(download 0-70% / backup 70-85% / extract 85-98% / restart 98-100%) + 前端 1s 轮询 /status + 底部 #verBar 进度条;流式 downloadFileWithProgress(边下边写盘);任务状态保留 10min 让前端重连能拉最终结果;彻底解决"升级成功但前端显示失败"+"黑屏等待"两个老问题
 
 ## 其它文档
 
