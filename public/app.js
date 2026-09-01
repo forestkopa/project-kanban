@@ -2444,25 +2444,72 @@ function updateUpgradeBtn() {
 }
 async function doUpgrade() {
   const status = document.getElementById('verStatus');
+  const bar = document.getElementById('verBar');
+  const barFill = document.getElementById('verBarFill');
+  const barText = document.getElementById('verBarText');
+  function setBar(pct, txt, color) {
+    if (barFill) { barFill.style.width = Math.max(0, Math.min(100, pct)) + '%'; barFill.style.background = color || ''; }
+    if (barText) { barText.textContent = txt; }
+    if (bar) bar.style.display = (pct == null) ? 'none' : '';
+  }
+  function setStatus(txt, color) { if (status) { status.textContent = txt; status.style.color = color || '#2b6cb0'; } }
+  let pollTimer = null;
+  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
   try {
-    if (status) { status.textContent = '比对中…'; status.style.color = '#2b6cb0'; }
+    setStatus('比对中…');
+    setBar(0, '准备中…', '#e2e8f0');
     const pre = await api('/admin/upgrade/prepare', { method: 'POST', timeout: 60000 });
     if (!pre || !pre.need) {
-      if (status) { status.textContent = '已是最新（v' + ((pre && pre.local) || '?') + '），无需升级'; status.style.color = '#2f855a'; }
+      setBar(null);
+      setStatus('已是最新（v' + ((pre && pre.local) || '?') + '），无需升级', '#2f855a');
       return;
     }
-    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务（公网约中断 10-30 秒）。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) return;
-    if (status) { status.textContent = '升级中…（下载/备份/解压）'; status.style.color = '#2b6cb0'; }
-    // 升级链路耗时：40MB 下载 + robocopy 备份 + 解压 + 重启；公司宽带 + 隧道下常超 60s
-    const r = await api('/admin/upgrade/confirm', { method: 'POST', timeout: 300000, body: JSON.stringify({ token: pre.token }) });
-    if (r && r.ok) {
-      if (status) { status.textContent = '升级完成，服务重启中…刷新即见 v' + pre.latest; status.style.color = '#2f855a'; }
-      toast('升级成功，看板正在重启（v' + pre.latest + '）');
-    } else {
-      if (status) { status.textContent = '升级失败：' + ((r && r.error) || '未知错误'); status.style.color = '#E0241B'; }
+    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务（公网约中断 10-30 秒）。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) {
+      setBar(null); setStatus('已取消', '#718096'); return;
     }
+    setStatus('启动升级任务…');
+    // confirm 阶段立即返回 taskId（<200ms），不再 15s/5min 超时
+    const r = await api('/admin/upgrade/confirm', { method: 'POST', body: JSON.stringify({ token: pre.token }) });
+    if (!r || !r.ok || !r.taskId) {
+      setBar(null);
+      setStatus('启动升级失败：' + ((r && r.error) || '未知错误'), '#E0241B');
+      return;
+    }
+    const taskId = r.taskId;
+    setStatus('升级中…', '#2b6cb0');
+    setBar(0, '已启动，等待下载…', '#3182ce');
+    // 轮询任务状态（每秒；进度变化时刷新；完成/错误停轮询）
+    let lastPhase = null, lastPct = -1;
+    pollTimer = setInterval(async () => {
+      try {
+        const st = await api('/admin/upgrade/status?taskId=' + encodeURIComponent(taskId), { method: 'GET', timeout: 10000 });
+        if (!st) return;
+        if (st.phase !== lastPhase || st.progress !== lastPct) {
+          lastPhase = st.phase; lastPct = st.progress;
+          const color = st.phase === 'error' ? '#E0241B' : (st.phase === 'done' ? '#2f855a' : '#3182ce');
+          setBar(st.progress, st.message || st.phase, color);
+        }
+        if (st.finished) {
+          stopPoll();
+          if (st.phase === 'done') {
+            setStatus('升级完成，服务重启中…刷新即见 v' + pre.latest, '#2f855a');
+            toast('升级成功，看板正在重启（v' + pre.latest + '）');
+          } else if (st.phase === 'error') {
+            setStatus('升级失败：' + (st.message || '未知错误'), '#E0241B');
+            toast('升级失败：' + (st.message || '未知错误'));
+          } else {
+            setStatus('任务结束：' + (st.message || st.phase), '#718096');
+          }
+        }
+      } catch (e) {
+        // 单次轮询失败不打断（弱网可能抖），下轮重试
+        console.warn('[upgrade] 轮询失败:', e && e.message);
+      }
+    }, 1000);
   } catch (e) {
-    if (status) { status.textContent = '升级出错：' + ((e && e.message) || e); status.style.color = '#E0241B'; }
+    stopPoll();
+    setBar(null);
+    setStatus('升级出错：' + ((e && e.message) || e), '#E0241B');
   }
 }
 const _verUpgrade = document.getElementById('verUpgrade');

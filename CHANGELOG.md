@@ -2,6 +2,14 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.5（2026-09-01）
+- **一键升级改为异步 + 实时进度条**：彻底解决「升级成功但前端显示失败」+「黑屏等待无反馈」两个老问题。
+  - 服务端 `lib/upgrade.js`：`startUpgrade` 立即返回 `taskId`（<200ms），后台任务分阶段更新状态（`download` 0-70% / `backup` 70-85% / `extract` 85-98% / `restart` 98-100% / `done` 或 `error`）；`downloadFile` 改造为流式 + 进度回调（边下边写盘 + 推送 percent）；新增 `getTaskStatus` 给前端轮询。
+  - 服务端 `server.js`：新增 `GET /api/admin/upgrade/status?taskId=xxx` 端点；`/confirm` 改为调 `startUpgrade` 不再 await 完整链路。
+  - 前端 `app.js` `doUpgrade`：`confirm` 拿到 taskId → 启动 `setInterval(1000ms)` 轮询 → 实时渲染底部进度条 + 阶段文字；完成/错误时停轮询。
+  - HTML/CSS：新增 `#verBar` 固定在 footer 上方（毛玻璃背景 + 8px 圆角进度条 + 阶段文字），升级中显示，结束隐藏。
+  - 任务状态保留 10 分钟（完成后），前端断网/关闭重连能拉到最终结果 → 彻底告别"假超时"。
+
 ## v1.4.4（hotfix，2026-09-01）
 - **一键升级超时修复**：「一键升级」点击后报「请求超时，请重试」并卡住。根因：前端 `api()` 的 `fetchT` 写死 15s 超时，但 `/admin/upgrade/confirm` 服务端链路（40MB 下载 + robocopy 备份 + 解压 + 重启）在公司宽带 + Cloudflare 隧道下常超 30–60s，触发 abort。修复：让 `api(opts)` 支持 `opts.timeout`，升级 prepare 用 60s、confirm 用 300s（5 分钟）。同步改 `kanban-workbench-template.html` 单文件离线版本。
 

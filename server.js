@@ -698,7 +698,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: false, error: (e && e.message) || 'fetch failed' });
       }
     }
-    // 自动升级（admin 两阶段：prepare 比对+发一次性 token；confirm 执行下载/备份/解压/重启）
+    // 自动升级（admin 三阶段：prepare 比对+发一次性 token；confirm 启动后台任务立即返 taskId；status 轮询任务快照）
     if (p === '/api/admin/upgrade/prepare' && req.method === 'POST') {
       if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
       if (await isRO()) return send(res, 403, { error: '只读模式禁止升级' });
@@ -714,11 +714,21 @@ const server = http.createServer(async (req, res) => {
       if (await isRO()) return send(res, 403, { error: '只读模式禁止升级' });
       try {
         const body = await readBody(req);
-        const r = await Upgrade.applyUpgrade(ROOT, body && body.token);
-        return send(res, 200, r);
+        const r = Upgrade.startUpgrade(ROOT, body && body.token);
+        return send(res, 200, r);  // 立即返回 { taskId }，不阻塞
       } catch (e) {
-        return send(res, 200, { ok: false, error: (e && e.message) || '升级失败' });
+        return send(res, 200, { ok: false, error: (e && e.message) || '启动升级失败' });
       }
+    }
+    // 任务状态查询（前端轮询；GET 用 query 传 taskId）
+    if (p === '/api/admin/upgrade/status' && req.method === 'GET') {
+      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
+      const url = new URL(req.url, 'http://localhost');
+      const taskId = url.searchParams.get('taskId');
+      if (!taskId) return send(res, 400, { error: '缺少 taskId' });
+      const st = Upgrade.getTaskStatus(taskId);
+      if (!st) return send(res, 200, { taskId, phase: 'unknown', progress: 0, message: '任务不存在或已过期（10 分钟后清理）', finished: true });
+      return send(res, 200, st);
     }
     // 只读模式：拦截所有非 GET 修改请求
     if (req.method !== 'GET' && await isRO()) {

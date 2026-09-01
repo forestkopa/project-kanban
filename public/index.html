@@ -370,6 +370,12 @@
   <span id="verUpgradeWrap" style="display:none;"><a id="verUpgrade" href="javascript:void(0)" style="color:#2f855a;cursor:pointer;text-decoration:none;font-weight:600;">一键升级</a></span>
   <span id="verStatus"></span>
 </div>
+<div id="verBar" style="display:none;position:fixed;left:0;right:0;bottom:26px;padding:8px 16px;background:rgba(255,255,255,.97);border-top:1px solid #e2e8f0;z-index:49;backdrop-filter:blur(4px);">
+  <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+    <div id="verBarFill" style="height:100%;width:0%;background:#3182ce;transition:width .4s ease;"></div>
+  </div>
+  <div id="verBarText" style="font-size:12px;color:#4a5568;margin-top:4px;"></div>
+</div>
 <script src="/app.js?v=@VER@"></script>
 <script nonce="@NONCE@">
 (function(){
