@@ -2,6 +2,9 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.6（hotfix，2026-09-01）
+- **一键升级「token 无效或已过期」修复**：生产机点「一键升级」报 `升级失败：token 无效或已过期，请重新点击「一键升级」`。根因：`lib/upgrade.js` 的 `pending` Map（一次性 token 存储）在**内存**中，`kanban-watchdog` 服务重启即清空 → `confirm` 时 `consumeToken` 读不到 → 报该错误。尤其生产机仍在 `v1.4.4`（v1.4.4→v1.4.5 升级未真正生效），旧前端同步 await 链路在 watchdog 重启后 token 丢失。修复：**token 持久化到 `data/upgrade-tokens.json`**（atomic write：tmp + rename），`prepareUpgrade` 生成 token 即落盘，`consumeToken` 在 `pending` 为空时从磁盘重读，进程重启不再丢 token。`TOKEN_TTL` 5 分钟过期仍生效（磁盘清理由 `pruneExpiredTokens` 负责）。
+
 ## v1.4.5（2026-09-01）
 - **一键升级改为异步 + 实时进度条**：彻底解决「升级成功但前端显示失败」+「黑屏等待无反馈」两个老问题。
   - 服务端 `lib/upgrade.js`：`startUpgrade` 立即返回 `taskId`（<200ms），后台任务分阶段更新状态（`download` 0-70% / `backup` 70-85% / `extract` 85-98% / `restart` 98-100% / `done` 或 `error`）；`downloadFile` 改造为流式 + 进度回调（边下边写盘 + 推送 percent）；新增 `getTaskStatus` 给前端轮询。
