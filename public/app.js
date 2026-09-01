@@ -34,11 +34,13 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const tok = getToken();
   if (tok) headers['X-Auth-Token'] = tok;
-  // fetch 超时封装（15s）：弱网不无限等待
+  // fetch 超时封装（默认 15s）：弱网不无限等待；长操作(升级)可传 opts.timeout 显式延长
   const fetchT = (u, o) => {
     const c = new AbortController();
-    const t = setTimeout(() => c.abort(), 15000);
-    return fetch(u, { ...o, signal: c.signal }).finally(() => clearTimeout(t))
+    const ms = Number(o && o.timeout) || 15000;
+    const t = setTimeout(() => c.abort(), ms);
+    const { timeout: _drop, ...rest } = o || {};
+    return fetch(u, { ...rest, signal: c.signal }).finally(() => clearTimeout(t))
       .catch(e => { if (e && e.name === 'AbortError') throw new Error('请求超时，请重试'); throw e; });
   };
   let r = await fetchT(API + path, { ...opts, method, headers });
@@ -2444,14 +2446,15 @@ async function doUpgrade() {
   const status = document.getElementById('verStatus');
   try {
     if (status) { status.textContent = '比对中…'; status.style.color = '#2b6cb0'; }
-    const pre = await api('/admin/upgrade/prepare', { method: 'POST' });
+    const pre = await api('/admin/upgrade/prepare', { method: 'POST', timeout: 60000 });
     if (!pre || !pre.need) {
       if (status) { status.textContent = '已是最新（v' + ((pre && pre.local) || '?') + '），无需升级'; status.style.color = '#2f855a'; }
       return;
     }
     if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务（公网约中断 10-30 秒）。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) return;
     if (status) { status.textContent = '升级中…（下载/备份/解压）'; status.style.color = '#2b6cb0'; }
-    const r = await api('/admin/upgrade/confirm', { method: 'POST', body: JSON.stringify({ token: pre.token }) });
+    // 升级链路耗时：40MB 下载 + robocopy 备份 + 解压 + 重启；公司宽带 + 隧道下常超 60s
+    const r = await api('/admin/upgrade/confirm', { method: 'POST', timeout: 300000, body: JSON.stringify({ token: pre.token }) });
     if (r && r.ok) {
       if (status) { status.textContent = '升级完成，服务重启中…刷新即见 v' + pre.latest; status.style.color = '#2f855a'; }
       toast('升级成功，看板正在重启（v' + pre.latest + '）');

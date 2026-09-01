@@ -2,6 +2,9 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.4（hotfix，2026-09-01）
+- **一键升级超时修复**：「一键升级」点击后报「请求超时，请重试」并卡住。根因：前端 `api()` 的 `fetchT` 写死 15s 超时，但 `/admin/upgrade/confirm` 服务端链路（40MB 下载 + robocopy 备份 + 解压 + 重启）在公司宽带 + Cloudflare 隧道下常超 30–60s，触发 abort。修复：让 `api(opts)` 支持 `opts.timeout`，升级 prepare 用 60s、confirm 用 300s（5 分钟）。同步改 `kanban-workbench-template.html` 单文件离线版本。
+
 ## v1.4.3（2026-09-01）
 
 ### 待办页改版

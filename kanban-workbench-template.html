@@ -1252,11 +1252,13 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const tok = getToken();
   if (tok) headers['X-Auth-Token'] = tok;
-  // fetch 超时封装（15s）：弱网不无限等待
+  // fetch 超时封装（默认 15s）：弱网不无限等待；长操作(升级)可传 opts.timeout 显式延长
   const fetchT = (u, o) => {
     const c = new AbortController();
-    const t = setTimeout(() => c.abort(), 15000);
-    return fetch(u, { ...o, signal: c.signal }).finally(() => clearTimeout(t))
+    const ms = Number(o && o.timeout) || 15000;
+    const t = setTimeout(() => c.abort(), ms);
+    const { timeout: _drop, ...rest } = o || {};
+    return fetch(u, { ...rest, signal: c.signal }).finally(() => clearTimeout(t))
       .catch(e => { if (e && e.name === 'AbortError') throw new Error('请求超时，请重试'); throw e; });
   };
   let r = await fetchT(API + path, { ...opts, method, headers });
