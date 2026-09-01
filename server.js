@@ -12,6 +12,7 @@ const XLSX = require('xlsx'); // 参考模版生成 + 上传 xlsx 解析（build
 // 单元格样式导出与重复任务逻辑已抽到 lib/（xlsx-export.js / recurrence.js），减少主文件体积、便于单测
 const { buildPlanXlsx, buildDiffXlsx, buildTodoXlsx, buildReportXlsx } = require('./lib/xlsx-export.js');
 const { RECUR, RECUR_NAME, shiftByRecurrence, spawnNextRecurrence } = require('./lib/recurrence.js');
+const Upgrade = require('./lib/upgrade.js'); // 自动升级：GitHub Release → 备份 → 解压 → 重启
 
 const PORT = process.env.PORT || 5180;
 const DEMO_MODE = process.argv.includes('--demo');
@@ -693,6 +694,28 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, tag: j.tag_name, version: (j.tag_name || '').replace(/^v/, ''), url: j.html_url });
       } catch (e) {
         return send(res, 200, { ok: false, error: (e && e.message) || 'fetch failed' });
+      }
+    }
+    // 自动升级（admin 两阶段：prepare 比对+发一次性 token；confirm 执行下载/备份/解压/重启）
+    if (p === '/api/admin/upgrade/prepare' && req.method === 'POST') {
+      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
+      if (await isRO()) return send(res, 403, { error: '只读模式禁止升级' });
+      try {
+        const r = await Upgrade.prepareUpgrade(ROOT);
+        return send(res, 200, r);
+      } catch (e) {
+        return send(res, 200, { ok: false, error: (e && e.message) || '获取更新失败' });
+      }
+    }
+    if (p === '/api/admin/upgrade/confirm' && req.method === 'POST') {
+      if (!DEMO_MODE && (!req.user || req.user.role !== 'admin')) return send(res, 403, { error: '仅管理员可操作' });
+      if (await isRO()) return send(res, 403, { error: '只读模式禁止升级' });
+      try {
+        const body = await readBody(req);
+        const r = await Upgrade.applyUpgrade(ROOT, body && body.token);
+        return send(res, 200, r);
+      } catch (e) {
+        return send(res, 200, { ok: false, error: (e && e.message) || '升级失败' });
       }
     }
     // 只读模式：拦截所有非 GET 修改请求

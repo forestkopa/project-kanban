@@ -2272,5 +2272,40 @@ async function checkUpdate() {
 }
 const _verCheck = document.getElementById('verCheck');
 if (_verCheck) _verCheck.addEventListener('click', checkUpdate);
+
+/* 一键升级（admin 可见）：prepare → 确认 → confirm → 重启 */
+function updateUpgradeBtn() {
+  const w = document.getElementById('verUpgradeWrap');
+  if (w) w.style.display = (state.user && state.user.role === 'admin') ? '' : 'none';
+}
+async function doUpgrade() {
+  const status = document.getElementById('verStatus');
+  try {
+    if (status) { status.textContent = '比对中…'; status.style.color = '#2b6cb0'; }
+    const pre = await api('/admin/upgrade/prepare', { method: 'POST' });
+    if (!pre || !pre.need) {
+      if (status) { status.textContent = '已是最新（v' + ((pre && pre.local) || '?') + '），无需升级'; status.style.color = '#2f855a'; }
+      return;
+    }
+    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务（公网约中断 10-30 秒）。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) return;
+    if (status) { status.textContent = '升级中…（下载/备份/解压）'; status.style.color = '#2b6cb0'; }
+    const r = await api('/admin/upgrade/confirm', { method: 'POST', body: JSON.stringify({ token: pre.token }) });
+    if (r && r.ok) {
+      if (status) { status.textContent = '升级完成，服务重启中…刷新即见 v' + pre.latest; status.style.color = '#2f855a'; }
+      toast('升级成功，看板正在重启（v' + pre.latest + '）');
+    } else {
+      if (status) { status.textContent = '升级失败：' + ((r && r.error) || '未知错误'); status.style.color = '#E0241B'; }
+    }
+  } catch (e) {
+    if (status) { status.textContent = '升级出错：' + ((e && e.message) || e); status.style.color = '#E0241B'; }
+  }
+}
+const _verUpgrade = document.getElementById('verUpgrade');
+if (_verUpgrade) _verUpgrade.addEventListener('click', doUpgrade);
+updateUpgradeBtn();
+// 登录为 admin 后揭示按钮（轮询至多 30 秒，开销极低）
+let _upgTicks = 0;
+const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 || (state.user && state.user.role === 'admin')) clearInterval(_upgTimer); }, 3000);
+
 loadAll();
 refreshVersion();
