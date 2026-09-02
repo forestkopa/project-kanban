@@ -43,10 +43,21 @@ Get-ChildItem $tmp | Where-Object { $_.Name -notin $skip } | ForEach-Object {
 # 处理 zip 内 data/ 下的非用户文件（如有）：仅覆盖结构，不动用户库。默认不动 data/。
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 
-# 3. 重启服务
+# 3. 重启服务（需管理员权限；失败要明确提示，不能静默吞掉）
 Write-Host "==> 重启服务 $Service"
-Restart-Service $Service -Force -ErrorAction SilentlyContinue
+$restarted = $false
+try {
+  Restart-Service $Service -Force -ErrorAction Stop
+  $restarted = $true
+} catch {
+  Write-Warning "服务重启失败（多半未以管理员身份运行）：$($_.Exception.Message)"
+  Write-Host "    请右键 PowerShell →「以管理员身份运行」后重跑本脚本，或手动：Restart-Service $Service -Force"
+}
 Start-Sleep -Seconds 3
 $up = (Get-Service $Service -ErrorAction SilentlyContinue).Status
-Write-Host "==> 完成。服务状态: $up 。请在浏览器硬刷新查看新版本（侧栏版本号应为 v1.4.4）。"
+# 版本号动态读取，避免写死后误导
+$newVer = 'unknown'
+try { $newVer = (Get-Content (Join-Path $Root 'package.json') -Raw | ConvertFrom-Json).version } catch { }
+Write-Host "==> 完成。目标版本 v$newVer ；服务状态: $up ；重启: $(if ($restarted) {'成功'} else {'未执行/失败'})。"
+Write-Host "    浏览器硬刷新（Ctrl+F5）后，侧栏底部版本号应为 v$newVer。"
 Write-Host "    若需回滚：用 $bak 目录覆盖回 data/ 即可。"
