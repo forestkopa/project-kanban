@@ -2,6 +2,21 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.7-hotfix3（2026-09-02）
+- **启动流程根因重构（彻底修复「未登录永久卡 splash」）**：hotfix2 仅把 modal 抬到 splash 之上、弹框前 `hideSplash()`，属打补丁；真正的脆弱设计仍在——`loadAll()` 用 `Promise.all` 并发 4 个请求，全部 401 时每个都去触发 `showLogin()`，`api()` 在 401 时也会递归弹登录框，启动路径与登录弹窗深度耦合。本次重构：
+  - 新增 `probeAuth()`：用需鉴权的 `/api/projects` 试探当前 token（200=已登录，401/无 token=未登录），**不在 loadAll 里并发触发 showLogin**。
+  - 新增 `boot()`：先 `probeAuth()`，已登录→直接 `loadAll()`；未登录→只弹**一次** `showLogin()`（modal 已置顶可见），登录成功后再重新 `boot()`，用户放弃则淡出 splash 露出页面（可经用户菜单再次登录）——**绝不卡死在首屏**。
+  - 入口由裸 `loadAll()` 改为 `boot()`；`window` 守卫确保 Node 测试环境不自动启动。
+- **`updateIOState` 防御性修复**：空项目列表时 `proj()` 为 `undefined`，原 `(p.status || 'active')` 直接抛 `Cannot read properties of undefined`，导致 `render()` 抛错、`loadAll()` 整体 reject。改为 `((p && p.status) || 'active')`。
+- **新增前端启动冒烟测试**（`test/frontend-boot.test.cjs`，无需 jsdom，用轻量 DOM/fetch/localStorage stub）：锁死两条回归——①未登录冷启动 splash 必淡出、登录框必可见（不再被遮罩盖住）；②已登录直接进 `loadAll` 不弹框。6 断言全绿。
+- **质量说明**：此前「清掉 localStorage token 触发卡死」的事故，根因是启动路径长期缺乏「未登录冷启动」回归测试。本次补测试锁死后，同类问题将在 CI 直接 fail，而非流向生产环境。
+
+## v1.4.7-hotfix2（2026-09-02）
+- **修复「未登录/会话失效时浏览器永久卡在『看板加载中…』splash」**：根因是 `#splash` 的 `z-index:9999` 高于登录弹窗 `.modal` 的 `z-index:200`，`loadAll()` 启动时 4 个并行请求（templates/projects/options/readonly）在无有效 token 时全部 401，前端虽弹出 `#loginModal` 但被 splash 遮罩完全盖住，用户既看不到也点不到登录框，死锁在 splash。修复：① 将 `.modal` 的 `z-index` 提到 `10000`（高于 splash，任何弹窗都置顶）；② `showLogin()` 内部在显示登录框前先调用 `hideSplash()` 淡出首屏遮罩。配合 hotfix1 已加的 `showLogin` 单例锁（并发 401 只弹一次），现在 token 失效会自动退 splash 并弹出登录框，用户可正常登录。
+
+## v1.4.7-hotfix1（2026-09-02）
+- **`tools/local-upgrade.ps1` 解析报错紧急修复**：生产机升级时脚本第 24 行触发 PowerShell 5.1 `ParseError: 语句缺少终止符 "}"`。根因：旧版本含「同行 `-Verbose` + `}`」与「单行 `if () { ... }`」易触发 PS 5.1 token 解析歧义（且部分生产环境 PS profile 会重写脚本中的 cmdlet 调用）。本次重写：**所有 if 全部换行写、全部 `Write-Host`/`Write-Warning` 改为 `+` 字符串拼接、严禁同行 `-Verbose` / 同行 `{}`**。`[System.Management.Automation.Language.Parser]` 已在本地通过解析验证。请用本版 zip 重新升级。
+
 ## v1.4.7（2026-09-02）
 - **公网间歇性打不开 / 升级报 `fetch failed` 根因修复**：`watchdog.js` 的隧道守护原逻辑为「每 15s 探测，**单次失败**即 `taskkill /F /IM cloudflared.exe` 再重拉」。问题：①公司宽带偶发丢包即误判，重连那几秒公网完全不可达；②重连慢时下个周期又失败又重启，陷入**每 15s 重启循环**，网站长时间不可用；③用户点「一键升级」撞上重启窗口 → `fetch failed`。修复为**三级保险**：
   - 首次失败后隔 2s **复查一次**（双次确认，抖动不误杀）；

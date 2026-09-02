@@ -68,14 +68,20 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.re
 
 /* ---------- 多用户：登录 / 登出 / 用户菜单 ---------- */
 const ROLE_NAME = { admin: '管理员', manager: '副管理员', member: '成员', viewer: '访客' };
+// 单例锁：并发 401（如 loadAll 的 4 个并行请求同时未授权）只弹一次登录框。
+// 否则多次调用会互相清空输入框、覆盖 onclick，用户根本无法完成登录。
+let _loginPromise = null;
 function showLogin() {
-  return new Promise(resolve => {
-    const m = $('#loginModal'); if (!m) return resolve(false);
+  if (_loginPromise) return _loginPromise;
+  _loginPromise = new Promise(resolve => {
+    const finish = ok => { _loginPromise = null; resolve(ok); };
+    const m = $('#loginModal'); if (!m) return finish(false);
     $('#loginName').value = ''; $('#loginPass').value = ''; $('#loginErr').textContent = '';
     // 记住密码回填
     let rm = null; try { rm = JSON.parse(localStorage.getItem('kb-remember') || 'null'); } catch (e) {}
     if (rm && rm.name) { $('#loginName').value = rm.name; $('#loginRemember').checked = true; } // 仅回填用户名，密码不落盘（安全）
     else { $('#loginRemember').checked = false; }
+    hideSplash();                                /* 弹登录框时先淡出首屏遮罩，否则 z-index 更高的 splash 会盖住登录框导致无法操作 */
     m.classList.remove('hidden');
     let settled = false;
     const done = ok => { if (settled) return; settled = true; m.classList.add('hidden'); $('#loginBtn').disabled = false; resolve(ok); };
@@ -243,6 +249,25 @@ function hideSplash() {
   if (!s) return;
   s.classList.add('hide');
   setTimeout(() => s.remove(), 400);
+}
+// 冷启动登录态探测：用需鉴权的端点（/api/projects）试探当前 token。
+// 200=已登录；401/无 token/网络错=未登录。避免在 loadAll 里让 4 个并发请求各自触发 showLogin。
+async function probeAuth() {
+  const tok = getToken();
+  if (!tok) return false;
+  try {
+    const r = await fetch(API + '/projects', { headers: { 'X-Auth-Token': tok } });
+    return r.ok;
+  } catch (e) { return false; }
+}
+// 启动编排：先探测登录态，再决定走 loadAll（已登录）还是 showLogin（未登录）。
+// 未登录时只弹一次登录框（modal z-index 已抬到 splash 之上，必然可见），成功后再重新启动；
+// 用户放弃登录则淡出 splash 露出页面，可经用户菜单再次登录——绝不卡死在首屏。
+async function boot() {
+  if (await probeAuth()) { await loadAll(); return; }
+  const ok = await showLogin();
+  if (ok) { await boot(); }
+  else { hideSplash(); }
 }
 async function loadAll() {
   try {
@@ -1064,7 +1089,7 @@ function updateIOState() {
   const at = $('#addTaskBtn'), dp = $('#delProjectBtn'), ab = $('#archiveBtn');
   if (at) at.disabled = !has;
   if (dp) dp.disabled = !has;
-  if (ab) { ab.disabled = !has; const al = $('#archiveLabel'); if (al) al.textContent = ((p.status || 'active') === 'archived') ? '取消归档' : '完成归档'; }
+  if (ab) { ab.disabled = !has; const al = $('#archiveLabel'); if (al) al.textContent = (((p && p.status) || 'active') === 'archived') ? '取消归档' : '完成归档'; }
 }
 function bufToBase64(buf) {
   const bytes = new Uint8Array(buf); let bin = ''; const chunk = 0x8000;
@@ -2527,5 +2552,8 @@ updateUpgradeBtn();
 let _upgTicks = 0;
 const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 || (state.user && state.user.role === 'admin')) clearInterval(_upgTimer); }, 3000);
 
-loadAll();
-refreshVersion();
+if (typeof window !== 'undefined') { boot(); refreshVersion(); }
+// 仅测试环境导出：Node require 时可调用 boot 做启动冒烟测试；浏览器中 module 未定义，自动跳过，零副作用。
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state };
+}

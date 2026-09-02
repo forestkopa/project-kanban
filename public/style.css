@@ -175,7 +175,7 @@ body {
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------- modal（居中卡片） ---------- */
-.modal { position: fixed; inset: 0; background: rgba(13,13,13,.42); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+.modal { position: fixed; inset: 0; background: rgba(13,13,13,.42); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px; }
 .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 26px; width: min(580px, 94vw); max-height: 88vh; overflow-y: auto; position: relative; box-shadow: 0 -12px 48px rgba(0,0,0,.22); }
 .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .modal-head h3 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
