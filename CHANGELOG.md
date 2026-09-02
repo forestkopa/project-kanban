@@ -2,6 +2,14 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.7（2026-09-02）
+- **公网间歇性打不开 / 升级报 `fetch failed` 根因修复**：`watchdog.js` 的隧道守护原逻辑为「每 15s 探测，**单次失败**即 `taskkill /F /IM cloudflared.exe` 再重拉」。问题：①公司宽带偶发丢包即误判，重连那几秒公网完全不可达；②重连慢时下个周期又失败又重启，陷入**每 15s 重启循环**，网站长时间不可用；③用户点「一键升级」撞上重启窗口 → `fetch failed`。修复为**三级保险**：
+  - 首次失败后隔 2s **复查一次**（双次确认，抖动不误杀）；
+  - 连续确认失败 **3 次**才真正重启（`TUNNEL_FAIL_THRESHOLD`）；
+  - 重启后 **90s 冷却期**（`TUNNEL_COOLDOWN`）内不再探测/重启，给隧道握手留足时间，杜绝重启循环。
+- **升级错误文案可读化**（v1.4.6 后续补）：`api()` 网络层失败由原始 `TypeError: fetch failed` 改为中文提示「无法连接到看板服务：…请检查：①公网隧道是否在线；②本地 DNS；③浏览器是否禁用第三方请求」；`doUpgrade` 去除「升级失败：升级失败：」重复前缀。
+- **回归测试**（`test/watchdog-tunnel.test.cjs`，已并入 `run-all.cjs`）：覆盖偶发抖动不重启 / 持续不可达才重启 / 冷却期内不重复重启 / 开发机模式永不接管隧道 4 个场景，全绿。
+
 ## v1.4.6（hotfix，2026-09-01）
 - **一键升级「token 无效或已过期」修复**：生产机点「一键升级」报 `升级失败：token 无效或已过期，请重新点击「一键升级」`。根因：`lib/upgrade.js` 的 `pending` Map（一次性 token 存储）在**内存**中，`kanban-watchdog` 服务重启即清空 → `confirm` 时 `consumeToken` 读不到 → 报该错误。尤其生产机仍在 `v1.4.4`（v1.4.4→v1.4.5 升级未真正生效），旧前端同步 await 链路在 watchdog 重启后 token 丢失。修复：**token 持久化到 `data/upgrade-tokens.json`**（atomic write：tmp + rename），`prepareUpgrade` 生成 token 即落盘，`consumeToken` 在 `pending` 为空时从磁盘重读，进程重启不再丢 token。`TOKEN_TTL` 5 分钟过期仍生效（磁盘清理由 `pruneExpiredTokens` 负责）。
 

@@ -97,7 +97,19 @@ async function ensureServer() {
   }
 }
 
-/* ---- 隧道守护：公网健康探测（进程存在 ≠ 隧道健康，曾有僵死进程骗过检测） ---- */
+/* ---- 隧道守护：公网健康探测（进程存在 ≠ 隧道健康，曾有僵死进程骗过检测） ----
+ * 稳定性改造（2026-09-02）：原逻辑「单次探测失败 → 立即 taskkill + 重拉」过于激进，
+ * 公司宽带偶发丢包即误判，且重连期间公网完全不可达，重连慢时更陷入「每 15s 重启」循环。
+ * 新逻辑：双次确认 + 连续 N 次才重启 + 重启后冷却（给隧道握手时间）。
+ */
+const TUNNEL_FAIL_THRESHOLD = 3;   // 连续确认失败 N 次才真正重启（避免单次抖动误杀）
+const TUNNEL_COOLDOWN = 90000;     // 重启后冷却 90s（隧道握手约 10-30s，冷却期内不重复探测/重启）
+const TUNNEL_RECHECK_DELAY = 2000; // 首次失败后隔 2s 复查一次（双次确认）
+let tunnelFailCount = 0;
+let tunnelLastRestart = 0;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 function isTunnelUp() {
   return new Promise(resolve => {
     const req = https.get(TUNNEL_URL, { timeout: 6000 }, r => { r.resume(); resolve(r.statusCode >= 200 && r.statusCode < 500); });
@@ -107,8 +119,28 @@ function isTunnelUp() {
 }
 async function ensureTunnel() {
   if (process.env.KANBAN_NO_TUNNEL) { log('开发机模式：跳过公网隧道接管（KANBAN_NO_TUNNEL=1）'); return; }
-  if (await isTunnelUp()) return;
-  log('公网不可达，清理残留并重启 Named Tunnel（' + TUNNEL_URL + '）');
+  // 冷却期：刚重启过，隧道正在握手，此期间不再探测也不再重启（避免反复 kill 导致长时间不可达）
+  if (tunnelLastRestart && Date.now() - tunnelLastRestart < TUNNEL_COOLDOWN) return;
+
+  if (await isTunnelUp()) {
+    if (tunnelFailCount) log('公网已恢复，失败计数清零（' + tunnelFailCount + ' → 0）');
+    tunnelFailCount = 0;
+    return;
+  }
+  // 首次失败：隔 2s 复查一次，降低偶发丢包误判
+  await sleep(TUNNEL_RECHECK_DELAY);
+  if (await isTunnelUp()) { log('公网复查通过，判定为偶发抖动，不重启'); tunnelFailCount = 0; return; }
+
+  tunnelFailCount++;
+  if (tunnelFailCount < TUNNEL_FAIL_THRESHOLD) {
+    log('公网不可达（连续确认失败 ' + tunnelFailCount + '/' + TUNNEL_FAIL_THRESHOLD + ' 次），暂不重启');
+    return;
+  }
+
+  // 连续多次确认失败 → 判定隧道真挂了，执行重启
+  tunnelFailCount = 0;
+  tunnelLastRestart = Date.now();
+  log('公网连续不可达，清理残留并重启 Named Tunnel（' + TUNNEL_URL + '）；后续 ' + (TUNNEL_COOLDOWN / 1000) + 's 冷却期内不再重启');
   try { spawnSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { timeout: 5000, stdio: 'ignore' }); } catch (e) {}
   try { spawn(CLOUDFLARED, ['tunnel', '--protocol', 'http2', '--config', TUNNEL_CONFIG, 'run'], { detached: true, stdio: 'ignore' }).unref(); }
   catch (e) { log('隧道拉起失败: ' + e.message); }

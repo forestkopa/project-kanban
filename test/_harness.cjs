@@ -7,7 +7,9 @@ const os = require('os');
 const net = require('net');
 const path = require('path');
 
-const NODE = process.env.KB_NODE || 'C:/Users/Administrator/.workbuddy/binaries/node/versions/22.22.2/node.exe';
+// node 路径：优先 KB_NODE 覆盖，否则用当前运行的 node（process.execPath）。
+// 曾硬编码 .../versions/22.22.2/node.exe，WorkBuddy 升级后实际为 22.22.2-2 → ENOENT 全部集成测试失败。
+const NODE = process.env.KB_NODE || process.execPath;
 const ROOT = path.join(__dirname, '..');
 const DEFAULT_PW = '000000';
 const TEST_PW = 'KbTest@2026';
