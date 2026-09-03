@@ -2050,14 +2050,15 @@ async function downloadTodoExcel(range) {
     const today = TODAY();
     let monIso = today, sunIso = today;
     if (kind === 'week') { const { mon, days } = weekRange(state.weekDate || new Date()); monIso = isoDate(mon); sunIso = isoDate(days[6]); }
+    else if (kind === 'nextweek') { const { mon, days } = weekRange(state.weekDate || new Date()); monIso = isoDate(addDays(mon, 7)); sunIso = isoDate(addDays(days[6], 7)); }
     else if (kind === 'month') { const d = state.monthlyDate || new Date(); monIso = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); sunIso = isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
     // 前端按 collectTodos(kind) 预过滤（保持与待办页语义一致：逾期 + 周期内到期）
     const rows = collectTodos(kind);
-    if (!rows.length) { toast((kind === 'today' ? '今天' : kind === 'week' ? '本周' : '本月') + '没有可导出的待办任务'); return; }
+    if (!rows.length) { toast((kind === 'today' ? '今天' : kind === 'week' ? '本周' : kind === 'nextweek' ? '下周' : '本月') + '没有可导出的待办任务'); return; }
     const projects = rows.map(({ p, list }) => ({ id: p.id, name: p.name, color: p.color, owner: p.owner, tasks: list.map(t => ({
       id: t.id, title: t.title, done: !!t.done,
       startDate: t.startDate, dueDate: t.dueDate, estimateDays: t.estimateDays || 0,
-      overdue: !!t.overdue, phaseId: t.phaseId, phaseName: t.phaseName || ''
+      overdue: !!t.overdue, carryover: !!t.carryover, phaseId: t.phaseId, phaseName: t.phaseName || ''
     })) }));
     const r = await fetch(API + '/reports/todo-export', {
       method: 'POST',
@@ -2069,7 +2070,7 @@ async function downloadTodoExcel(range) {
     const blob = await r.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const nameMap = { today: '今日待办_', week: '周报待办清单_', month: '本月待办_' };
+    const nameMap = { today: '今日待办_', week: '周报待办清单_', month: '本月待办_', nextweek: '下周待办_' };
     a.download = nameMap[kind] + today.replace(/-/g, '') + '.xlsx';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -2086,14 +2087,34 @@ function collectTodos(range) {
   if (range === 'week') {
     const { mon, days } = weekRange(state.weekDate || new Date());
     ref.monIso = isoDate(mon); ref.sunIso = isoDate(days[6]);
+  } else if (range === 'nextweek') {
+    const { mon, days } = weekRange(state.weekDate || new Date());
+    ref.monIso = isoDate(addDays(mon, 7)); ref.sunIso = isoDate(addDays(days[6], 7)); // 下周一到下周日
+    ref.thisSunIso = isoDate(days[6]);                                             // 本周日（顺延判定基准）
   } else if (range === 'month') {
     const d = state.monthlyDate || new Date();
     const y = d.getFullYear(), mo = d.getMonth();
     ref.moFirstIso = isoDate(new Date(y, mo, 1)); ref.moEndIso = isoDate(new Date(y, mo + 1, 0));
   }
-  const base = range === 'today' ? today : (range === 'week' ? ref.monIso : ref.moFirstIso);
+  const base = range === 'today' ? today : (range === 'week' || range === 'nextweek' ? ref.thisSunIso || ref.monIso : ref.moFirstIso);
   const rows = [];
   activeProjects().forEach(p => {
+    // 下周待办（顺延模型）：本周未完成(done=false)自动顺延 + 下周原本计划。已完成排除。
+    if (range === 'nextweek') {
+      let list = (p.tasks || []).filter(t => {
+        if (t.done || !t.dueDate) return false;
+        const carry = t.dueDate <= ref.thisSunIso;                                 // 本周(含更早)未完成 → 顺延
+        const next = t.dueDate >= ref.monIso && t.dueDate <= ref.sunIso;           // 下周计划
+        if (f.overdueOnly && !carry) return false;                                 // 仅逾期：只留顺延项
+        if (q && !(t.title || '').toLowerCase().includes(q) && !(p.name || '').toLowerCase().includes(q)) return false;
+        return carry || next;
+      });
+      if (!list.length) return;
+      list = list.map(t => ({ ...t, carryover: t.dueDate <= ref.thisSunIso, overdue: t.dueDate < today }))
+                .sort((a, b) => (a.carryover === b.carryover ? (a.dueDate || '').localeCompare(b.dueDate || '') : (a.carryover ? -1 : 1))); // 顺延在前（B）
+      rows.push({ p, list });
+      return;
+    }
     let list = (p.tasks || []).filter(t => {
       if (t.done || !t.dueDate) return false;
       if (range === 'today') { if (!(t.dueDate <= today)) return false; }          // 逾期 + 今天到期
@@ -2109,7 +2130,7 @@ function collectTodos(range) {
               .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));   // 项目内按到期日升序（逾期最早最前）（B）
     rows.push({ p, list });
   });
-  rows.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
+  rows.sort((a, b) => (b.list.filter(t => t.carryover).length - a.list.filter(t => t.carryover).length) || (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
   return rows;
 }
 function buildTodos() {
@@ -2179,20 +2200,20 @@ function buildTodos() {
 function openExportModal() {
   const counts = {};
   let total = 0;
-  ['today', 'week', 'month'].forEach(k => {
+  ['today', 'week', 'month', 'nextweek'].forEach(k => {
     const rows = collectTodos(k);
     const n = rows.reduce((a, r) => a + r.list.length, 0);
     counts[k] = { tasks: n, projs: rows.length };
     total += n;
   });
-  const titleMap = { today: '今日待办', week: '本周待办', month: '本月待办' };
+  const titleMap = { today: '今日待办', week: '本周待办', month: '本月待办', nextweek: '下周待办' };
   const opt = (k) => `<label class="exp-opt"><input type="radio" name="expRange" value="${k}"${k === 'week' ? ' checked' : ''}><span class="exp-name">${titleMap[k]}</span><span class="exp-meta">${counts[k].tasks} 个任务 · 涉及 ${counts[k].projs} 个项目</span></label>`;
   const m = $('#exportModal');
   m.innerHTML = `
     <div class="modal-box" style="width:min(420px,92vw)">
       <div class="modal-head"><h3>${ICON.download} 导出待办清单</h3><button class="x" data-close>×</button></div>
       <p class="pi-sub" style="margin:0 0 14px">选择导出的时间范围（共 ${total} 个未完成任务可导出）</p>
-      <div class="exp-opts">${opt('today')}${opt('week')}${opt('month')}</div>
+      <div class="exp-opts">${opt('today')}${opt('week')}${opt('month')}${opt('nextweek')}</div>
       <div class="modal-acts" style="margin-top:18px">
         <button class="btn" data-close>取消</button>
         <button class="btn primary" id="expOk">${ICON.download} 导出 Excel</button>
@@ -2555,5 +2576,5 @@ const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 |
 if (typeof window !== 'undefined') { boot(); refreshVersion(); }
 // 仅测试环境导出：Node require 时可调用 boot 做启动冒烟测试；浏览器中 module 未定义，自动跳过，零副作用。
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state };
+  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state, collectTodos, weekRange, addDays, isoDate, TODAY };
 }

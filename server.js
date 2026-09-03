@@ -812,7 +812,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/reports/todo-export' && req.method === 'POST') {
       const body = await readBody(req);
       if (!Array.isArray(body.projects)) return send(res, 400, { error: '缺少项目数据' });
-      const kind = body.kind === 'today' ? 'today' : body.kind === 'month' ? 'month' : 'week';
+      const kind = body.kind === 'today' ? 'today' : body.kind === 'month' ? 'month' : body.kind === 'nextweek' ? 'nextweek' : 'week';
       const today = isoDate(new Date());
       const range = body.range || {};
       const monIso = range.mon || today, sunIso = range.sun || monIso;
@@ -821,7 +821,8 @@ const server = http.createServer(async (req, res) => {
       const fileMap = {
         today: { ascii: 'daily_todo_' + date + '.xlsx', utf8: '今日待办_' + date + '.xlsx' },
         week:  { ascii: 'weekly_todo_' + date + '.xlsx', utf8: '周报待办清单_' + date + '.xlsx' },
-        month: { ascii: 'monthly_todo_' + date + '.xlsx', utf8: '本月待办_' + date + '.xlsx' }
+        month: { ascii: 'monthly_todo_' + date + '.xlsx', utf8: '本月待办_' + date + '.xlsx' },
+        nextweek: { ascii: 'nextweek_todo_' + date + '.xlsx', utf8: '下周待办_' + date + '.xlsx' }
       };
       const { ascii, utf8 } = fileMap[kind];
       res.writeHead(200, {

@@ -2,6 +2,14 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.7-hotfix4（2026-09-03）
+- **待办导出新增「下周待办」（顺延模型）**：导出弹窗范围单选加「下周」选项（与今日/本周/本月并列，默认仍本周）。
+  - 下周待办 = **本周未完成（done=false）任务自动顺延** + **下周原本计划的未完成任务**；已完成的排除。
+  - 两类合并进同一张「待办清单」sheet：顺延项标「⚠ 本周未完成·顺延」（逾期标红），下周计划项标「下周计划」。
+  - 实现：`collectTodos` 加 `nextweek` 分支（算本周日+下周边界、打 `carryover` 标记）；`downloadTodoExcel` 算下周边界并透传 `carryover`；`openExportModal` 加选项；`lib/xlsx-export.js buildTodoXlsx` 顺延任务无条件纳入；`server.js` todo-export 路由放行 `nextweek` kind（此前三元写死会静默回退成 week）。
+- **回归测试**：`test/lib-xlsx-export.test.cjs` 加 nextweek 用例（顺延/计划纳入、已完成排除、标题正确）；新增 `test/todo-nextweek.test.cjs` 锁前端 `collectTodos('nextweek')` 选择逻辑。
+- **待办导出列宽自适应（方案 B）+ 顺手修状态逾期红字 bug**：原 `buildTodoXlsx` 状态列写死 `wch:12`，nextweek 顺延文案「⚠ 本周未完成·顺延」约 10 中文，Excel 下需 ~17 字符宽，12 装不下 → 状态被截断遮住；任务列 36 又偏宽，整体宽窄失衡。改为 `computeTodoCols(rows)` 按单元格字符长度估算（中文/全角×1.8、英文×1，跳过标题合并行避免撑爆首列，min 8 / max 40），状态列自动撑到 ~18、任务列按实际收紧。另修隐藏 bug：状态列索引是 5，但原逾期红字判定写 `c === 6`（第七列，不存在）永不命中 → 状态逾期红字从未生效；改为 `c === 5` 并给状态列加 `wrapText` 兜底换行。
+
 ## v1.4.7-hotfix3（2026-09-02）
 - **启动流程根因重构（彻底修复「未登录永久卡 splash」）**：hotfix2 仅把 modal 抬到 splash 之上、弹框前 `hideSplash()`，属打补丁；真正的脆弱设计仍在——`loadAll()` 用 `Promise.all` 并发 4 个请求，全部 401 时每个都去触发 `showLogin()`，`api()` 在 401 时也会递归弹登录框，启动路径与登录弹窗深度耦合。本次重构：
   - 新增 `probeAuth()`：用需鉴权的 `/api/projects` 试探当前 token（200=已登录，401/无 token=未登录），**不在 loadAll 里并发触发 showLogin**。
