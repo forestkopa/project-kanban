@@ -2,6 +2,13 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.4.7-hotfix5（2026-09-03）
+- **修复「升级页脚自相矛盾」**：页脚同时显示「当前 v1.4.7-hotfix3」+「已是最新（v1.4.7-hotfix4）✓」，导致管理员无法判断是否需升级、一键升级按钮看似失效。
+  - 根因：`public/app.js` 的 `cmpVer(a,b)` 只按 `.` 拆版本号并 `parseInt`，遇到 `1.4.7-hotfix3` 会把 `7-hotfix3` 整段 `parseInt` 得 7，后缀被吞；`cmpVer('1.4.7-hotfix3','1.4.7-hotfix4')` 错误返回 0（相等），`checkUpdate()` 走「已是最新」分支。
+  - 修复：按 `.` 拆数字段、首个 `-` 之后当决胜后缀（空后缀最小，`hotfix3` < `hotfix4` 字典序也对）。`cmpVer` 同步加入 `module.exports` 供单测。
+  - 影响：所有含 `-` 后缀的版本（hotfix1..4 等）现在能正确比较，生产环境升级检测恢复正常，本地 hotfix3 → hotfix4/5 升级链路打通。
+- **新增回归测试**：`test/cmp-ver.test.cjs`（10 断言），含 hotfix3 vs hotfix4 回归点 + 无后缀 vs 有后缀决胜 + 跨大小版本比较；纳入 `test/run-all.cjs`。
+
 ## v1.4.7-hotfix4（2026-09-03）
 - **待办导出新增「下周待办」（顺延模型）**：导出弹窗范围单选加「下周」选项（与今日/本周/本月并列，默认仍本周）。
   - 下周待办 = **本周未完成（done=false）任务自动顺延** + **下周原本计划的未完成任务**；已完成的排除。

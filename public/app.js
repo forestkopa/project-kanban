@@ -2444,13 +2444,25 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
 }
 
 /* ---------- 版本查看：本地版本 ↔ GitHub 最新 Release ---------- */
+// 版本比较：按 '.' 拆数字段，首个 '-' 之后当决胜后缀。
+// 回归点：原实现只按 '.' 拆，导致 '1.4.7-hotfix3' 与 '1.4.7-hotfix4' 被当作 [1,4,7]==[1,4,7]
+// → cmpVer 返回 0 → checkUpdate 走 "已是最新" 分支，生产环境页脚自相矛盾（badge=hotfix3，状态=hotfix4）。
 function cmpVer(a, b) {
-  const pa = ('' + a).split('.').map(x => parseInt(x, 10) || 0);
-  const pb = ('' + b).split('.').map(x => parseInt(x, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0, y = pb[i] || 0;
+  const parse = v => {
+    const s = String(v == null ? '' : v);
+    const i = s.indexOf('-');
+    const main = i >= 0 ? s.slice(0, i) : s;
+    const suffix = i >= 0 ? s.slice(i + 1) : '';
+    const nums = main.split('.').map(x => { const n = parseInt(x, 10); return Number.isFinite(n) ? n : 0; });
+    return { nums, suffix };
+  };
+  const pa = parse(a), pb = parse(b);
+  const len = Math.max(pa.nums.length, pb.nums.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa.nums[i] || 0, y = pb.nums[i] || 0;
     if (x !== y) return x < y ? -1 : 1;
   }
+  if (pa.suffix !== pb.suffix) return pa.suffix < pb.suffix ? -1 : 1;
   return 0;
 }
 async function refreshVersion() {
@@ -2576,5 +2588,5 @@ const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 |
 if (typeof window !== 'undefined') { boot(); refreshVersion(); }
 // 仅测试环境导出：Node require 时可调用 boot 做启动冒烟测试；浏览器中 module 未定义，自动跳过，零副作用。
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state, collectTodos, weekRange, addDays, isoDate, TODAY };
+  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state, collectTodos, weekRange, addDays, isoDate, TODAY, cmpVer };
 }
