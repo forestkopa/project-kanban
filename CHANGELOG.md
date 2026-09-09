@@ -2,6 +2,17 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.5.0（2026-09-09）
+- **AI 助手升级为对话式 Agent**（新增 `lib/ai-agent.js`）：不再只是「问答」，而是理解意图 → 调工具 → 多步执行。
+  - 10 个工具：只读 4（list_projects / get_overview / get_project / search_tasks）、写入 4（create_project / add_task / update_task / update_project）、危险 2（delete_task / delete_project，**先返回确认 token、二次确认才执行，删除进回收站可恢复**）。
+  - 以登录用户身份执行，member 越权访问他人数据直接拒；项目名/任务名模糊匹配，多命中时反问澄清。
+  - 双协议：原生 function calling 优先；小模型不支持时自动降级文本协议（`TOOL:{...}` 指令块），主循环上限 8 步。
+- **对话记录（可新建 / 选择 / 删除，服务端持久化）**：新增 `ai_sessions` + `ai_messages` 两表（user_id/session_id 外键级联、按账号隔离，标题截 40 字、单条消息截 20000 字）。UI 为标题栏双图标（✏️ 新对话 / 🕘 历史对话），历史会话为右侧浮层，零常驻占用，切换/删除后自动收起。
+- **AI 输出 Markdown 结构化渲染**：自研 `mdToHtml`（先转义防 XSS，支持表格/列表/标题/引用/代码块），统一三入口（Agent 对话 / 周报总结 / 月报总结）。
+- **本地模型检测修复**：新增 `/api/ai/local-models` 并行探测 LM Studio(1234) + Ollama(11434)；原「检测本地模型」只认 Ollama，装了 LM Studio 永远检测不到。
+- 修复：本地小模型多步推理被前端 15s 超时 abort（`aiRun` 透传 150s，超时文案改为引导换更小模型或开云端）；月报 AI 总结对只读访客 403（viewer 闸门豁免纯只读 summarize，Agent 工具层补 viewer 纵深防护）；离线模板卡登录框（适配器启动时预置 kb-token）。
+- 新增 6 套测试共 179 断言（ai-agent 79 / e2e 21 / ai-sessions 23 / ai-sessions-api 22 / md-render 23 / ai-timeout 11），全套 27 套件通过（含 jsdom 冒烟 SMOKE_OK）。
+
 ## v1.4.7-hotfix5（2026-09-03）
 - **修复「升级页脚自相矛盾」**：页脚同时显示「当前 v1.4.7-hotfix3」+「已是最新（v1.4.7-hotfix4）✓」，导致管理员无法判断是否需升级、一键升级按钮看似失效。
   - 根因：`public/app.js` 的 `cmpVer(a,b)` 只按 `.` 拆版本号并 `parseInt`，遇到 `1.4.7-hotfix3` 会把 `7-hotfix3` 整段 `parseInt` 得 7，后缀被吞；`cmpVer('1.4.7-hotfix3','1.4.7-hotfix4')` 错误返回 0（相等），`checkUpdate()` 走「已是最新」分支。
