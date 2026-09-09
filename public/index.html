@@ -309,21 +309,34 @@
 <input type="file" id="tplImportFile" accept=".xlsx" style="display:none">
 <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
 
-<!-- AI 助手：描述生成任务 -->
+<!-- AI 助手：对话式 Agent（能查询并操作看板）；左侧为对话记录（可新建/切换/删除） -->
 <div id="aiModal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="width:min(580px,94vw)">
-    <div class="modal-head"><h3>AI 助手 · 智能生成项目</h3><button class="x" data-close>×</button></div>
-    <div class="pi-sub">用一句话描述你的项目 / 产品，AI 自动拆解任务清单（阶段 + 工期 + 负责人建议）。</div>
-    <textarea id="aiDesc" class="inp" style="min-height:88px" placeholder="例：做一个智能门锁项目，含指纹/NFC 开锁、防技术开启、10 万次寿命测试，下周三启动"></textarea>
-    <div class="ai-actions">
-      <button class="btn primary" id="aiGenBtn">生成任务清单</button>
-      <button class="btn" id="aiSettingsOpen">AI 设置</button>
-      <span id="aiGenNote" class="pi-sub" style="margin:0"></span>
+  <div class="modal-box ai-wrap" style="width:min(760px,96vw)">
+    <div class="modal-head"><h3>AI 助手</h3><span class="ai-head-right"><span id="aiAgentMode" class="ai-badge"></span><button class="ai-ico" id="aiNewBtn" title="新对话" aria-label="新对话"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button><button class="ai-ico" id="aiHistBtn" title="历史对话" aria-label="历史对话"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></button><button class="x" data-close>×</button></span></div>
+    <div class="ai-body">
+      <div class="ai-main">
+        <div id="aiChatLog" class="ai-log" aria-live="polite"></div>
+        <div id="aiConfirm" class="ai-confirm hidden"></div>
+        <div class="ai-chips" id="aiChips">
+          <button class="ai-chip" data-q="我有几个项目？整体进度如何">有几个项目</button>
+          <button class="ai-chip" data-q="有哪些逾期的任务？">逾期任务</button>
+          <button class="ai-chip" data-q="本周有什么任务到期？">本周到期</button>
+          <button class="ai-chip" data-q="帮我建一个智能音箱降本项目，含结构降本与固件开发">建个项目</button>
+        </div>
+        <div class="ai-input-row">
+          <textarea id="aiInput" class="inp" rows="2" placeholder="问进度、找任务，或直接让我改，如「把音箱项目的结构打样标为完成」（Enter 发送 / Shift+Enter 换行）"></textarea>
+          <button class="btn primary" id="aiSendBtn">发送</button>
+        </div>
+      </div>
+      <div class="ai-side" id="aiSide">
+        <div class="ai-side-head"><b>历史对话</b><button class="ai-ico" id="aiSideClose" title="收起列表" aria-label="收起列表"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+        <div class="ai-sess-list" id="aiSessList"></div>
+        <div class="ai-side-foot" id="aiSessMeta"></div>
+      </div>
     </div>
-    <div id="aiPreview" class="ai-preview"></div>
-    <div class="ai-actions" id="aiCreateRow" style="display:none;margin-top:14px">
-      <input id="aiProjName" class="inp" style="margin:0;flex:1" placeholder="项目名称">
-      <button class="btn primary" id="aiCreateBtn">创建项目</button>
+    <div class="ai-foot">
+      <span id="aiGenNote" class="pi-sub" style="margin:0"></span>
+      <button class="btn" id="aiSettingsOpen">AI 设置</button>
     </div>
   </div>
 </div>
@@ -338,7 +351,7 @@
     <input id="aiKey" class="inp" type="password" placeholder="API Key（本地模型无需填写）">
     <label class="remember-row"><input type="checkbox" id="aiLocal"> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:2px"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M9 20h6"/><path d="M12 16v4"/></svg> 本地大模型（无需 API Key，需 OpenAI 兼容服务：Ollama / LM Studio / vLLM）</label>
     <div class="nu-row" style="margin:6px 0">
-      <button class="btn" id="aiDetectOllama"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>检测本机 Ollama</button>
+      <button class="btn" id="aiDetectOllama"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>检测本地模型</button>
       <select id="aiLocalModel" class="inp" style="display:none;margin:0"></select>
       <span id="aiOllamaMsg" class="pi-sub" style="margin:0"></span>
     </div>
@@ -352,12 +365,12 @@
 
 <!-- AI 项目总结 -->
 <div id="aiSummaryModal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="width:min(580px,94vw)">
+  <div class="modal-box" style="width:min(720px,94vw)">
     <div class="modal-head"><h3>AI 项目总结</h3><button class="x" data-close>×</button></div>
-    <div class="pi-sub">由大模型基于项目数据生成（需配置 AI Key）。</div>
-    <textarea id="aiSummaryText" class="inp" style="min-height:170px" readonly></textarea>
+    <div class="pi-sub">由大模型基于项目数据生成（需配置 AI Key）。已按 Markdown 排版，可直接复制进日报 / 周报 / 月报。</div>
+    <div id="aiSummaryView" class="md ai-summary-view"></div>
     <div class="ai-actions">
-      <button class="btn" id="aiSummaryCopy">复制</button>
+      <button class="btn" id="aiSummaryCopy">复制文本</button>
       <button class="btn primary" id="aiSummaryClose">关闭</button>
     </div>
   </div>

@@ -88,10 +88,27 @@ function init(file) {
       payload_json TEXT NOT NULL,
       deleted_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS ai_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT '新对话',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS ai_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES ai_sessions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      meta_json TEXT DEFAULT '',
+      created_at TEXT NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id, sort);
     CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
     CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens(user_id);
     CREATE INDEX IF NOT EXISTS idx_trash_user ON trash(user_id, deleted_at);
+    CREATE INDEX IF NOT EXISTS idx_ai_sessions_user ON ai_sessions(user_id, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_ai_messages_session ON ai_messages(session_id);
   `);
   // 兼容旧库：幂等补列（新建表已含，重复执行的报错按「列已存在」忽略）
   try { db.exec('ALTER TABLE tokens ADD COLUMN expires_at TEXT'); } catch (e) { /* 列已存在 */ }
@@ -423,4 +440,60 @@ function migrateJson(seedFilePath, ownerId) {
 }
 
 module.exports = { init, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, usesDefaultPassword, changePassword, resetPassword, issueToken, tokenUserId, cleanupExpiredTokens, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser,
-  trashPush, trashList, trashGet, trashDrop, purgeTrash, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword };
+  trashPush, trashList, trashGet, trashDrop, purgeTrash, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword,
+  aiListSessions, aiCreateSession, aiRenameSession, aiDeleteSession, aiListMessages, aiAppendMessages };
+
+/* ---------------- AI 助手：对话记录（会话 + 消息，owner 隔离） ----------------
+   会话归属 user_id：只能看/改/删自己的；删除会话级联删消息（外键 ON DELETE CASCADE）。 */
+const AI_TITLE_MAX = 40, AI_MSG_MAX = 20000; // 标题与单条消息长度上限（防脏数据撑爆存储）
+function aiListSessions(userId) {
+  const rows = db.prepare(`SELECT s.id, s.title, s.created_at, s.updated_at,
+      (SELECT COUNT(*) FROM ai_messages m WHERE m.session_id = s.id) AS msg_count
+    FROM ai_sessions s WHERE s.user_id = ? ORDER BY s.updated_at DESC`).all(userId);
+  return rows.map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, updatedAt: r.updated_at, msgCount: r.msg_count }));
+}
+function aiCreateSession(userId, title) {
+  const id = 'ais_' + crypto.randomBytes(8).toString('hex');
+  const now = new Date().toISOString();
+  const safeTitle = String(title || '').trim().slice(0, AI_TITLE_MAX) || '新对话';
+  db.prepare('INSERT INTO ai_sessions (id,user_id,title,created_at,updated_at) VALUES (?,?,?,?,?)').run(id, userId, safeTitle, now, now);
+  return { id, title: safeTitle, createdAt: now, updatedAt: now, msgCount: 0 };
+}
+function aiRenameSession(userId, sessionId, title) {
+  const safeTitle = String(title || '').trim().slice(0, AI_TITLE_MAX);
+  if (!safeTitle) return false;
+  const r = db.prepare('UPDATE ai_sessions SET title=?, updated_at=? WHERE id=? AND user_id=?').run(safeTitle, new Date().toISOString(), sessionId, userId);
+  return r.changes > 0;
+}
+function aiDeleteSession(userId, sessionId) {
+  const r = db.prepare('DELETE FROM ai_sessions WHERE id=? AND user_id=?').run(sessionId, userId);
+  return r.changes > 0;
+}
+function aiListMessages(userId, sessionId) {
+  const s = db.prepare('SELECT id FROM ai_sessions WHERE id=? AND user_id=?').get(sessionId, userId);
+  if (!s) return null; // 会话不存在或非本人 → 调用方按 404/403 处理
+  const rows = db.prepare('SELECT id,role,content,meta_json,created_at FROM ai_messages WHERE session_id=? ORDER BY created_at, rowid').all(sessionId);
+  return rows.map(r => ({ id: r.id, role: r.role, content: r.content, meta: r.meta_json ? JSON.parse(r.meta_json) : {}, createdAt: r.created_at }));
+}
+// 追加消息（整批原子写 + 刷新会话 updated_at 到最新一条）；msgs: [{role,content,meta?}]
+function aiAppendMessages(userId, sessionId, msgs) {
+  const s = db.prepare('SELECT id FROM ai_sessions WHERE id=? AND user_id=?').get(sessionId, userId);
+  if (!s) return null;
+  if (!Array.isArray(msgs) || !msgs.length) return { added: 0, sessionId };
+  const now = new Date().toISOString();
+  const ins = db.prepare('INSERT INTO ai_messages (id,session_id,role,content,meta_json,created_at) VALUES (?,?,?,?,?,?)');
+  let added = 0, lastTs = now;
+  db.exec('BEGIN');
+  try {
+    msgs.forEach(m => {
+      const role = String(m && m.role || 'user') === 'ai' ? 'ai' : 'user';
+      const content = String((m && m.content) || '').slice(0, AI_MSG_MAX);
+      if (!content.trim() && role === 'user') return; // 空 user 消息不入库
+      ins.run('aim_' + crypto.randomBytes(8).toString('hex'), sessionId, role, content, (m && m.meta) ? JSON.stringify(m.meta) : '', now);
+      added++;
+    });
+    if (added) db.prepare('UPDATE ai_sessions SET updated_at=? WHERE id=?').run(lastTs, sessionId);
+    db.exec('COMMIT');
+  } catch (e) { try { db.exec('ROLLBACK'); } catch (_) {} throw e; }
+  return { added, sessionId };
+}

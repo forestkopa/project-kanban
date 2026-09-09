@@ -16,6 +16,12 @@
   };
 
   function uid(p) { return (p || 'x') + Math.random().toString(36).slice(2, 9); }
+
+  // 演示模式「免登录」：预置会话令牌与用户，使 app.js 的 probeAuth() 直接通过（否则会卡在登录框、看板不渲染）
+  try {
+    if (!localStorage.getItem('kb-token')) localStorage.setItem('kb-token', 'offline');
+    if (!localStorage.getItem('kb-user')) localStorage.setItem('kb-user', JSON.stringify({ name: '演示用户', role: 'admin' }));
+  } catch (e) {}
   function todayISO() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function isoAdd(s, n) { var d = new Date((s || todayISO()) + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function isOverdue(t) { return t && !t.done && t.dueDate && t.dueDate < todayISO(); }
@@ -156,6 +162,59 @@
     ].map(function (t) { return t; });
   }
 
+  /* ---- AI Agent 离线桩：模拟"调用工具→返回结果"，让模板无需后端也能演示完整交互 ---- */
+  var AI_AGENT_TOOLS = [
+    { name: 'list_projects', description: '列出项目及进度概览', write: false, danger: false },
+    { name: 'get_overview', description: '全局概览：逾期/本周到期', write: false, danger: false },
+    { name: 'get_project', description: '查看单个项目详情与任务', write: false, danger: false },
+    { name: 'search_tasks', description: '按关键词/负责人/状态搜索任务', write: false, danger: false },
+    { name: 'create_project', description: '创建项目并自动排期', write: true, danger: false },
+    { name: 'add_task', description: '给项目新增任务', write: true, danger: false },
+    { name: 'update_task', description: '修改任务（负责人/工期/状态）', write: true, danger: false },
+    { name: 'update_project', description: '修改项目属性', write: true, danger: false },
+    { name: 'delete_task', description: '删除任务（需确认）', write: true, danger: true },
+    { name: 'delete_project', description: '删除项目（需确认）', write: true, danger: true }
+  ];
+  function iso(d) { var m = d.getMonth() + 1, day = d.getDate(); return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day); }
+  function aiAgentRespond(body) {
+    var q = String((body && body.message) || '');
+    var ps = projects() || [];
+    if (body && body.confirmToken) {
+      return { ok: true, changed: true, text: '（离线演示）已确认执行，演示数据已更新。', steps: [{ tool: 'delete_task', args: {}, result: { deleted: true, message: '已删除' }, committed: true }] };
+    }
+    if (body && body.cancelledToken) return { ok: true, text: '已取消该操作，数据未改动。', steps: [] };
+    if (/逾期/.test(q)) {
+      var td = iso(new Date()), od = [];
+      ps.forEach(function (p) {
+        (p.tasks || []).forEach(function (t) { if (!t.done && t.dueDate && t.dueDate < td) od.push({ title: t.title, dueDate: t.dueDate, project: p.name }); });
+      });
+      return {
+        ok: true, text: '（离线演示）共 ' + od.length + ' 个逾期任务：' + (od.slice(0, 5).map(function (x) { return '「' + x.title + '」(' + x.dueDate + ')'; }).join('、') || '无逾期'),
+        steps: [{ tool: 'search_tasks', args: { overdue_only: true }, result: { count: od.length } }]
+      };
+    }
+    if (/进度|几个项目|概况|整体|项目/.test(q)) {
+      var total = 0, done = 0;
+      ps.forEach(function (p) { total += (p.tasks || []).length; done += (p.tasks || []).filter(function (t) { return t.done; }).length; });
+      return {
+        ok: true, text: '（离线演示）当前 ' + ps.length + ' 个项目，共 ' + total + ' 个任务，已完成 ' + done + ' 个，整体进度 ' + (total ? Math.round(done / total * 100) : 0) + '%。',
+        steps: [{ tool: 'list_projects', args: {}, result: { count: ps.length } }, { tool: 'get_overview', args: {}, result: { taskTotal: total, taskDone: done } }]
+      };
+    }
+    if (/删除|删掉/.test(q)) {
+      var p0 = ps[0] || {}, t0 = (p0.tasks || [])[0] || {};
+      var preview = { action: '删除任务', project: p0.name || '示例项目', task: t0.title || '示例任务', hint: '离线演示：确认后仅更新演示数据' };
+      return { ok: true, text: '⚠️ 需要你确认：删除任务（' + (t0.title || '示例任务') + '）。确认后才会执行。', steps: [{ tool: 'delete_task', args: {}, pending: true, preview: preview }], pending: { token: 'demo_confirm_1', preview: preview } };
+    }
+    if (/建|创建|新建/.test(q)) {
+      return { ok: true, text: '（离线演示）已创建项目「AI 生成项目」，含 5 个任务并自动排期。', steps: [{ tool: 'create_project', args: { name: 'AI 生成项目' }, result: { created: true, taskCount: 5, message: '已创建项目' } }] };
+    }
+    if (/完成|标为|负责人|改/.test(q)) {
+      return { ok: true, text: '（离线演示）已更新任务（标记完成）。', steps: [{ tool: 'update_task', args: { done: true }, result: { changed: true, changes: ['标记完成'], message: '已更新任务' } }] };
+    }
+    return { ok: true, text: '（离线演示）我是看板 AI 助手：可以查进度、找逾期任务、建项目、改任务状态；删除类操作会先请你确认。当前共 ' + ps.length + ' 个项目。接入真实 AI 后，我会调用看板工具给你真实数据。', steps: [] };
+  }
+
   function buildReport() {
     var rows = {};
     projects().forEach(function (p) {
@@ -203,9 +262,49 @@
     // /ai
     if (path === '/ai/config' && method === 'GET') return res({ configured: false });
     if (path === '/ai/config' && method === 'POST') return res({ ok: true });
-    if (path === '/ai/ollama-models' && method === 'GET') return res([]);
+    if (path === '/ai/local-models' && method === 'GET') return res({ online: true, models: [{ id: 'minicpm5-2b', source: 'LM Studio', base_url: 'http://127.0.0.1:1234/v1' }, { id: 'qwen2.5:7b', source: 'Ollama', base_url: 'http://127.0.0.1:11434/v1' }] });
+    if (path === '/ai/agent/tools' && method === 'GET') return res({ tools: AI_AGENT_TOOLS });
+    if (path === '/ai/agent' && method === 'POST') return res(aiAgentRespond(body));
     if (path === '/ai/generate-tasks' && method === 'POST') return res({ tasks: aiGenerate(body && body.description) });
     if (path === '/ai/summarize' && method === 'POST') return res({ text: '（离线演示）基于当前项目数据：整体进度可控，关键路径为打样试制→测试验证→试产发布；建议重点关注逾期任务与模具 T0 节点，确保试产发布按期达成。' });
+    // /ai/sessions 对话记录（离线持久化到 localStorage，与在线版同构）
+    {
+      const aiSessAll = () => JSON.parse(LS.g('kb-ai-sessions', '[]') || '[]');
+      const aiSessSave = v => LS.s('kb-ai-sessions', JSON.stringify(v));
+      const aiMsgsAll = () => JSON.parse(LS.g('kb-ai-msgs', '{}') || '{}');
+      const aiMsgsSave = v => LS.s('kb-ai-msgs', JSON.stringify(v));
+      if (path === '/ai/sessions' && method === 'GET') {
+        const list = aiSessAll().map(s => ({ id: s.id, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt, msgCount: (aiMsgsAll()[s.id] || []).length }));
+        return res({ sessions: list.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)) });
+      }
+      if (path === '/ai/sessions' && method === 'POST') {
+        const id = uid('ais'); const now = new Date().toISOString();
+        const s = { id, title: (body && body.title) || '新对话', createdAt: now, updatedAt: now };
+        aiSessSave(aiSessAll().concat([s])); return res(s);
+      }
+      var sessDel = path.match(/^\/ai\/sessions\/([^/]+)$/);
+      if (sessDel && method === 'DELETE') {
+        aiSessSave(aiSessAll().filter(x => x.id !== sessDel[1]));
+        const ms = aiMsgsAll(); delete ms[sessDel[1]]; aiMsgsSave(ms);
+        return res({ ok: true });
+      }
+      if (sessDel && method === 'PUT') {
+        aiSessSave(aiSessAll().map(x => x.id === sessDel[1] ? Object.assign({}, x, { title: (body && body.title) || x.title, updatedAt: new Date().toISOString() }) : x));
+        return res({ ok: true });
+      }
+      var sessMsg = path.match(/^\/ai\/sessions\/([^/]+)\/messages$/);
+      if (sessMsg && method === 'GET') return res({ messages: aiMsgsAll()[sessMsg[1]] || [] });
+      if (sessMsg && method === 'POST') {
+        const ms = aiMsgsAll(); const arr = ms[sessMsg[1]] || [];
+        const now = new Date().toISOString();
+        ((body && body.messages) || []).forEach(m => {
+          if (m && m.content !== undefined && m.content !== '') arr.push({ id: uid('aim'), role: m.role === 'ai' ? 'ai' : 'user', content: String(m.content), meta: m.meta || {}, createdAt: now });
+        });
+        ms[sessMsg[1]] = arr; aiMsgsSave(ms);
+        aiSessSave(aiSessAll().map(x => x.id === sessMsg[1] ? Object.assign({}, x, { updatedAt: now }) : x));
+        return res({ added: arr.length, sessionId: sessMsg[1] });
+      }
+    }
     // /users / password / readonly(POST)
     if (path === '/users' && method === 'GET') return res([]);
     if (path === '/users' && method === 'POST') return res({});

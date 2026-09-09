@@ -20,6 +20,12 @@ run('数据层权限单测', [path.join(__dirname, 'db-permissions.test.cjs')], 
 run('lib 纯函数单测(recurrence)', [path.join(__dirname, 'lib-recurrence.test.cjs')], nodeOpts);
 run('lib 纯函数单测(xlsx-export)', [path.join(__dirname, 'lib-xlsx-export.test.cjs')], nodeOpts);
 run('版本比较纯函数单测(cmpVer)', [path.join(__dirname, 'cmp-ver.test.cjs')], nodeOpts);
+run('AI Markdown 渲染单测(mdToHtml)', [path.join(__dirname, 'md-render.test.cjs')], nodeOpts);
+run('AI 超时配置回归(本地慢模型)', [path.join(__dirname, 'ai-timeout.test.cjs')], nodeOpts);
+run('AI 对话记录 db 层(会话 CRUD/隔离)', [path.join(__dirname, 'ai-sessions.test.cjs')], nodeOpts);
+run('AI 对话记录 API(真实实例)', [path.join(__dirname, 'ai-sessions-api.test.cjs')], nodeOpts);
+run('AI Agent 单测(权限/确认/双协议)', [path.join(__dirname, 'ai-agent.test.cjs')], nodeOpts);
+run('AI Agent 端到端(真实实例+mock LLM)', [path.join(__dirname, 'ai-agent.e2e.cjs')], nodeOpts);
 run('后端 API 集成', [path.join(__dirname, 'api.integration.test.cjs')], nodeOpts);
 run('角色分级强制(live)', [path.join(__dirname, 'api-roles.test.cjs')], nodeOpts);
 run('升级链路集成(v1.4.6 回归)', [path.join(__dirname, 'upgrade.integration.test.cjs')], nodeOpts);

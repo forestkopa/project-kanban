@@ -42,7 +42,11 @@ async function api(path, opts = {}) {
     const { timeout: _drop, ...rest } = o || {};
     return fetch(u, { ...rest, signal: c.signal }).finally(() => clearTimeout(t))
       .catch(e => {
-        if (e && e.name === 'AbortError') throw new Error('请求超时（' + ms + 'ms），请重试');
+        if (e && e.name === 'AbortError') {
+          // 给用户更准的归因（之前统一"请求超时，请重试"误导，因为本地小模型确实慢）
+          const sec = Math.round(ms / 1000);
+          throw new Error('请求超过 ' + sec + ' 秒未返回。本地小模型（如 LM Studio）推理较慢属正常；若反复超时，请在「AI 设置」换更小的模型或开启云端接口');
+        }
         // 网络层失败（DNS/TCP/TLS/隧道断）：翻译成人话，避免原始 "TypeError: fetch failed" 让用户看不懂
         throw new Error('无法连接到看板服务：' + (e && e.message ? e.message : '网络异常') + '。请检查：①公网隧道（Cloudflare）是否在线；②本地 DNS 解析是否正常；③浏览器是否禁用第三方请求');
       });
@@ -1446,7 +1450,7 @@ $$('.modal').forEach(bindModalA11y);
    AI 助手 + 移动端抽屉 + 模板共创
    ========================================================= */
 const PHASE_OPTIONS = ['需求立项', '设计开发', '打样试制', '测试验证', '量产导入', '上市运营'];
-let aiTasks = null;
+// 工具中文名（展示"AI 做了什么"）
 
 /* ---- 移动端抽屉 ---- */
 function openSidebar() { $('#sidebar').classList.add('open'); $('#scrim').classList.remove('hidden'); }
@@ -1455,57 +1459,352 @@ $('#menuBtn').onclick = openSidebar;
 $('#scrim').onclick = closeSidebar;
 $$('.tab').forEach(b => { const o = b.onclick; b.onclick = () => { o && o(); closeSidebar(); }; });
 
-/* ---- AI 助手：生成任务清单 ---- */
-async function loadAiConfig() {
-  try { const c = await api('/ai/config'); $('#aiGenNote').textContent = c.configured ? ('已接入：' + (c.model || '')) : '未配置 AI Key：将使用内置模板智能建议'; return c; }
-  catch (e) { return null; }
+/* ---- AI 输出 Markdown → 结构化 HTML（轻量自研渲染器；XSS 安全：先转义后解析） ---- */
+function mdInline(t) { // 行内：`code` / **加粗** / *斜体* / [文本](http链接)，入参须已 esc
+  t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  t = t.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
 }
-function openAiModal() { $('#aiModal').classList.remove('hidden'); $('#aiPreview').innerHTML = ''; $('#aiCreateRow').style.display = 'none'; $('#aiGenNote').textContent = ''; loadAiConfig(); $('#aiDesc').focus(); }
-$('#aiBtn').onclick = openAiModal;
-async function aiGenerate() {
-  const desc = $('#aiDesc').value.trim();
-  if (!desc) { toast('请先描述你的项目'); return; }
-  const btn = $('#aiGenBtn'); btn.disabled = true; const old = btn.textContent; btn.textContent = '生成中…';
+function mdTblSep(ln) { // 表格分隔行：| --- | :---: |
+  const t = String(ln || '').trim();
+  if (!t || t[0] !== '|') return false;
+  const cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|');
+  return cells.length > 0 && cells.every(c => /^\s*:?-{3,}:?\s*$/.test(c));
+}
+function mdToHtml(text) {
+  if (text == null) return '';
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let i = 0;
+  const listKind = t => t[0] === '>' ? 'quote' : (/^\d[.)]\s+/.test(t) ? 'ol' : (/^[-*+]\s+/.test(t) ? 'ul' : ''));
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (!t) { i++; continue; }
+    if (/^```/.test(t)) { // 代码块
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { buf.push(lines[i]); i++; }
+      i++;
+      out.push('<pre><code>' + esc(buf.join('\n')) + '</code></pre>');
+      continue;
+    }
+    if (t[0] === '|' && i + 1 < lines.length && mdTblSep(lines[i + 1])) { // 表格
+      const rows = [];
+      while (i < lines.length && lines[i].trim()[0] === '|') { rows.push(lines[i]); i++; }
+      const cells = r => r.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => mdInline(esc(c.trim())));
+      let h = '<div class="tblwrap"><table>';
+      rows.forEach((r, idx) => {
+        if (idx === 1) return; // 第二行是分隔行 |---|---|，不渲染
+        const cs = cells(r);
+        if (idx === 0) h += '<thead><tr>' + cs.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>';
+        else h += '<tr>' + cs.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+      });
+      out.push(h + '</tbody></table></div>');
+      continue;
+    }
+    const hd = t.match(/^(#{1,4})\s+(.*)$/); // 标题
+    if (hd) { out.push('<b class="md-h md-h' + hd[1].length + '">' + mdInline(esc(hd[2])) + '</b>'); i++; continue; }
+    if (/^(-{3,}|\*{3,})\s*$/.test(t)) { out.push('<hr>'); i++; continue; } // 分隔线
+    const kind = listKind(t); // 列表 / 引用（收集连续同类行）
+    if (kind) {
+      const buf = [];
+      while (i < lines.length) {
+        const tt = lines[i].trim();
+        const k = listKind(tt);
+        if (!k || k !== kind) break;
+        if (k === 'quote') buf.push('<div>' + mdInline(esc(tt.replace(/^>\s?/, ''))) + '</div>');
+        else buf.push('<li>' + mdInline(esc(tt.replace(/^[-*+]\s+|\d+[.)]\s+/, ''))) + '</li>');
+        i++;
+      }
+      out.push(kind === 'quote' ? '<blockquote>' + buf.join('') + '</blockquote>' : '<' + kind + '>' + buf.join('') + '</' + kind + '>');
+      continue;
+    }
+    const para = []; // 普通段落（连续非空行合并）
+    while (i < lines.length) {
+      const tt = lines[i].trim();
+      if (!tt || /^```/.test(tt) || (tt[0] === '|' && i + 1 < lines.length && mdTblSep(lines[i + 1])) || /^#{1,4}\s/.test(tt) || listKind(tt)) break;
+      para.push(mdInline(esc(tt)));
+      i++;
+    }
+    if (para.length) out.push('<p>' + para.join('<br>') + '</p>');
+  }
+  return out.join('\n');
+}
+
+/* ---- AI 助手：对话式 Agent（可查询并操作看板） ---- */
+const TOOL_LABEL = {
+  list_projects: '查询项目列表', get_overview: '获取全局概览', get_project: '查看项目详情',
+  search_tasks: '搜索任务', create_project: '创建项目', add_task: '新增任务',
+  update_task: '修改任务', update_project: '修改项目', delete_task: '删除任务', delete_project: '删除项目'
+};
+let aiHistory = [];   // 对话上下文（回传后端做多轮）
+let aiBusy = false;
+let aiPending = null; // 待确认的危险操作
+let aiSessions = [];  // 当前用户的对话记录列表 [{id,title,updatedAt,msgCount}]
+let aiSessionId = null; // 当前会话 id（null = 尚未落库的新对话）
+let aiSaved = 0;        // aiHistory 中已持久化到当前会话的条数（增量保存游标）
+
+/* ---- 对话记录（会话列表 / 新建 / 切换 / 删除 / 增量持久化）---- */
+function aiShortTs(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  const y = d.getFullYear() === now.getFullYear() ? '' : d.getFullYear() + '/';
+  return y + (d.getMonth() + 1) + '/' + d.getDate();
+}
+// 会话标题（未命名时取首条用户消息）
+function aiSessionTitle() {
+  const firstUser = (aiHistory || []).find(m => m && m.role === 'user');
+  const s = (firstUser && firstUser.content || '').trim().replace(/\s+/g, ' ');
+  return s ? s.slice(0, 18) : '新对话';
+}
+async function aiLoadSessions() {
   try {
-    const r = await api('/ai/generate-tasks', { method: 'POST', body: JSON.stringify({ description: desc }) });
-    aiTasks = (r.tasks || []).map(t => ({ title: String(t.title || ''), phase: String(t.phase || ''), estimateDays: Number(t.estimateDays) || 3, assignee: String(t.assignee || '') }));
-    $('#aiGenNote').textContent = r.note || (r.source === 'ai' ? '由大模型生成' : '');
-    renderAiPreview(aiTasks);
-    $('#aiCreateRow').style.display = 'flex';
-    $('#aiProjName').value = desc.slice(0, 24) || 'AI 生成项目';
-  } catch (e) { toast(e.message); }
-  finally { btn.disabled = false; btn.textContent = old; }
+    const r = await api('/ai/sessions', { timeout: 15000 });
+    aiSessions = Array.isArray(r.sessions) ? r.sessions : [];
+  } catch (e) { aiSessions = []; }
+  aiRenderSess();
 }
-function renderAiPreview(tasks) {
-  const box = $('#aiPreview'); box.innerHTML = '';
-  if (!tasks.length) { box.innerHTML = '<div class="ai-empty">未生成任务，换个描述试试。</div>'; return; }
-  tasks.forEach((t, i) => {
-    const row = document.createElement('div'); row.className = 'ai-row';
-    row.innerHTML = `<span class="ar-seq">${i + 1}</span>
-      <input class="ar-title" value="${esc(t.title)}" data-i="${i}">
-      <select class="ar-phase" data-i="${i}">${PHASE_OPTIONS.map(o => `<option ${o === t.phase ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
-      <input class="ar-days" type="number" min="0" value="${t.estimateDays}" data-i="${i}">`;
-    box.appendChild(row);
+function aiRenderSess() {
+  const el = $('#aiSessList'); if (!el) return;
+  el.innerHTML = '';
+  (aiSessions || []).forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'ai-sess' + (s.id === aiSessionId ? ' active' : '');
+    const title = document.createElement('span');
+    title.className = 'ai-sess-t'; title.textContent = s.title || '新对话';
+    const ts = document.createElement('span');
+    ts.className = 'ai-sess-ts'; ts.textContent = aiShortTs(s.updatedAt);
+    const del = document.createElement('button');
+    del.className = 'ai-sess-del'; del.title = '删除此对话';
+    del.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+    del.onclick = async ev => { ev.stopPropagation(); await aiDeleteSession(s.id); };
+    item.appendChild(title); item.appendChild(ts); item.appendChild(del);
+    item.onclick = () => aiSwitchSession(s.id);
+    el.appendChild(item);
   });
-  box.querySelectorAll('.ar-title').forEach(el => el.oninput = () => { aiTasks[el.dataset.i].title = el.value; });
-  box.querySelectorAll('.ar-phase').forEach(el => el.onchange = () => { aiTasks[el.dataset.i].phase = el.value; });
-  box.querySelectorAll('.ar-days').forEach(el => el.oninput = () => { aiTasks[el.dataset.i].estimateDays = Number(el.value) || 0; });
+  const meta = $('#aiSessMeta');
+  if (meta) meta.textContent = aiSessions.length ? ('共 ' + aiSessions.length + ' 个对话') : '';
 }
-async function aiCreate() {
-  if (!aiTasks || !aiTasks.length) { toast('先生成任务清单'); return; }
-  const name = ($('#aiProjName').value || 'AI 生成项目').trim();
-  const order = [], map = {};
-  aiTasks.forEach(t => { const ph = t.phase || PHASE_OPTIONS[0]; if (!map[ph]) { map[ph] = 'p' + (order.length + 1); order.push({ id: map[ph], name: ph, color: PHASE_COLORS[order.length % PHASE_COLORS.length] }); } });
-  const phases = order.length ? order : [{ id: 'p1', name: PHASE_OPTIONS[0], color: PHASE_COLORS[0] }];
-  const tasks = aiTasks.map(t => ({ title: t.title || '未命名', phaseId: map[t.phase || PHASE_OPTIONS[0]] || phases[0].id, estimateDays: t.estimateDays || 0, assignee: t.assignee || '' }));
+// 把 aiHistory[aiSaved..] 的新消息增量保存到当前会话；无会话则先自动创建（标题取首问）
+async function aiPersist() {
+  const unsaved = (aiHistory || []).length - aiSaved;
+  if (unsaved <= 0) return;
+  const fresh = aiHistory.slice(aiSaved).map(m => ({ role: m.role, content: m.content, meta: m.steps ? { steps: m.steps } : undefined }));
   try {
-    const np = await api('/projects', { method: 'POST', body: JSON.stringify({ name, phases, tasks, type: 'C端', level: 'B' }) });
-    state.projects.push(np); state.currentId = np.id; $('#aiModal').classList.add('hidden'); aiTasks = null;
-    toast('项目已创建：' + np.name); render();
-  } catch (e) { toast(e.message); }
+    let sid = aiSessionId;
+    if (!sid) {
+      const c = await api('/ai/sessions', { method: 'POST', body: JSON.stringify({ title: aiSessionTitle() }), timeout: 15000 });
+      sid = c.id; aiSessionId = sid;
+    }
+    await api('/ai/sessions/' + sid + '/messages', { method: 'POST', body: JSON.stringify({ messages: fresh }), timeout: 15000 });
+    aiSaved = (aiHistory || []).length;
+    // 未命名会话 → 用首问做标题，刷新列表顺序
+    const sess = aiSessions.find(s => s.id === sid);
+    if (!sess || sess.title === '新对话' || sess.title === '') {
+      const t = aiSessionTitle();
+      if (t && t !== '新对话') { try { await api('/ai/sessions/' + sid, { method: 'PUT', body: JSON.stringify({ title: t }), timeout: 15000 }); } catch (e) {} }
+    }
+    await aiLoadSessions();
+  } catch (e) { console.error('[ai] 保存对话记录失败:', e); }
 }
-$('#aiGenBtn').onclick = aiGenerate;
-$('#aiCreateBtn').onclick = aiCreate;
+async function aiNewSession() {
+  if (aiBusy) return;
+  await aiPersist(); // 当前未命名对话先落库（若有内容）
+  aiSessionId = null; aiSaved = 0; aiHistory = [];
+  const log = $('#aiChatLog'); if (log) log.innerHTML = '';
+  aiMsg('ai', '你好，我是看板 AI 助手。我能查进度、找逾期任务、建项目、改任务负责人和状态；<b>删除类操作会先请你确认</b>才会执行。');
+  aiRenderSess();
+  aiSideClose(); // 新对话后收起历史浮层
+  const inp = $('#aiInput'); if (inp) { inp.disabled = false; setTimeout(() => inp.focus(), 60); }
+}
+async function aiSwitchSession(id) {
+  if (aiBusy) return;
+  await aiPersist(); // 切换前把当前会话未保存内容落库
+  try {
+    const r = await api('/ai/sessions/' + id + '/messages', { timeout: 15000 });
+    const msgs = Array.isArray(r.messages) ? r.messages : [];
+    aiSessionId = id; aiHistory = msgs.map(m => ({ role: m.role, content: m.content, steps: (m.meta && m.meta.steps) || null }));
+    aiSaved = aiHistory.length;
+    const log = $('#aiChatLog'); if (log) log.innerHTML = '';
+    if (!aiHistory.length) aiMsg('ai', '这个对话还是空的，说点什么开始吧。');
+    aiHistory.forEach(m => {
+      if (m.role === 'user') aiMsg('user', esc(m.content).replace(/\n/g, '<br>'));
+      else aiMsg('ai', mdToHtml(m.content || ''), m.steps || []);
+    });
+    aiRenderSess();
+    aiSideClose(); // 切换完成收起浮层，回到对话视图
+    const inp = $('#aiInput'); if (inp) { inp.disabled = false; setTimeout(() => inp.focus(), 60); }
+  } catch (e) { toast('加载对话失败：' + (e.message || '')); }
+}
+async function aiDeleteSession(id) {
+  if (aiBusy) return;
+  if (!window.confirm('删除这组对话记录？此操作不可恢复。')) return;
+  try {
+    await api('/ai/sessions/' + id, { method: 'DELETE', timeout: 15000 });
+    if (aiSessionId === id) { aiSessionId = null; aiSaved = 0; aiHistory = []; const log = $('#aiChatLog'); if (log) log.innerHTML = ''; aiMsg('ai', '对话已删除。点「新对话」开新提问，或点右上「历史对话」图标选其他记录。'); }
+    await aiLoadSessions();
+  } catch (e) { toast('删除失败：' + (e.message || '')); }
+}
+function aiModalReset() { aiPending = null; aiSessionId = null; aiSaved = 0; aiHistory = []; aiSessions = []; const log = $('#aiChatLog'); if (log) log.innerHTML = ''; hideAiConfirm(); }
+
+async function loadAiConfig() {
+  try {
+    const c = await api('/ai/config');
+    $('#aiGenNote').textContent = c.configured ? ('已接入：' + (c.model || '')) : '未配置 AI：请在「AI 设置」填写 Key 或启用本地模型';
+    return c;
+  } catch (e) { return null; }
+}
+
+function aiScroll() { const el = $('#aiChatLog'); if (el) el.scrollTop = el.scrollHeight; }
+function aiMsg(role, html, steps) {
+  const box = document.createElement('div');
+  box.className = 'ai-msg ' + (role === 'user' ? 'ai-me' : 'ai-bot');
+  const bubble = document.createElement('div');
+  bubble.className = 'ai-bubble'; bubble.innerHTML = html;
+  box.appendChild(bubble);
+  if (steps && steps.length) box.appendChild(aiStepsEl(steps));
+  $('#aiChatLog').appendChild(box);
+  aiScroll();
+  return bubble;
+}
+function aiStepsEl(steps) {
+  const wrap = document.createElement('details');
+  wrap.className = 'ai-steps';
+  const sum = document.createElement('summary');
+  const wrote = steps.filter(s => ['create_project', 'add_task', 'update_task', 'update_project'].indexOf(s.tool) >= 0).length;
+  sum.textContent = wrote ? ('已执行 ' + wrote + ' 项修改（共 ' + steps.length + ' 步）') : ('执行了 ' + steps.length + ' 个查询');
+  wrap.appendChild(sum);
+  steps.forEach(s => {
+    const d = document.createElement('div'); d.className = 'ai-step';
+    let detail = ''; const r = s.result || {};
+    if (s.pending) detail = '等待确认…';
+    else if (r.error) detail = '失败：' + r.error;
+    else if (r.message) detail = r.message;
+    else if (r.count !== undefined) detail = '返回 ' + r.count + ' 条';
+    else if (r.name) detail = r.name;
+    d.innerHTML = '<span class="ai-step-name">' + esc(TOOL_LABEL[s.tool] || s.tool) + '</span><span class="ai-step-res">' + esc(detail) + '</span>';
+    wrap.appendChild(d);
+  });
+  return wrap;
+}
+function aiSetBusy(b) {
+  const btn = $('#aiSendBtn'); if (btn) { btn.disabled = !!b; btn.textContent = b ? '处理中…' : '发送'; }
+  const inp = $('#aiInput'); if (inp && !b) inp.disabled = false;
+}
+function showAiConfirm(pending) {
+  aiPending = pending;
+  const box = $('#aiConfirm'); if (!box) return;
+  const pv = pending.preview || {};
+  let lines = '';
+  if (pv.project) lines += '项目：' + esc(pv.project) + '<br>';
+  if (pv.task) lines += '任务：' + esc(pv.task) + '<br>';
+  if (pv.assignee) lines += '负责人：' + esc(pv.assignee) + '<br>';
+  if (pv.dueDate) lines += '截止：' + esc(pv.dueDate) + '<br>';
+  if (pv.taskCount !== undefined) lines += '含 ' + Number(pv.taskCount) + ' 个任务<br>';
+  box.innerHTML = '<div class="ai-confirm-title">⚠️ ' + esc(pv.action || '危险操作') + '</div>' +
+    '<div class="ai-confirm-body">' + lines + '<span class="ai-confirm-hint">' + esc(pv.hint || '执行后可在回收站恢复') + '</span></div>' +
+    '<div class="ai-confirm-actions"><button class="btn" id="aiCancelBtn">取消</button><button class="btn primary" id="aiOkBtn">确认执行</button></div>';
+  box.classList.remove('hidden');
+  $('#aiOkBtn').onclick = () => aiRun({ confirmToken: pending.token });
+  $('#aiCancelBtn').onclick = () => aiRun({ cancelledToken: pending.token });
+  aiScroll();
+}
+function hideAiConfirm() { aiPending = null; const b = $('#aiConfirm'); if (b) { b.classList.add('hidden'); b.innerHTML = ''; } }
+
+// 统一入口：普通提问 / 确认待执行操作 / 取消待执行操作
+// AI Agent 单轮会走「模型推理→工具调用→再推理」多步循环，本地小模型（比如 LM Studio 上的 2b）单步可能 10~30s，
+// 整轮 120s 都可能。所以前端 timeout 必须高于后端 server.js 调 LM Studio 的 120s，否则会被前端先 abort 而非后端自然完成。
+const AI_AGENT_TIMEOUT_MS = 150000; // 150s，留 30s 余量给后端多步+冷启动
+async function aiRun(payload) {
+  if (aiBusy) return;
+  aiBusy = true; aiSetBusy(true); hideAiConfirm();
+  const bubble = aiMsg('ai', '<span class="ai-typing">思考中…</span>');
+  const isConfirm = !!(payload.confirmToken || payload.cancelledToken);
+  try {
+    const body = Object.assign({ history: isConfirm ? aiCtx() : aiCtx().slice(0, -1) }, payload);
+    const r = await api('/ai/agent', { method: 'POST', body: JSON.stringify(body), timeout: AI_AGENT_TIMEOUT_MS });
+    const text = r.text || r.error || '（无响应）';
+    bubble.innerHTML = mdToHtml(text);
+    const steps = r.steps || [];
+    if (steps.length) {
+      const box = bubble.parentElement;
+      const old = box.querySelector('.ai-steps'); if (old) old.remove();
+      box.appendChild(aiStepsEl(steps));
+    }
+    if (r.mode === 'text' && $('#aiAgentMode')) $('#aiAgentMode').textContent = '文本协议（模型不支持函数调用）';
+    aiHistory.push({ role: 'ai', content: text, steps: (steps && steps.length) ? steps : null });
+    if (r.pending) showAiConfirm(r.pending);
+    // 数据被改动 → 静默刷新看板（用户无需手动 F5）
+    const changed = r.changed || steps.some(s => s.committed || ['create_project', 'add_task', 'update_task', 'update_project'].indexOf(s.tool) >= 0);
+    if (changed) { try { await loadAll(); render(); } catch (e) { console.error('[ai] 刷新看板失败:', e); } }
+  } catch (e) {
+    bubble.innerHTML = '<span class="ai-err">出错：' + esc((e && e.message) || '请求失败') + '</span>';
+    // 出错也把 user 提问落库（保留提问记录，AI 侧缺失可见）
+  } finally {
+    aiBusy = false; aiSetBusy(false); aiScroll();
+    aiPersist(); // 增量保存本轮对话（fire-and-forget，内部自捕错）
+  }
+}
+
+async function aiSend() {
+  const el = $('#aiInput');
+  const text = ((el && el.value) || '').trim();
+  if (!text || aiBusy) return;
+  el.value = '';
+  aiMsg('user', esc(text).replace(/\n/g, '<br>'));
+  aiHistory.push({ role: 'user', content: text });
+  await aiRun({ message: text });
+}
+
+// 供后端做多轮上下文：只保留 role/content，steps 等本地展示字段不发出
+function aiCtx() { return (aiHistory || []).map(m => ({ role: m.role === 'ai' ? 'ai' : 'user', content: String(m.content || '') })); }
+
+async function openAiModal() {
+  $('#aiModal').classList.remove('hidden');
+  loadAiConfig();
+  aiLoadSessions(); // 对话记录列表
+  const log = $('#aiChatLog');
+  if (!aiHistory.length && log && !log.children.length) {
+    aiMsg('ai', '你好，我是看板 AI 助手。我能查进度、找逾期任务、建项目、改任务负责人和状态；<b>删除类操作会先请你确认</b>才会执行。');
+  }
+  const inp = $('#aiInput'); if (inp) { inp.disabled = false; setTimeout(() => inp.focus(), 60); }
+  aiScroll();
+}
+$('#aiBtn').onclick = openAiModal;
+$('#aiNewBtn').onclick = aiNewSession;
+$('#aiSendBtn').onclick = aiSend;
+$('#aiInput').onkeydown = e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); }
+};
+$$('#aiChips .ai-chip').forEach(b => {
+  b.onclick = () => { const inp = $('#aiInput'); if (aiBusy || !inp) return; inp.value = b.dataset.q || ''; aiSend(); };
+});
+
+/* ---- 历史对话浮层（标题栏「历史对话」图标开合，平时不占空间） ---- */
+function aiSideOpen() {
+  const side = $('#aiSide'); if (!side) return;
+  side.classList.add('open');
+  const b = $('#aiHistBtn'); if (b) b.classList.add('active');
+  aiScroll();
+}
+function aiSideClose() {
+  const side = $('#aiSide'); if (side) side.classList.remove('open');
+  const b = $('#aiHistBtn'); if (b) b.classList.remove('active');
+}
+function aiSideToggle() { const side = $('#aiSide'); if (side) { side.classList.contains('open') ? aiSideClose() : aiSideOpen(); } }
+$('#aiHistBtn').onclick = aiSideToggle;
+$('#aiSideClose').onclick = ev => { ev.stopPropagation(); aiSideClose(); };
+// 浮层开着时点对话区任意处 → 收起（点会话项/删除按钮/头部图标不触发关闭由内部处理）
+document.addEventListener('click', ev => {
+  const side = $('#aiSide');
+  if (!side || !side.classList.contains('open')) return;
+  if (side.contains(ev.target)) return;
+  if (ev.target && ev.target.closest && ev.target.closest('#aiHistBtn, #aiNewBtn')) return;
+  aiSideClose();
+});
 
 /* ---- AI 设置 ---- */
 async function openAiSettings() {
@@ -1533,26 +1832,30 @@ $('#aiKeyClear').onclick = async () => {
     toast('API Key 已清除');
   } catch (e) { $('#aiSettingsMsg').textContent = '清除失败：' + e.message; }
 };
-// 本地大模型：检测本机 Ollama
+// 本地大模型：检测本机 LM Studio / Ollama
+let localModelMap = {};
 $('#aiDetectOllama').onclick = async () => {
   const msg = $('#aiOllamaMsg'), sel = $('#aiLocalModel');
   msg.textContent = '检测中…';
   try {
-    const r = await api('/ai/ollama-models');
+    const r = await api('/ai/local-models');
     if (r.online && r.models.length) {
-      sel.innerHTML = r.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      localModelMap = {};
+      r.models.forEach(m => { localModelMap[m.id] = m.base_url; });
+      sel.innerHTML = r.models.map(m => `<option value="${esc(m.id)}">${esc(m.id)} · ${esc(m.source)}</option>`).join('');
       sel.style.display = '';
-      msg.textContent = '已检测到 Ollama，选择模型自动配置：';
-    } else { sel.style.display = 'none'; msg.textContent = '未检测到本机 Ollama（需先安装并启动：ollama serve）'; }
+      msg.textContent = '已检测到本地模型，选择后自动配置：';
+    } else { sel.style.display = 'none'; msg.textContent = '未检测到本机模型（请先启动 LM Studio 或 Ollama）'; }
   } catch (e) { sel.style.display = 'none'; msg.textContent = '检测失败：' + e.message; }
 };
 $('#aiLocalModel').onchange = () => {
-  $('#aiBase').value = 'http://127.0.0.1:11434/v1';
-  $('#aiModel').value = $('#aiLocalModel').value;
+  const id = $('#aiLocalModel').value;
+  $('#aiBase').value = localModelMap[id] || 'http://127.0.0.1:1234/v1';
+  $('#aiModel').value = id;
   $('#aiLocal').checked = true;
   $('#aiKey').value = '';
   $('#aiKeyClear').style.display = 'none';
-  $('#aiSettingsMsg').textContent = '已选用本地模型「' + $('#aiLocalModel').value + '」，点「保存设置」生效（无需 Key）';
+  $('#aiSettingsMsg').textContent = '已选用本地模型「' + id + '」，点「保存设置」生效（无需 Key）';
 };
 $('#aiSaveBtn').onclick = async () => {
   try {
@@ -1564,10 +1867,16 @@ $('#aiSaveBtn').onclick = async () => {
   } catch (e) { $('#aiSettingsMsg').textContent = '保存失败：' + e.message; }
 };
 
-/* ---- AI 项目总结 ---- */
+/* ---- AI 项目总结（Markdown 结构化渲染） ---- */
+let aiSummaryRaw = '';
+function aiSummarySet(text) {
+  aiSummaryRaw = String(text || '');
+  const v = $('#aiSummaryView');
+  if (v) v.innerHTML = mdToHtml(aiSummaryRaw);
+}
 async function aiSummarize(mode) {
-  const m = $('#aiSummaryModal'); const ta = $('#aiSummaryText');
-  m.classList.remove('hidden'); ta.value = '生成中…';
+  const m = $('#aiSummaryModal');
+  m.classList.remove('hidden'); aiSummarySet('生成中…');
   let projects;
   if (mode === 'daily' || mode === 'weekly' || mode === 'monthly') {
     projects = reportProjects(mode); // 全局：全部进行中 + 归档时间窗口内的归档项目
@@ -1576,12 +1885,22 @@ async function aiSummarize(mode) {
     if (!p) { toast('请先选择项目'); m.classList.add('hidden'); return; }
     projects = [p];
   }
-  if (!projects.length) { ta.value = '当前没有可总结的项目'; return; }
-  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ projects, mode }) }); ta.value = r.text || ''; }
-  catch (e) { ta.value = '生成失败：' + e.message; }
+  if (!projects.length) { aiSummarySet('当前没有可总结的项目'); return; }
+  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ projects, mode }), timeout: 60000 }); aiSummarySet(r.text || '（空）'); }
+  catch (e) { aiSummarySet('生成失败：' + e.message); }
 }
 $('#aiSummaryClose').onclick = () => $('#aiSummaryModal').classList.add('hidden');
-$('#aiSummaryCopy').onclick = () => { const ta = $('#aiSummaryText'); ta.select(); try { document.execCommand('copy'); } catch (e) {} toast('已复制'); };
+$('#aiSummaryCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText(aiSummaryRaw); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = aiSummaryRaw; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e2) { /* 忽略 */ }
+    ta.remove();
+  }
+  toast('已复制 Markdown 文本');
+};
 
 /* ---- 模板共创：导出参考模版（Excel）/ 导入社区模板 ---- */
 $('#tplExportBtn').onclick = () => {
@@ -2588,5 +2907,5 @@ const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 |
 if (typeof window !== 'undefined') { boot(); refreshVersion(); }
 // 仅测试环境导出：Node require 时可调用 boot 做启动冒烟测试；浏览器中 module 未定义，自动跳过，零副作用。
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state, collectTodos, weekRange, addDays, isoDate, TODAY, cmpVer };
+  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state, collectTodos, weekRange, addDays, isoDate, TODAY, cmpVer, mdToHtml };
 }

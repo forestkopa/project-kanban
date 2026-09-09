@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>多项目管理看板 · 工作台模板</title>
+<meta name="theme-color" content="#10a37f">
+<meta name="description" content="多项目管理个人看板：阶段看板 / 甘特公式联动 / 日历 / 报告导出">
+<link rel="manifest" href="/app.webmanifest">
+<link rel="icon" href="/wb-logo.png" type="image/png" sizes="114x89">
+<link rel="apple-touch-icon" href="/wb-logo.png">
 <style>
 /* =========================================================
    OpenAI Academy 风格设计系统（已应用到正式文件）
@@ -38,6 +43,21 @@
   --btn-primary-bg:#f5f5f5;
   --btn-primary-fg:#0d0d0d;
   --info:#64d2ff;
+}
+/* 跟随系统深色（P1-13）：仅在用户未手动指定 data-theme 时生效；双击主题按钮可回到跟随 */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme]){
+    --bg:#0d0d0d; --surface:#1c1c1e; --bg-2:#2a2a2c; --border:#2c2c2e; --border-strong:#3a3a3c;
+    --text:#f5f5f5; --text-2:#a1a1a6; --text-3:#6e6e73; --accent:#19c37d;
+    --accent-weak:#11342a; --dark:#f5f5f5; --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.5);
+    --btn-primary-bg:#f5f5f5;
+    --btn-primary-fg:#0d0d0d;
+    --info:#64d2ff;
+  }
+}
+/* 尊重「减少动效」偏好（a11y） */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -142,7 +162,17 @@ body {
 .who-ava { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--acc, var(--accent)); color: #fff; font-size: 10px; font-weight: 700; flex: none; }
 .days { background: var(--bg-2); border-radius: 6px; padding: 1px 7px; }
 .cacts { position: absolute; top: 9px; right: 9px; display: none; gap: 5px; }
-.card:hover .cacts { display: flex; }
+.card:hover .cacts, .card:focus-within .cacts, .card:focus .cacts { display: flex; }
+/* 键盘可达（P0-1）：卡片聚焦态清晰可见 */
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: var(--shadow); }
+/* 到期高亮（P0-4 到期提醒的看板侧呈现） */
+.card.overdue { border-color: var(--danger); background: linear-gradient(0deg, rgba(224,36,27,.06), rgba(224,36,27,.06)), var(--surface); }
+.card.soon { border-color: #d98600; }
+.due-tag { border-radius: 6px; padding: 1px 7px; font-weight: 700; font-size: 10.5px; }
+.due-tag.overdue { background: rgba(224,36,27,.14); color: var(--danger); }
+.due-tag.soon { background: rgba(217,134,0,.16); color: #b06f00; }
+:root[data-theme="dark"] .due-tag.soon { color: #ffb84d; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme]) .due-tag.soon { color: #ffb84d; } }
 .mini { background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 7px; width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
 .mini:hover { background: var(--border); }
 .mini.del:hover { background: rgba(224,36,27,.12); color: var(--danger); }
@@ -157,7 +187,7 @@ body {
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------- modal（居中卡片） ---------- */
-.modal { position: fixed; inset: 0; background: rgba(13,13,13,.42); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+.modal { position: fixed; inset: 0; background: rgba(13,13,13,.42); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px; }
 .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 26px; width: min(580px, 94vw); max-height: 88vh; overflow-y: auto; position: relative; box-shadow: 0 -12px 48px rgba(0,0,0,.22); }
 .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .modal-head h3 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
@@ -464,6 +494,85 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .ai-row .ar-days { width: 58px; flex: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 12px; font-family: inherit; background: var(--surface); color: var(--text); text-align: center; }
 .ai-empty { font-size: 13px; color: var(--text-3); padding: 10px 2px; }
 
+/* ---- AI 助手：对话式 Agent（消息流 / 工具步骤 / 危险操作确认） ---- */
+/* 布局：左侧对话记录栏 + 右侧对话区 */
+.ai-body { position: relative; display: flex; min-height: 420px; max-height: 64vh; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 2px; }
+.ai-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 10px 14px 8px; }
+.ai-main .ai-log { flex: 1; max-height: none; }
+/* 头部右侧图标组（新对话 / 历史对话 / 关闭） */
+.ai-head-right { display: flex; align-items: center; gap: 6px; }
+.ai-ico { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid transparent; background: none; border-radius: 8px; cursor: pointer; color: var(--text-2); }
+.ai-ico:hover { background: var(--surface); color: var(--text-1); border-color: var(--border); }
+.ai-ico.active { color: var(--accent); background: var(--surface); }
+/* 历史对话浮层（默认收起，点「历史对话」图标展开） */
+.ai-side { display: none; position: absolute; top: 0; right: 0; bottom: 0; width: 236px; flex-direction: column; background: var(--bg-2); border-left: 1px solid var(--border); box-shadow: -8px 0 18px rgba(0, 0, 0, .07); z-index: 6; }
+.ai-side.open { display: flex; }
+.ai-side-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 2px 14px; font-size: 13px; color: var(--text-1); }
+.ai-sess-list { flex: 1; overflow-y: auto; padding: 4px 6px 8px; }
+.ai-sess { position: relative; display: flex; align-items: center; gap: 6px; padding: 8px 26px 8px 10px; border-radius: 8px; cursor: pointer; font-size: 12.5px; margin: 1px 0; color: var(--text-2); }
+.ai-sess:hover { background: var(--surface); }
+.ai-sess.active { background: var(--accent); color: var(--on-accent); }
+.ai-sess-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-sess-ts { flex: none; font-size: 10.5px; opacity: .7; }
+.ai-sess-del { display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); border: 0; background: none; cursor: pointer; color: inherit; opacity: .75; padding: 3px; border-radius: 5px; }
+.ai-sess:hover .ai-sess-del { display: block; }
+.ai-sess-del:hover { opacity: 1; background: rgba(128,128,128,.22); }
+.ai-side-foot { padding: 6px 12px; font-size: 11px; color: var(--text-3); border-top: 1px solid var(--border); }
+.ai-log { display: flex; flex-direction: column; gap: 12px; max-height: min(52vh, 430px); overflow-y: auto; padding: 4px 2px 8px; }
+.ai-msg { display: flex; }
+.ai-msg.ai-me { justify-content: flex-end; }
+.ai-bubble { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.65; word-break: break-word; }
+.ai-bot .ai-bubble { background: var(--bg-2); border: 1px solid var(--border); border-top-left-radius: 4px; }
+.ai-me .ai-bubble { background: var(--accent); color: var(--on-accent); border-top-right-radius: 4px; }
+.ai-typing { color: var(--text-3); }
+.ai-err { color: var(--danger-strong); }
+.ai-steps { margin-top: 7px; font-size: 12px; color: var(--text-2); }
+.ai-steps summary { cursor: pointer; user-select: none; color: var(--text-3); }
+.ai-steps summary:hover { color: var(--accent); }
+
+/* ---- AI 输出 Markdown 结构化渲染 ---- */
+.md { font-size: 13.5px; line-height: 1.7; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 6px 0; }
+.md b.md-h { display: block; font-weight: 700; margin: 10px 0 4px; color: var(--text); }
+.md .md-h1 { font-size: 15px; }
+.md .md-h2 { font-size: 14px; }
+.md .md-h3, .md .md-h4 { font-size: 13.5px; }
+.md ul, .md ol { margin: 6px 0; padding-left: 20px; }
+.md li { margin: 2px 0; }
+.md code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12px; font-family: Consolas, Menlo, monospace; }
+.md pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; overflow-x: auto; margin: 8px 0; }
+.md pre code { background: none; border: 0; padding: 0; font-size: 12px; }
+.md blockquote { margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--accent); background: var(--bg-2); border-radius: 0 6px 6px 0; color: var(--text-2); }
+.md hr { border: 0; border-top: 1px dashed var(--border); margin: 10px 0; }
+.md strong { font-weight: 700; color: var(--text); }
+.md em { font-style: italic; }
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md .tblwrap { overflow-x: auto; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; }
+.md table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.md th, .md td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; white-space: nowrap; }
+.md th { background: var(--surface); font-weight: 600; }
+.md tbody tr:nth-child(even) { background: var(--surface); }
+.md-h + p, .md p:empty { display: none; }
+.ai-summary-view { max-height: 46vh; overflow-y: auto; min-height: 170px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.ai-step { display: flex; gap: 8px; padding: 3px 0 3px 4px; }
+.ai-step-name { color: var(--text-2); flex: none; }
+.ai-step-res { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 8px; }
+.ai-chip { font-size: 12px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; font-family: inherit; }
+.ai-chip:hover { border-color: var(--accent); color: var(--accent); }
+.ai-input-row { display: flex; gap: 10px; align-items: flex-end; }
+.ai-input-row .inp { flex: 1; margin: 0; min-height: 46px; resize: vertical; font-family: inherit; }
+.ai-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.ai-badge { font-size: 11px; color: var(--text-3); margin-left: auto; margin-right: 6px; }
+.ai-confirm { margin: 10px 0 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent); background: color-mix(in srgb, var(--danger) 9%, transparent); }
+.ai-confirm-title { font-size: 13px; font-weight: 600; color: var(--danger-strong); margin-bottom: 6px; }
+.ai-confirm-body { font-size: 12.5px; color: var(--text-2); line-height: 1.7; }
+.ai-confirm-hint { display: block; margin-top: 5px; color: var(--text-3); font-size: 11.5px; }
+.ai-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+
 /* =========================================================
    日报 / 周报实时展示页（阶段泳道图）
    ========================================================= */
@@ -474,24 +583,37 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .date-nav .cal-title { font-size: 14px; font-weight: 600; min-width: 158px; text-align: center; }
 .report-wrap { padding: 22px 30px 30px; }
 .swim { overflow-x: auto; }
-/* 待完成项目清单（周报） */
-.todo-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 6px; }
+/* 待办页（项目多场景优化 + 美观） */
+.todo-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 6px; align-items: start; }
 @media (max-width: 1500px) { .todo-list { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 1100px) { .todo-list { grid-template-columns: repeat(2, 1fr); } }
-.todo-kpis { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); padding: 4px 0 8px; grid-column: 1 / -1; }
-.todo-kpis b { font-size: 14px; }
-.todo-kpis .todo-warn { color: var(--danger-strong); }
-.todo-proj { background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; min-width: 0; }
-.todo-proj-h { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; margin-bottom: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.todo-kpis { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); padding: 4px 0 12px; grid-column: 1 / -1; }
+.todo-kpis b { font-size: 14px; color: var(--text); }
+.todo-kpis span { background: var(--bg-2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 13px; }
+.todo-kpis .todo-warn { color: var(--danger-strong); background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: color-mix(in srgb, var(--danger) 32%, transparent); }
+.todo-proj { background: var(--bg-2); border: 1px solid var(--border); border-left: 4px solid var(--pc, var(--accent)); border-radius: 12px; padding: 11px 13px; min-width: 0; box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: box-shadow .18s, transform .18s; }
+.todo-proj:hover { box-shadow: 0 6px 18px rgba(0,0,0,.10); transform: translateY(-2px); }
+.todo-proj-h { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; margin-bottom: 7px; cursor: pointer; user-select: none; }
 .todo-proj-h .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-.todo-cnt { font-size: 10.5px; color: var(--on-accent); background: var(--accent); border-radius: 20px; padding: 0 6px; font-weight: 500; flex: none; }
-.todo-t { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 0; border-top: 1px dashed var(--border); overflow: hidden; }
-.todo-t:first-of-type { border-top: none; }
-.todo-chk { color: var(--text-3); flex: none; }
+.todo-proj-h .todo-caret { color: var(--text-3); font-size: 11px; flex: none; }
+.todo-proj-h .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-cnt { font-size: 10.5px; color: var(--on-accent); background: var(--accent); border-radius: 20px; padding: 1px 7px; font-weight: 600; flex: none; }
+.todo-tasks { display: flex; flex-direction: column; gap: 2px; }
+.todo-t { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background .12s, transform .12s; }
+.todo-t:hover { background: var(--bg-3); transform: translateX(2px); }
+.todo-t:hover .todo-go { opacity: 1; }
+.todo-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; border: 2px solid var(--text-3); box-sizing: border-box; }
+.todo-dot.over { background: var(--danger-strong); border-color: var(--danger-strong); }
+.todo-tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .todo-days { color: var(--text-3); font-size: 10.5px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 5px; flex: none; }
-.todo-date { color: var(--text-3); font-size: 11px; margin-left: auto; white-space: nowrap; flex: none; }
-.todo-warn { color: var(--danger-strong); }
-.todo-empty { text-align: center; color: var(--text-3); padding: 28px 0; grid-column: 1 / -1; }
+.todo-due { color: var(--text-2); font-size: 11px; white-space: nowrap; flex: none; padding: 1px 7px; border-radius: 6px; background: var(--bg-3); }
+.todo-t.over .todo-due { color: var(--danger-strong); background: color-mix(in srgb, var(--danger) 16%, transparent); font-weight: 600; }
+.todo-t.over .todo-tt { color: var(--danger-strong); }
+.todo-go { font-size: 10.5px; color: var(--accent); opacity: 0; transition: opacity .12s; flex: none; }
+.todo-empty { text-align: center; color: var(--text-3); padding: 36px 0; grid-column: 1 / -1; font-size: 14px; }
+/* 待办页→看板 任务高亮定位 */
+.card-flash { outline: 3px solid var(--accent); outline-offset: 2px; animation: cardFlash 1.6s ease forwards; }
+@keyframes cardFlash { from { outline-color: var(--accent); } to { outline-color: transparent; } }
 /* 月度计划 */
 .mp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 6px; }
 @media (max-width: 1500px) { .mp-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -582,9 +704,56 @@ body.viewer .proj .bar-fill { opacity: .85; }
 .del-user-btn:hover:not(:disabled) { background: rgba(224,36,27,.08); }
 .del-user-btn:disabled { opacity: .45; cursor: not-allowed; }
 
+/* 使用引导弹窗（P1-12） */
+.guide-list { margin: 4px 0 0 4px; padding-left: 20px; display: flex; flex-direction: column; gap: 11px; }
+.guide-list li { font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+.guide-list li b { color: var(--text); }
+.guide-list kbd { background: var(--bg-2); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; font-size: 11px; font-family: inherit; color: var(--text); }
+.guide-tip { margin-top: 16px; padding: 10px 13px; background: var(--accent-weak); border-radius: 11px; font-size: 12.5px; color: var(--text-2); }
+.modal-acts { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.guide-skip { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-3); cursor: pointer; user-select: none; }
+.guide-skip input { accent-color: var(--accent); width: 14px; height: 14px; }
+
+/* 重复任务标记 + toast 撤销按钮（P0-4） */
+.recur-tag { background: var(--bg-2); border-radius: 6px; padding: 1px 7px; color: var(--text-2); font-weight: 600; }
+.toast-undo { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 7px; padding: 2px 10px; margin-left: 8px; cursor: pointer; font-size: 12px; font-weight: 700; font-family: inherit; }
+.toast-undo:hover { background: rgba(255,255,255,.16); }
+
+/* ---------- 待办页：tab 切换 / 过滤栏 / 分组折叠（v1.4.3） ---------- */
+.todo-bar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin: 4px 0 12px; }
+.todo-tabs { display: flex; gap: 6px; }
+.todo-tab { padding: 6px 16px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-2); border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: background .15s, color .15s; }
+.todo-tab:hover { background: var(--bg-3); }
+.todo-tab.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.todo-filters { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tf { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-2); cursor: pointer; user-select: none; }
+.tf input { accent-color: var(--accent); cursor: pointer; }
+.tf-q { padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 12.5px; font-family: inherit; min-width: 170px; }
+.tf-q:focus { outline: none; border-color: var(--accent); }
+.todo-caret { font-size: 10px; color: var(--text-3); flex: none; width: 12px; text-align: center; }
+.todo-proj.collapsed .todo-tasks { display: none; }
+.todo-proj-h { cursor: pointer; }
+
+/* 首屏加载遮罩（消除白屏等待感：HTML 同步渲染，JS 执行期间已可见，loadAll 完成后淡出） */
+#splash { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--bg, #fff); color: var(--text, #333); }
+#splash .sp { width: 42px; height: 42px; border-radius: 50%; border: 4px solid rgba(16,163,127,.2); border-top-color: #10a37f; animation: splashSpin .8s linear infinite; }
+#splash .st { font-size: 14px; color: var(--text-2, #666); letter-spacing: .05em; }
+#splash.hide { opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+@keyframes splashSpin { to { transform: rotate(360deg); } }
+
+/* 待办页：独立导出键 + 范围选择模态框 */
+.todo-export { margin-left: 8px; padding: 6px 12px; font-weight: 600; }
+.exp-opts { display: flex; flex-direction: column; gap: 8px; }
+.exp-opt { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border, #e3e3e3); border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+.exp-opt:hover { border-color: var(--accent, #0a84ff); background: var(--bg-hover, rgba(10,132,255,.04)); }
+.exp-opt input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent, #0a84ff); cursor: pointer; flex: 0 0 auto; }
+.exp-opt .exp-name { font-weight: 700; font-size: 15px; min-width: 80px; }
+.exp-opt .exp-meta { color: var(--text-2, #666); font-size: 13px; margin-left: auto; }
+
 </style>
 </head>
 <body>
+<div id="splash" role="status" aria-live="polite"><div class="sp"></div><div class="st">看板加载中…</div></div>
 <div id="roBanner" class="hidden">只读模式：当前仅可查看，修改已锁定</div>
 <aside id="sidebar">
   <div class="brand"><img id="brandLogo" class="logo" src="/wb-logo.png" alt="WorkBuddy" title="点击更换看板图标"><span id="appName" title="点击编辑看板名称">项目看板</span></div>
@@ -639,6 +808,8 @@ body.viewer .proj .bar-fill { opacity: .85; }
         <div id="userMenu" class="export-menu">
           <button id="userMenuUsers" data-u="users"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 015.5 4.5"/></svg></span>用户管理</button>
           <button data-u="password"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span>修改密码</button>
+          <button data-u="guide"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 114 2c-.9.7-1.5 1.2-1.5 2.3"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></span>使用引导</button>
+          <button data-u="trash"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg></span>回收站</button>
           <button data-u="logout"><span class="em-ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>退出登录</button>
         </div>
       </div>
@@ -654,6 +825,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
       <button class="tab" data-view="daily">日报</button>
       <button class="tab" data-view="weekly">周报</button>
       <button class="tab" data-view="monthly">月度计划</button>
+      <button class="tab" data-view="todos">待办</button>
       <button class="tab" data-view="summary"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16l3-3 3 3 5-6"/></svg>报告</button>
     </div>
     <div id="viewActions" class="view-actions"></div>
@@ -666,6 +838,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
   <section id="report" class="view hidden"></section>
   <section id="monthly" class="view hidden"></section>
   <section id="summary" class="view hidden"></section>
+  <section id="todos" class="view hidden"></section>
 </main>
 
 <!-- 登录 -->
@@ -712,6 +885,25 @@ body.viewer .proj .bar-fill { opacity: .85; }
   </div>
 </div>
 
+<!-- 使用引导（首次登录自动弹，用户菜单可重看） -->
+<div id="guideModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-box" style="width:min(560px,94vw)">
+    <div class="modal-head"><h3>快速上手</h3><button class="x" data-close>×</button></div>
+    <ol class="guide-list">
+      <li><b>建项目</b>：左侧「+ 新建项目」→ 可从模版导入（自动生成阶段与任务），或空白起步。</li>
+      <li><b>排任务</b>：看板拖拽卡片换阶段；<kbd>←</kbd> <kbd>→</kbd> 也能移动（无需鼠标），<kbd>Enter</kbd> 编辑、<kbd>Delete</kbd> 删除。</li>
+      <li><b>看进度</b>：顶部切「甘特图 / 日历 / 报告」；甘特支持公式联动（改一个日期，下游自动顺延）。</li>
+      <li><b>找东西</b>：按 <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> 全局搜索项目与任务。</li>
+      <li><b>出材料</b>：报告页可导出 Excel；AI 助手能按项目生成周报/月报总结。</li>
+    </ol>
+    <div class="guide-tip">逾期任务卡片会标红「逾期」，3 天内到期标「临期」。</div>
+    <div class="modal-acts">
+      <label class="guide-skip"><input type="checkbox" id="guideNoMore"> 不再自动显示</label>
+      <button class="btn primary" id="guideDone">开始使用</button>
+    </div>
+  </div>
+</div>
+
 <!-- 新建项目：双入口 -->
 <div id="newProjectModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-box">
@@ -746,6 +938,9 @@ body.viewer .proj .bar-fill { opacity: .85; }
     <div id="tplGrid" class="tpl-grid"></div>
   </div>
 </div>
+
+<!-- 导出待办清单：日 / 周 / 月三选一 -->
+<div id="exportModal" class="modal hidden" role="dialog" aria-modal="true"></div>
 
 <!-- 项目信息：工程师 + 类型（选项可配置，可新增/编辑/删除） -->
 <div id="projInfoModal" class="modal hidden" role="dialog" aria-modal="true">
@@ -831,7 +1026,23 @@ body.viewer .proj .bar-fill { opacity: .85; }
       <input id="taskAssignee" class="inp" placeholder="负责人（可选）">
       <input id="taskEst" type="number" class="inp" placeholder="工期(天)" min="0">
     </div>
+    <select id="taskRecur" class="inp" title="重复周期：勾选完成后自动生成下一期">
+      <option value="">不重复</option>
+      <option value="daily">每天重复</option>
+      <option value="weekly">每周重复</option>
+      <option value="biweekly">每两周重复</option>
+      <option value="monthly">每月重复</option>
+    </select>
     <button id="taskSave" class="btn primary">保存</button>
+  </div>
+</div>
+
+<!-- 回收站（P0-4）：删除的项目/任务可恢复，保留 30 天 -->
+<div id="trashModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-box" style="width:min(680px,94vw)">
+    <div class="modal-head"><h3>回收站</h3><button class="x" data-close>×</button></div>
+    <div class="muted" style="margin-bottom:12px">删除的项目与任务在此保留 30 天，可随时恢复。</div>
+    <div id="trashList"></div>
   </div>
 </div>
 
@@ -839,21 +1050,34 @@ body.viewer .proj .bar-fill { opacity: .85; }
 <input type="file" id="tplImportFile" accept=".xlsx" style="display:none">
 <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
 
-<!-- AI 助手：描述生成任务 -->
+<!-- AI 助手：对话式 Agent（能查询并操作看板）；左侧为对话记录（可新建/切换/删除） -->
 <div id="aiModal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="width:min(580px,94vw)">
-    <div class="modal-head"><h3>AI 助手 · 智能生成项目</h3><button class="x" data-close>×</button></div>
-    <div class="pi-sub">用一句话描述你的项目 / 产品，AI 自动拆解任务清单（阶段 + 工期 + 负责人建议）。</div>
-    <textarea id="aiDesc" class="inp" style="min-height:88px" placeholder="例：做一个智能门锁项目，含指纹/NFC 开锁、防技术开启、10 万次寿命测试，下周三启动"></textarea>
-    <div class="ai-actions">
-      <button class="btn primary" id="aiGenBtn">生成任务清单</button>
-      <button class="btn" id="aiSettingsOpen">AI 设置</button>
-      <span id="aiGenNote" class="pi-sub" style="margin:0"></span>
+  <div class="modal-box ai-wrap" style="width:min(760px,96vw)">
+    <div class="modal-head"><h3>AI 助手</h3><span class="ai-head-right"><span id="aiAgentMode" class="ai-badge"></span><button class="ai-ico" id="aiNewBtn" title="新对话" aria-label="新对话"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button><button class="ai-ico" id="aiHistBtn" title="历史对话" aria-label="历史对话"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></button><button class="x" data-close>×</button></span></div>
+    <div class="ai-body">
+      <div class="ai-main">
+        <div id="aiChatLog" class="ai-log" aria-live="polite"></div>
+        <div id="aiConfirm" class="ai-confirm hidden"></div>
+        <div class="ai-chips" id="aiChips">
+          <button class="ai-chip" data-q="我有几个项目？整体进度如何">有几个项目</button>
+          <button class="ai-chip" data-q="有哪些逾期的任务？">逾期任务</button>
+          <button class="ai-chip" data-q="本周有什么任务到期？">本周到期</button>
+          <button class="ai-chip" data-q="帮我建一个智能音箱降本项目，含结构降本与固件开发">建个项目</button>
+        </div>
+        <div class="ai-input-row">
+          <textarea id="aiInput" class="inp" rows="2" placeholder="问进度、找任务，或直接让我改，如「把音箱项目的结构打样标为完成」（Enter 发送 / Shift+Enter 换行）"></textarea>
+          <button class="btn primary" id="aiSendBtn">发送</button>
+        </div>
+      </div>
+      <div class="ai-side" id="aiSide">
+        <div class="ai-side-head"><b>历史对话</b><button class="ai-ico" id="aiSideClose" title="收起列表" aria-label="收起列表"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button></div>
+        <div class="ai-sess-list" id="aiSessList"></div>
+        <div class="ai-side-foot" id="aiSessMeta"></div>
+      </div>
     </div>
-    <div id="aiPreview" class="ai-preview"></div>
-    <div class="ai-actions" id="aiCreateRow" style="display:none;margin-top:14px">
-      <input id="aiProjName" class="inp" style="margin:0;flex:1" placeholder="项目名称">
-      <button class="btn primary" id="aiCreateBtn">创建项目</button>
+    <div class="ai-foot">
+      <span id="aiGenNote" class="pi-sub" style="margin:0"></span>
+      <button class="btn" id="aiSettingsOpen">AI 设置</button>
     </div>
   </div>
 </div>
@@ -868,7 +1092,7 @@ body.viewer .proj .bar-fill { opacity: .85; }
     <input id="aiKey" class="inp" type="password" placeholder="API Key（本地模型无需填写）">
     <label class="remember-row"><input type="checkbox" id="aiLocal"> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:2px"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M9 20h6"/><path d="M12 16v4"/></svg> 本地大模型（无需 API Key，需 OpenAI 兼容服务：Ollama / LM Studio / vLLM）</label>
     <div class="nu-row" style="margin:6px 0">
-      <button class="btn" id="aiDetectOllama"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>检测本机 Ollama</button>
+      <button class="btn" id="aiDetectOllama"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>检测本地模型</button>
       <select id="aiLocalModel" class="inp" style="display:none;margin:0"></select>
       <span id="aiOllamaMsg" class="pi-sub" style="margin:0"></span>
     </div>
@@ -882,17 +1106,30 @@ body.viewer .proj .bar-fill { opacity: .85; }
 
 <!-- AI 项目总结 -->
 <div id="aiSummaryModal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="width:min(580px,94vw)">
+  <div class="modal-box" style="width:min(720px,94vw)">
     <div class="modal-head"><h3>AI 项目总结</h3><button class="x" data-close>×</button></div>
-    <div class="pi-sub">由大模型基于项目数据生成（需配置 AI Key）。</div>
-    <textarea id="aiSummaryText" class="inp" style="min-height:170px" readonly></textarea>
+    <div class="pi-sub">由大模型基于项目数据生成（需配置 AI Key）。已按 Markdown 排版，可直接复制进日报 / 周报 / 月报。</div>
+    <div id="aiSummaryView" class="md ai-summary-view"></div>
     <div class="ai-actions">
-      <button class="btn" id="aiSummaryCopy">复制</button>
+      <button class="btn" id="aiSummaryCopy">复制文本</button>
       <button class="btn primary" id="aiSummaryClose">关闭</button>
     </div>
   </div>
 </div>
 
+<div id="footer" style="position:fixed;left:0;right:0;bottom:0;height:26px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12px;color:#888;background:rgba(248,248,248,.95);border-top:1px solid #e5e5e5;z-index:50;">
+  <span id="verBadge" style="font-weight:600;color:#444;">v…</span>
+  <span>·</span>
+  <a id="verCheck" href="javascript:void(0)" style="color:#2b6cb0;cursor:pointer;text-decoration:none;">检查更新</a>
+  <span id="verUpgradeWrap" style="display:none;"><a id="verUpgrade" href="javascript:void(0)" style="color:#2f855a;cursor:pointer;text-decoration:none;font-weight:600;">一键升级</a></span>
+  <span id="verStatus"></span>
+</div>
+<div id="verBar" style="display:none;position:fixed;left:0;right:0;bottom:26px;padding:8px 16px;background:rgba(255,255,255,.97);border-top:1px solid #e2e8f0;z-index:49;backdrop-filter:blur(4px);">
+  <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+    <div id="verBarFill" style="height:100%;width:0%;background:#3182ce;transition:width .4s ease;"></div>
+  </div>
+  <div id="verBarText" style="font-size:12px;color:#4a5568;margin-top:4px;"></div>
+</div>
 <script>
 /* =========================================================================
  * WorkBuddy 工作台模板 · 离线适配器
@@ -912,6 +1149,12 @@ body.viewer .proj .bar-fill { opacity: .85; }
   };
 
   function uid(p) { return (p || 'x') + Math.random().toString(36).slice(2, 9); }
+
+  // 演示模式「免登录」：预置会话令牌与用户，使 app.js 的 probeAuth() 直接通过（否则会卡在登录框、看板不渲染）
+  try {
+    if (!localStorage.getItem('kb-token')) localStorage.setItem('kb-token', 'offline');
+    if (!localStorage.getItem('kb-user')) localStorage.setItem('kb-user', JSON.stringify({ name: '演示用户', role: 'admin' }));
+  } catch (e) {}
   function todayISO() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function isoAdd(s, n) { var d = new Date((s || todayISO()) + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function isOverdue(t) { return t && !t.done && t.dueDate && t.dueDate < todayISO(); }
@@ -1052,6 +1295,59 @@ body.viewer .proj .bar-fill { opacity: .85; }
     ].map(function (t) { return t; });
   }
 
+  /* ---- AI Agent 离线桩：模拟"调用工具→返回结果"，让模板无需后端也能演示完整交互 ---- */
+  var AI_AGENT_TOOLS = [
+    { name: 'list_projects', description: '列出项目及进度概览', write: false, danger: false },
+    { name: 'get_overview', description: '全局概览：逾期/本周到期', write: false, danger: false },
+    { name: 'get_project', description: '查看单个项目详情与任务', write: false, danger: false },
+    { name: 'search_tasks', description: '按关键词/负责人/状态搜索任务', write: false, danger: false },
+    { name: 'create_project', description: '创建项目并自动排期', write: true, danger: false },
+    { name: 'add_task', description: '给项目新增任务', write: true, danger: false },
+    { name: 'update_task', description: '修改任务（负责人/工期/状态）', write: true, danger: false },
+    { name: 'update_project', description: '修改项目属性', write: true, danger: false },
+    { name: 'delete_task', description: '删除任务（需确认）', write: true, danger: true },
+    { name: 'delete_project', description: '删除项目（需确认）', write: true, danger: true }
+  ];
+  function iso(d) { var m = d.getMonth() + 1, day = d.getDate(); return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day); }
+  function aiAgentRespond(body) {
+    var q = String((body && body.message) || '');
+    var ps = projects() || [];
+    if (body && body.confirmToken) {
+      return { ok: true, changed: true, text: '（离线演示）已确认执行，演示数据已更新。', steps: [{ tool: 'delete_task', args: {}, result: { deleted: true, message: '已删除' }, committed: true }] };
+    }
+    if (body && body.cancelledToken) return { ok: true, text: '已取消该操作，数据未改动。', steps: [] };
+    if (/逾期/.test(q)) {
+      var td = iso(new Date()), od = [];
+      ps.forEach(function (p) {
+        (p.tasks || []).forEach(function (t) { if (!t.done && t.dueDate && t.dueDate < td) od.push({ title: t.title, dueDate: t.dueDate, project: p.name }); });
+      });
+      return {
+        ok: true, text: '（离线演示）共 ' + od.length + ' 个逾期任务：' + (od.slice(0, 5).map(function (x) { return '「' + x.title + '」(' + x.dueDate + ')'; }).join('、') || '无逾期'),
+        steps: [{ tool: 'search_tasks', args: { overdue_only: true }, result: { count: od.length } }]
+      };
+    }
+    if (/进度|几个项目|概况|整体|项目/.test(q)) {
+      var total = 0, done = 0;
+      ps.forEach(function (p) { total += (p.tasks || []).length; done += (p.tasks || []).filter(function (t) { return t.done; }).length; });
+      return {
+        ok: true, text: '（离线演示）当前 ' + ps.length + ' 个项目，共 ' + total + ' 个任务，已完成 ' + done + ' 个，整体进度 ' + (total ? Math.round(done / total * 100) : 0) + '%。',
+        steps: [{ tool: 'list_projects', args: {}, result: { count: ps.length } }, { tool: 'get_overview', args: {}, result: { taskTotal: total, taskDone: done } }]
+      };
+    }
+    if (/删除|删掉/.test(q)) {
+      var p0 = ps[0] || {}, t0 = (p0.tasks || [])[0] || {};
+      var preview = { action: '删除任务', project: p0.name || '示例项目', task: t0.title || '示例任务', hint: '离线演示：确认后仅更新演示数据' };
+      return { ok: true, text: '⚠️ 需要你确认：删除任务（' + (t0.title || '示例任务') + '）。确认后才会执行。', steps: [{ tool: 'delete_task', args: {}, pending: true, preview: preview }], pending: { token: 'demo_confirm_1', preview: preview } };
+    }
+    if (/建|创建|新建/.test(q)) {
+      return { ok: true, text: '（离线演示）已创建项目「AI 生成项目」，含 5 个任务并自动排期。', steps: [{ tool: 'create_project', args: { name: 'AI 生成项目' }, result: { created: true, taskCount: 5, message: '已创建项目' } }] };
+    }
+    if (/完成|标为|负责人|改/.test(q)) {
+      return { ok: true, text: '（离线演示）已更新任务（标记完成）。', steps: [{ tool: 'update_task', args: { done: true }, result: { changed: true, changes: ['标记完成'], message: '已更新任务' } }] };
+    }
+    return { ok: true, text: '（离线演示）我是看板 AI 助手：可以查进度、找逾期任务、建项目、改任务状态；删除类操作会先请你确认。当前共 ' + ps.length + ' 个项目。接入真实 AI 后，我会调用看板工具给你真实数据。', steps: [] };
+  }
+
   function buildReport() {
     var rows = {};
     projects().forEach(function (p) {
@@ -1099,9 +1395,49 @@ body.viewer .proj .bar-fill { opacity: .85; }
     // /ai
     if (path === '/ai/config' && method === 'GET') return res({ configured: false });
     if (path === '/ai/config' && method === 'POST') return res({ ok: true });
-    if (path === '/ai/ollama-models' && method === 'GET') return res([]);
+    if (path === '/ai/local-models' && method === 'GET') return res({ online: true, models: [{ id: 'minicpm5-2b', source: 'LM Studio', base_url: 'http://127.0.0.1:1234/v1' }, { id: 'qwen2.5:7b', source: 'Ollama', base_url: 'http://127.0.0.1:11434/v1' }] });
+    if (path === '/ai/agent/tools' && method === 'GET') return res({ tools: AI_AGENT_TOOLS });
+    if (path === '/ai/agent' && method === 'POST') return res(aiAgentRespond(body));
     if (path === '/ai/generate-tasks' && method === 'POST') return res({ tasks: aiGenerate(body && body.description) });
     if (path === '/ai/summarize' && method === 'POST') return res({ text: '（离线演示）基于当前项目数据：整体进度可控，关键路径为打样试制→测试验证→试产发布；建议重点关注逾期任务与模具 T0 节点，确保试产发布按期达成。' });
+    // /ai/sessions 对话记录（离线持久化到 localStorage，与在线版同构）
+    {
+      const aiSessAll = () => JSON.parse(LS.g('kb-ai-sessions', '[]') || '[]');
+      const aiSessSave = v => LS.s('kb-ai-sessions', JSON.stringify(v));
+      const aiMsgsAll = () => JSON.parse(LS.g('kb-ai-msgs', '{}') || '{}');
+      const aiMsgsSave = v => LS.s('kb-ai-msgs', JSON.stringify(v));
+      if (path === '/ai/sessions' && method === 'GET') {
+        const list = aiSessAll().map(s => ({ id: s.id, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt, msgCount: (aiMsgsAll()[s.id] || []).length }));
+        return res({ sessions: list.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)) });
+      }
+      if (path === '/ai/sessions' && method === 'POST') {
+        const id = uid('ais'); const now = new Date().toISOString();
+        const s = { id, title: (body && body.title) || '新对话', createdAt: now, updatedAt: now };
+        aiSessSave(aiSessAll().concat([s])); return res(s);
+      }
+      var sessDel = path.match(/^\/ai\/sessions\/([^/]+)$/);
+      if (sessDel && method === 'DELETE') {
+        aiSessSave(aiSessAll().filter(x => x.id !== sessDel[1]));
+        const ms = aiMsgsAll(); delete ms[sessDel[1]]; aiMsgsSave(ms);
+        return res({ ok: true });
+      }
+      if (sessDel && method === 'PUT') {
+        aiSessSave(aiSessAll().map(x => x.id === sessDel[1] ? Object.assign({}, x, { title: (body && body.title) || x.title, updatedAt: new Date().toISOString() }) : x));
+        return res({ ok: true });
+      }
+      var sessMsg = path.match(/^\/ai\/sessions\/([^/]+)\/messages$/);
+      if (sessMsg && method === 'GET') return res({ messages: aiMsgsAll()[sessMsg[1]] || [] });
+      if (sessMsg && method === 'POST') {
+        const ms = aiMsgsAll(); const arr = ms[sessMsg[1]] || [];
+        const now = new Date().toISOString();
+        ((body && body.messages) || []).forEach(m => {
+          if (m && m.content !== undefined && m.content !== '') arr.push({ id: uid('aim'), role: m.role === 'ai' ? 'ai' : 'user', content: String(m.content), meta: m.meta || {}, createdAt: now });
+        });
+        ms[sessMsg[1]] = arr; aiMsgsSave(ms);
+        aiSessSave(aiSessAll().map(x => x.id === sessMsg[1] ? Object.assign({}, x, { updatedAt: now }) : x));
+        return res({ added: arr.length, sessionId: sessMsg[1] });
+      }
+    }
     // /users / password / readonly(POST)
     if (path === '/users' && method === 'GET') return res([]);
     if (path === '/users' && method === 'POST') return res({});
@@ -1240,7 +1576,7 @@ const ICON = {
 };
 const AVA_COLORS = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#ff453a', '#64d2ff', '#5e5ce6', '#ff375f', '#00c7be', '#a2845e'];
 function avaColor(n) { let h = 0; const s = String(n || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return AVA_COLORS[h % AVA_COLORS.length]; }
-let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null };
+let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null, todoRange: 'today', todoFilter: { overdueOnly: false, q: '' }, _jumpTaskId: null };
 try { const u = localStorage.getItem('kb-user'); if (u) state.user = JSON.parse(u); } catch (e) {}
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
@@ -1259,7 +1595,15 @@ async function api(path, opts = {}) {
     const t = setTimeout(() => c.abort(), ms);
     const { timeout: _drop, ...rest } = o || {};
     return fetch(u, { ...rest, signal: c.signal }).finally(() => clearTimeout(t))
-      .catch(e => { if (e && e.name === 'AbortError') throw new Error('请求超时，请重试'); throw e; });
+      .catch(e => {
+        if (e && e.name === 'AbortError') {
+          // 给用户更准的归因（之前统一"请求超时，请重试"误导，因为本地小模型确实慢）
+          const sec = Math.round(ms / 1000);
+          throw new Error('请求超过 ' + sec + ' 秒未返回。本地小模型（如 LM Studio）推理较慢属正常；若反复超时，请在「AI 设置」换更小的模型或开启云端接口');
+        }
+        // 网络层失败（DNS/TCP/TLS/隧道断）：翻译成人话，避免原始 "TypeError: fetch failed" 让用户看不懂
+        throw new Error('无法连接到看板服务：' + (e && e.message ? e.message : '网络异常') + '。请检查：①公网隧道（Cloudflare）是否在线；②本地 DNS 解析是否正常；③浏览器是否禁用第三方请求');
+      });
   };
   let r = await fetchT(API + path, { ...opts, method, headers });
   // 未登录 / 会话失效 → 弹登录框，成功后重试一次（演示模式免登录不弹）
@@ -1270,21 +1614,32 @@ async function api(path, opts = {}) {
       r = await fetchT(API + path, { ...opts, method, headers });
     }
   }
-  if (!r.ok) { const e = await r.json().catch(() => ({ error: r.status })); throw new Error(e.error || r.status); }
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({ error: r.status }));
+    // P1-8：服务端判定仍用初始密码 → 直接拉起强制改密弹窗
+    if (r.status === 403 && e.code === 'MUST_CHANGE_PASSWORD') openPasswordModal(true);
+    throw new Error(e.error || r.status);
+  }
   return r.status === 204 ? null : r.json();
 }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 1800); }
 
 /* ---------- 多用户：登录 / 登出 / 用户菜单 ---------- */
 const ROLE_NAME = { admin: '管理员', manager: '副管理员', member: '成员', viewer: '访客' };
+// 单例锁：并发 401（如 loadAll 的 4 个并行请求同时未授权）只弹一次登录框。
+// 否则多次调用会互相清空输入框、覆盖 onclick，用户根本无法完成登录。
+let _loginPromise = null;
 function showLogin() {
-  return new Promise(resolve => {
-    const m = $('#loginModal'); if (!m) return resolve(false);
+  if (_loginPromise) return _loginPromise;
+  _loginPromise = new Promise(resolve => {
+    const finish = ok => { _loginPromise = null; resolve(ok); };
+    const m = $('#loginModal'); if (!m) return finish(false);
     $('#loginName').value = ''; $('#loginPass').value = ''; $('#loginErr').textContent = '';
     // 记住密码回填
     let rm = null; try { rm = JSON.parse(localStorage.getItem('kb-remember') || 'null'); } catch (e) {}
     if (rm && rm.name) { $('#loginName').value = rm.name; $('#loginRemember').checked = true; } // 仅回填用户名，密码不落盘（安全）
     else { $('#loginRemember').checked = false; }
+    hideSplash();                                /* 弹登录框时先淡出首屏遮罩，否则 z-index 更高的 splash 会盖住登录框导致无法操作 */
     m.classList.remove('hidden');
     let settled = false;
     const done = ok => { if (settled) return; settled = true; m.classList.add('hidden'); $('#loginBtn').disabled = false; resolve(ok); };
@@ -1303,7 +1658,7 @@ function showLogin() {
         updateUserUI();
         toast('欢迎，' + j.user.name);
         done(true);
-        if (j.mustChange) setTimeout(() => { toast('您正在使用初始密码，请立即修改'); openPasswordModal(); }, 500);
+        if (j.mustChange) setTimeout(() => { toast('您正在使用初始密码，请立即修改'); openPasswordModal(true); }, 500);
       } catch (e) { $('#loginErr').textContent = '网络错误，请重试'; $('#loginBtn').disabled = false; }
     };
     // 游客登录（guest / 000000，只读）
@@ -1374,7 +1729,20 @@ function openUsersModal() {
     } catch (e) { toast(e.message); }
   })();
 }
-function openPasswordModal() { $('#pwOld').value = ''; $('#pwNew').value = ''; $('#pwErr').textContent = ''; $('#passwordModal').classList.remove('hidden'); }
+/* force=true 时为「强制改密」：隐藏关闭入口、Esc/点遮罩不可关（P1-8） */
+function openPasswordModal(force) {
+  const m = $('#passwordModal');
+  $('#pwOld').value = ''; $('#pwNew').value = ''; $('#pwErr').textContent = '';
+  m.classList.toggle('force', !!force);
+  if (force) {
+    $('#pwErr').textContent = '您仍在使用初始密码，必须修改后才能继续操作';
+    $$('[data-close]', m).forEach(b => b.style.display = 'none');
+    if ($('#pwOld')) $('#pwOld').value = '000000'; /* 初始密码预填，减少一步输入 */
+  } else {
+    $$('[data-close]', m).forEach(b => b.style.display = '');
+  }
+  m.classList.remove('hidden');
+}
 
 /* ---------- 报告：按人聚合 ---------- */
 async function renderSummary() {
@@ -1434,27 +1802,66 @@ function dayDiff(a, b) { return Math.round((parseD(a) - parseD(b)) / 86400000); 
 function phaseColor(p, t) { const ph = p.phases.find(x => x.id === t.phaseId); return ph ? ph.color : '#888'; }
 function TODAY() { return isoDate(new Date()); }
 
+function hideSplash() {
+  const s = document.getElementById('splash');
+  if (!s) return;
+  s.classList.add('hide');
+  setTimeout(() => s.remove(), 400);
+}
+// 冷启动登录态探测：用需鉴权的端点（/api/projects）试探当前 token。
+// 200=已登录；401/无 token/网络错=未登录。避免在 loadAll 里让 4 个并发请求各自触发 showLogin。
+async function probeAuth() {
+  const tok = getToken();
+  if (!tok) return false;
+  try {
+    const r = await fetch(API + '/projects', { headers: { 'X-Auth-Token': tok } });
+    return r.ok;
+  } catch (e) { return false; }
+}
+// 启动编排：先探测登录态，再决定走 loadAll（已登录）还是 showLogin（未登录）。
+// 未登录时只弹一次登录框（modal z-index 已抬到 splash 之上，必然可见），成功后再重新启动；
+// 用户放弃登录则淡出 splash 露出页面，可经用户菜单再次登录——绝不卡死在首屏。
+async function boot() {
+  if (await probeAuth()) { await loadAll(); return; }
+  const ok = await showLogin();
+  if (ok) { await boot(); }
+  else { hideSplash(); }
+}
 async function loadAll() {
   try {
-    state.templates = await api('/templates');
-    state.projects = await api('/projects');
-    try { state.options = await api('/options'); } catch (e) { state.options = null; }
-    try { const r = await api('/readonly'); state.readonly = !!(r && r.on); state.demo = !!(r && r.demo); if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); } } catch (e) {}
+    // 4 个初始化请求并行（原串行 4×RTT）：公网隧道下省掉明显等待
+    const [tpls, projs, opts, ro] = await Promise.all([
+      api('/templates'),
+      api('/projects'),
+      api('/options').catch(() => null),
+      api('/readonly').catch(() => null),
+    ]);
+    state.templates = tpls;
+    state.projects = projs;
+    state.options = opts;
+    if (ro) {
+      state.readonly = !!(ro && ro.on);
+      state.demo = !!(ro && ro.demo);
+      if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); }
+    }
     updateUserUI();
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
   } catch (e) { toast('加载失败: ' + e.message); }
   render();
+  hideSplash();                              /* 首屏遮罩淡出（消除白屏等待感） */
+  maybeAutoGuide();                          /* 首次使用引导（P1-12） */
+  if (!state._remindShown) { state._remindShown = true; setTimeout(dueReminder, 1400); } /* 到期提醒（P0-4），只在本次会话首次加载提示 */
 }
 
 function render() {
   renderSidebar();
   const p = proj();
   $$('.tab').forEach(b => { const on = b.dataset.view === state.view; b.classList.toggle('active', on); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
-  const secMap = { board: 'board', gantt: 'gantt', calendar: 'calendar', panorama: 'panorama', daily: 'report', weekly: 'report', monthly: 'monthly', summary: 'summary' };
-  ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly', 'summary'].forEach(id => $('#' + id).classList.add('hidden'));
+  const secMap = { board: 'board', gantt: 'gantt', calendar: 'calendar', panorama: 'panorama', daily: 'report', weekly: 'report', monthly: 'monthly', summary: 'summary', todos: 'todos' };
+  ['board', 'gantt', 'calendar', 'panorama', 'report', 'monthly', 'summary', 'todos'].forEach(id => $('#' + id).classList.add('hidden'));
   if (secMap[state.view]) $('#' + secMap[state.view]).classList.remove('hidden');
   $('#viewActions').innerHTML = '';
-  const globalViews = ['daily', 'weekly', 'monthly', 'panorama', 'summary'];
+  const globalViews = ['daily', 'weekly', 'monthly', 'panorama', 'summary', 'todos'];
   if (!p && !globalViews.includes(state.view)) {
     $('#projTitle').innerHTML = '<span class="muted">未选择项目</span>';
     $('#projMeta').innerHTML = '';
@@ -1485,6 +1892,7 @@ function render() {
   else if (state.view === 'panorama') renderPanorama();
   else if (state.view === 'monthly') renderMonthly();
   else if (state.view === 'summary') renderSummary();
+  else if (state.view === 'todos') buildTodos();
   else renderReport();
   $('#stats').style.display = (state.view === 'board') ? 'flex' : 'none';
   updateIOState();
@@ -1574,6 +1982,21 @@ function renderSidebar() {
   group('已归档', archived, 'archived', true);
 }
 
+/* 卡片签名：用于增量渲染时判断某张卡是否真的变了 */
+function cardSig(t, ph) {
+  return [t.title, t.note || '', t.done ? 1 : 0, t.assignee || '', t.estimateDays || '', t.dueDate || '', t.recurrence || '', ph.color || '', ph.name || ''].join('\u0001');
+}
+
+/* 到期状态：overdue=已逾期 / soon=3 天内到期（含今天） */
+function dueState(t) {
+  if (t.done || !t.dueDate) return '';
+  const d = dayDiff(t.dueDate, TODAY());
+  if (d === null || isNaN(d)) return '';
+  if (d < 0) return 'overdue';
+  if (d <= 3) return 'soon';
+  return '';
+}
+
 function renderBoard(p) {
   const pc = progress(p);
   $('#stats').style.display = 'flex';
@@ -1582,50 +2005,156 @@ function renderBoard(p) {
     <div class="stat"><div class="stat-num">${p.tasks.length}</div><div class="stat-lbl">任务</div></div>
     <div class="stat"><div class="stat-num">${p.tasks.filter(t => t.done).length}</div><div class="stat-lbl">已完成</div></div>
     <div class="stat"><div class="stat-num">${p.tasks.filter(t => !t.done).length}</div><div class="stat-lbl">进行中</div></div>`;
-  const board = $('#board'); board.innerHTML = '';
-  p.phases.forEach(ph => {
-    const col = document.createElement('div'); col.className = 'col';
+
+  const board = $('#board');
+  /* 项目切换时才整体重建，同项目内走增量复用（P0-2） */
+  if (board.dataset.pid !== p.id) { board.innerHTML = ''; board.dataset.pid = p.id; }
+  board.setAttribute('role', 'list');
+  board.setAttribute('aria-label', '看板阶段列表');
+
+  const keepCols = new Set();
+  p.phases.forEach((ph, ci) => {
+    keepCols.add(ph.id);
     const tasks = p.tasks.filter(t => t.phaseId === ph.id);
-    const head = document.createElement('div');
-    head.className = 'col-head'; head.style.borderTopColor = ph.color;
-    head.innerHTML = `<span>${esc(ph.name)}</span><span class="col-count">${tasks.length}</span>`;
-    col.appendChild(head);
-    const body = document.createElement('div'); body.className = 'col-body';
-    body.ondragover = e => { e.preventDefault(); col.classList.add('drag'); };
-    body.ondragleave = () => col.classList.remove('drag');
-    body.ondrop = e => { e.preventDefault(); col.classList.remove('drag'); const tid = e.dataTransfer.getData('text/plain'); if (tid) moveTask(p.id, tid, ph.id); };
-    tasks.forEach(t => body.appendChild(taskCard(p, t, ph)));
-    if (!tasks.length) { const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '8px'; e.textContent = '拖拽任务到此'; body.appendChild(e); }
-    col.appendChild(body); board.appendChild(col);
+    let col = board.querySelector(`.col[data-phase="${cssEsc(ph.id)}"]`);
+    if (!col) {
+      col = document.createElement('div');
+      col.className = 'col'; col.dataset.phase = ph.id;
+      col.setAttribute('role', 'listitem');
+      col.innerHTML = '<div class="col-head"></div><div class="col-body"></div>';
+      const body = col.querySelector('.col-body');
+      body.setAttribute('role', 'list');
+      body.ondragover = e => { e.preventDefault(); col.classList.add('drag'); };
+      body.ondragleave = () => col.classList.remove('drag');
+      body.ondrop = e => { e.preventDefault(); col.classList.remove('drag'); const tid = e.dataTransfer.getData('text/plain'); if (tid) moveTask(p.id, tid, ph.id); };
+      board.appendChild(col);
+    }
+    /* 列顺序对齐（阶段被重排时不重建 DOM，只移动位置） */
+    if (board.children[ci] !== col) board.insertBefore(col, board.children[ci] || null);
+
+    const head = col.querySelector('.col-head');
+    const headSig = ph.name + '|' + ph.color + '|' + tasks.length;
+    if (head.dataset.sig !== headSig) {
+      head.dataset.sig = headSig;
+      head.style.borderTopColor = ph.color;
+      head.innerHTML = `<span>${esc(ph.name)}</span><span class="col-count">${tasks.length}</span>`;
+    }
+    col.querySelector('.col-body').setAttribute('aria-label', ph.name + ' 阶段，共 ' + tasks.length + ' 个任务');
+
+    const body = col.querySelector('.col-body');
+    const keepCards = new Set();
+    tasks.forEach((t, ti) => {
+      keepCards.add(t.id);
+      let el = body.querySelector(`.card[data-id="${cssEsc(t.id)}"]`);
+      const sig = cardSig(t, ph);
+      if (!el) { el = taskCard(p, t, ph); body.appendChild(el); }
+      else if (el.dataset.sig !== sig) { const fresh = taskCard(p, t, ph); body.replaceChild(fresh, el); el = fresh; }
+      if (body.children[ti] !== el) body.insertBefore(el, body.children[ti] || null);
+    });
+    /* 移除已不存在的卡 */
+    [...body.querySelectorAll('.card')].forEach(el => { if (!keepCards.has(el.dataset.id)) el.remove(); });
+
+    let ph0 = body.querySelector('.empty');
+    if (!tasks.length) {
+      if (!ph0) { ph0 = document.createElement('div'); ph0.className = 'empty'; ph0.style.padding = '8px'; ph0.textContent = '拖拽任务到此，或按 Enter 新建'; body.appendChild(ph0); }
+    } else if (ph0) ph0.remove();
   });
+  /* 移除已删除的阶段列 */
+  [...board.querySelectorAll('.col')].forEach(col => { if (!keepCols.has(col.dataset.phase)) col.remove(); });
+  /* 待办页跳转过来的任务：滚动居中并高亮定位（P0-4 待办→看板） */
+  if (state._jumpTaskId) {
+    const je = board.querySelector(`.card[data-id="${cssEsc(state._jumpTaskId)}"]`);
+    if (je) { je.scrollIntoView({ block: 'center', behavior: 'smooth' }); je.classList.add('card-flash'); setTimeout(() => je.classList.remove('card-flash'), 1600); }
+    state._jumpTaskId = null;
+  }
+}
+
+/* CSS 选择器转义（id 里可能含特殊字符） */
+function cssEsc(s) {
+  return (window.CSS && CSS.escape) ? CSS.escape(String(s)) : String(s).replace(/["\\\]]/g, '\\$&');
 }
 
 function taskCard(p, t, ph) {
-  const el = document.createElement('div'); el.className = 'card' + (t.done ? ' done' : '');
+  const el = document.createElement('div');
+  const due = dueState(t);
+  el.className = 'card' + (t.done ? ' done' : '') + (due ? ' ' + due : '');
+  el.dataset.id = t.id;
+  el.dataset.sig = cardSig(t, ph);
   el.style.setProperty('--cc', ph.color || '#999');
   el.draggable = !state.readonly;
   el.ondragstart = e => e.dataTransfer.setData('text/plain', t.id);
+
+  /* P0-1：键盘可达 —— 卡片可聚焦，方向键移动阶段，Enter/空格编辑，Delete 删除 */
+  el.tabIndex = 0;
+  el.setAttribute('role', 'listitem');
+  const dueTxt = due === 'overdue' ? '，已逾期' : (due === 'soon' ? '，即将到期' : '');
+  el.setAttribute('aria-label', `任务：${t.title}，阶段：${ph.name}${t.assignee ? '，负责人：' + t.assignee : ''}${t.done ? '，已完成' : ''}${dueTxt}。方向键左右移动阶段，回车编辑`);
+
   el.innerHTML = `
-    <label class="chk"><input type="checkbox" ${t.done ? 'checked' : ''} ${state.readonly ? 'disabled' : ''}><span class="ctitle">${esc(t.title)}</span></label>
+    <label class="chk"><input type="checkbox" ${t.done ? 'checked' : ''} ${state.readonly ? 'disabled' : ''} aria-label="标记完成：${esc(t.title)}"><span class="ctitle">${esc(t.title)}</span></label>
     ${t.note ? `<div class="cnote">${esc(t.note)}</div>` : ''}
-    <div class="cmeta"><span class="phase" style="color:${ph.color}">${esc(ph.name)}</span>${t.assignee ? `<span class="who-ava" style="--acc:${avaColor(t.assignee)}" title="${esc(t.assignee)}">${esc(t.assignee[0] || '?')}</span>` : ''}${t.estimateDays ? `<span class="days">${t.estimateDays}d</span>` : ''}</div>
-    <div class="cacts"><button class="mini" data-edit title="编辑">${ICON.edit}</button><button class="mini del" data-del title="删除">${ICON.del}</button></div>`;
+    <div class="cmeta"><span class="phase" style="color:${ph.color}">${esc(ph.name)}</span>${due ? `<span class="due-tag ${due}">${due === 'overdue' ? '逾期' : '临期'}</span>` : ''}${t.recurrence ? `<span class="recur-tag" title="完成后自动生成下一期">↻ ${esc(RECUR_NAME[t.recurrence] || t.recurrence)}</span>` : ''}${t.assignee ? `<span class="who-ava" style="--acc:${avaColor(t.assignee)}" title="${esc(t.assignee)}">${esc(t.assignee[0] || '?')}</span>` : ''}${t.estimateDays ? `<span class="days">${t.estimateDays}d</span>` : ''}</div>
+    <div class="cacts"><button class="mini" data-edit title="编辑" aria-label="编辑任务：${esc(t.title)}">${ICON.edit}</button><button class="mini del" data-del title="删除" aria-label="删除任务：${esc(t.title)}">${ICON.del}</button></div>`;
+
   el.querySelector('input').onchange = async e => {
-    try { await api(`/projects/${p.id}/tasks/${t.id}`, { method: 'PUT', body: JSON.stringify({ done: e.target.checked }) }); t.done = e.target.checked; render(); }
-    catch (err) { toast(err.message); }
+    try {
+      const r = await api(`/projects/${p.id}/tasks/${t.id}`, { method: 'PUT', body: JSON.stringify({ done: e.target.checked }) });
+      t.done = e.target.checked;
+      // 重复任务：后端派生了下一期 → 拉取最新项目并提示（P0-4）
+      if (r && r.spawned) {
+        const np = await api('/projects/' + p.id); Object.assign(p, np);
+        toast('已完成，已生成下一期（' + (r.spawned.dueDate || r.spawned.startDate || '') + '）');
+      }
+      render();
+    } catch (err) { toast(err.message); }
   };
   el.querySelector('[data-edit]').onclick = () => openTaskModal(p, t);
-  el.querySelector('[data-del]').onclick = async () => {
-    if (!confirm('删除任务？')) return;
-    try { await api(`/projects/${p.id}/tasks/${t.id}`, { method: 'DELETE' }); p.tasks = p.tasks.filter(x => x.id !== t.id); render(); }
-    catch (err) { toast(err.message); }
+  const doDelete = async () => {
+    if (!confirm('删除任务？（可在回收站恢复）')) return;
+    try {
+      const r = await api(`/projects/${p.id}/tasks/${t.id}`, { method: 'DELETE' });
+      p.tasks = p.tasks.filter(x => x.id !== t.id); render();
+      toastUndo('已删除「' + t.title + '」', r && r.trashId);   /* 8 秒内可撤销（P0-4） */
+    } catch (err) { toast(err.message); }
+  };
+  el.querySelector('[data-del]').onclick = doDelete;
+
+  el.onkeydown = e => {
+    if (e.target !== el) return; /* 只处理卡片自身，不劫持内部控件 */
+    const idx = p.phases.findIndex(x => x.id === ph.id);
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTaskModal(p, t); return; }
+    if (e.key === 'Delete' && !state.readonly) { e.preventDefault(); doDelete(); return; }
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !state.readonly) {
+      e.preventDefault();
+      const next = p.phases[idx + (e.key === 'ArrowRight' ? 1 : -1)];
+      if (!next) { toast(e.key === 'ArrowRight' ? '已是最后一个阶段' : '已是第一个阶段'); return; }
+      state._focusTask = t.id;
+      moveTask(p.id, t.id, next.id);
+      toast(`已移至「${next.name}」`);
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const cards = [...el.parentElement.querySelectorAll('.card')];
+      const i = cards.indexOf(el);
+      const tgt = cards[i + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (tgt) tgt.focus();
+    }
   };
   return el;
 }
 
 async function moveTask(pid, tid, phaseId) {
-  try { const t = await api(`/projects/${pid}/tasks/${tid}`, { method: 'PUT', body: JSON.stringify({ phaseId }) }); const p = proj(); const x = p.tasks.find(y => y.id === tid); Object.assign(x, t); render(); }
-  catch (err) { toast(err.message); }
+  try {
+    const t = await api(`/projects/${pid}/tasks/${tid}`, { method: 'PUT', body: JSON.stringify({ phaseId }) });
+    const p = proj(); const x = p.tasks.find(y => y.id === tid); Object.assign(x, t); render();
+    /* 键盘移动后把焦点跟到新列的同一张卡（P0-1） */
+    if (state._focusTask === tid) {
+      state._focusTask = null;
+      const el = document.querySelector(`#board .card[data-id="${cssEsc(tid)}"]`);
+      if (el) el.focus();
+    }
+  } catch (err) { toast(err.message); }
 }
 
 /* ---------- Gantt ---------- */
@@ -1789,17 +2318,13 @@ function ganttRowHtml(r, p, min, dayW, trackW, bg) {
 }
 function renderGantt(p) {
   ensureGanttDelegation();
-  $('#viewActions').innerHTML = `<span class="va-label">项目开始</span><input type="date" id="projStart" class="inp" value="${p.startDate || ''}"><button class="btn" id="reschedBtn" title="保留公式，按公式全量重算一遍（无公式则顺序排期）">重新排期</button>`;
+  $('#viewActions').innerHTML = `<span class="va-label">项目开始</span><input type="date" id="projStart" class="inp" value="${p.startDate || ''}">`;
   $('#projStart').onchange = e => {
     const v = e.target.value;
     debounce('ps', async () => {
       try { await api('/projects/' + p.id, { method: 'PUT', body: JSON.stringify({ startDate: v }) }); p.startDate = v; const np = await api('/projects/' + p.id); Object.assign(p, np); render(); }
       catch (err) { toast(err.message); }
     });
-  };
-  $('#reschedBtn').onclick = async () => {
-    try { const np = await api('/projects/' + p.id + '/reschedule', { method: 'POST' }); Object.assign(p, np); render(); toast('已按公式重算排期'); }
-    catch (err) { toast(err.message); }
   };
   const wrap = $('#gantt');
   if (!p.tasks.length) { wrap.innerHTML = '<div class="empty" style="margin:auto">暂无任务</div>'; return; }
@@ -2093,6 +2618,7 @@ function openTaskModal(p, t) {
   $('#taskEst').value = t ? t.estimateDays || '' : '';
   const sel = $('#taskPhase');
   sel.innerHTML = p.phases.map(ph => `<option value="${ph.id}" ${t && t.phaseId === ph.id ? 'selected' : ''}>${esc(ph.name)}</option>`).join('');
+  const rc = $('#taskRecur'); if (rc) rc.value = (t && t.recurrence) || '';
   $('#taskModal').classList.remove('hidden'); $('#taskTitle').focus();
 }
 async function saveTask() {
@@ -2102,6 +2628,7 @@ async function saveTask() {
   const body = { title, note: $('#taskNote').value, phaseId: $('#taskPhase').value, assignee: $('#taskAssignee').value.trim(), estimateDays: parseInt($('#taskEst').value) || 0 };
   if ($('#taskStart').value) body.startDate = $('#taskStart').value;
   if ($('#taskDue').value) body.dueDate = $('#taskDue').value;
+  if ($('#taskRecur')) body.recurrence = $('#taskRecur').value;   /* 重复周期（P0-4） */
   try {
     if (state.editingTaskId) {
       await api(`/projects/${p.id}/tasks/${state.editingTaskId}`, { method: 'PUT', body: JSON.stringify(body) });
@@ -2120,7 +2647,7 @@ function updateIOState() {
   const at = $('#addTaskBtn'), dp = $('#delProjectBtn'), ab = $('#archiveBtn');
   if (at) at.disabled = !has;
   if (dp) dp.disabled = !has;
-  if (ab) { ab.disabled = !has; const al = $('#archiveLabel'); if (al) al.textContent = ((p.status || 'active') === 'archived') ? '取消归档' : '完成归档'; }
+  if (ab) { ab.disabled = !has; const al = $('#archiveLabel'); if (al) al.textContent = (((p && p.status) || 'active') === 'archived') ? '取消归档' : '完成归档'; }
 }
 function bufToBase64(buf) {
   const bytes = new Uint8Array(buf); let bin = ''; const chunk = 0x8000;
@@ -2234,7 +2761,132 @@ $$('#userMenu button').forEach(b => b.onclick = e => {
   if (u === 'logout') logout();
   else if (u === 'users') openUsersModal();
   else if (u === 'password') openPasswordModal();
+  else if (u === 'guide') openGuide();
+  else if (u === 'trash') openTrash();
 });
+
+/* ---------- 回收站（P0-4）：列表 / 恢复 / 彻底删除 ---------- */
+const RECUR_NAME = { daily: '每天', weekly: '每周', biweekly: '每两周', monthly: '每月' };
+async function openTrash() {
+  const m = $('#trashModal'); if (!m) return;
+  m.classList.remove('hidden');
+  const box = $('#trashList');
+  box.innerHTML = '<div class="empty">加载中…</div>';
+  try {
+    const items = await api('/trash');
+    if (!items.length) { box.innerHTML = '<div class="empty">回收站是空的</div>'; return; }
+    box.innerHTML = `<table class="rpt-table"><thead><tr><th>类型</th><th>名称</th><th>所属项目</th><th>删除时间</th><th></th></tr></thead><tbody>${
+      items.map(it => `<tr data-tid="${esc(it.id)}">
+        <td>${it.kind === 'project' ? '项目' : '任务'}</td>
+        <td><b>${esc(it.title || '(无标题)')}</b></td>
+        <td class="muted">${esc(it.kind === 'project' ? '—' : (it.projectName || '—'))}</td>
+        <td class="muted">${esc((it.deletedAt || '').slice(0, 16).replace('T', ' '))}</td>
+        <td style="white-space:nowrap"><button class="btn" data-restore style="padding:4px 10px;font-size:12px">恢复</button>
+        <button class="del-user-btn" data-purge>彻底删除</button></td>
+      </tr>`).join('')}</tbody></table>`;
+    $$('#trashList tr[data-tid]').forEach(tr => {
+      const id = tr.dataset.tid;
+      tr.querySelector('[data-restore]').onclick = async () => {
+        try { await api('/trash/' + id + '/restore', { method: 'POST' }); toast('已恢复'); await loadAll(); openTrash(); }
+        catch (e) { toast(e.message); }
+      };
+      tr.querySelector('[data-purge]').onclick = async () => {
+        if (!confirm('彻底删除该条目？不可恢复。')) return;
+        try { await api('/trash/' + id, { method: 'DELETE' }); toast('已彻底删除'); openTrash(); }
+        catch (e) { toast(e.message); }
+      };
+    });
+  } catch (e) { box.innerHTML = '<div class="empty">加载失败：' + esc(e.message) + '</div>'; }
+}
+
+/* 带「撤销」的 toast：删除后 8 秒内可一键恢复 */
+function toastUndo(msg, trashId) {
+  const t = $('#toast');
+  if (!trashId) { toast(msg); return; }
+  t.innerHTML = '';
+  t.appendChild(document.createTextNode(msg + ' '));
+  const b = document.createElement('button');
+  b.className = 'toast-undo'; b.textContent = '撤销';
+  b.onclick = async () => {
+    t.classList.add('hidden');
+    try { await api('/trash/' + trashId + '/restore', { method: 'POST' }); toast('已撤销删除'); await loadAll(); }
+    catch (e) { toast('撤销失败：' + e.message); }
+  };
+  t.appendChild(b);
+  t.classList.remove('hidden');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => { t.classList.add('hidden'); t.textContent = ''; }, 8000);
+}
+
+/* ---------- 到期提醒（P0-4）：登录后汇总今日/逾期，点击可跳转 ---------- */
+function dueReminder() {
+  const today = TODAY();
+  let overdue = 0, todayN = 0, firstPid = null;
+  (state.projects || []).forEach(p => {
+    if ((p.status || 'active') === 'archived') return;
+    (p.tasks || []).forEach(t => {
+      if (t.done || !t.dueDate) return;
+      if (t.dueDate < today) { overdue++; firstPid = firstPid || p.id; }
+      else if (t.dueDate === today) { todayN++; firstPid = firstPid || p.id; }
+    });
+  });
+  if (!overdue && !todayN) return;
+  const parts = [];
+  if (overdue) parts.push('逾期 ' + overdue + ' 项');
+  if (todayN) parts.push('今天到期 ' + todayN + ' 项');
+  const t = $('#toast');
+  t.innerHTML = '';
+  t.appendChild(document.createTextNode('待办提醒：' + parts.join('，') + ' '));
+  if (firstPid) {
+    const b = document.createElement('button');
+    b.className = 'toast-undo'; b.textContent = '查看';
+    b.onclick = () => { state.view = 'todos'; render(); t.classList.add('hidden'); };
+    t.appendChild(b);
+  }
+  t.classList.remove('hidden');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => { t.classList.add('hidden'); t.textContent = ''; }, 7000);
+}
+
+/* ---------- 全局快捷添加（P0-4）：N 新建任务、Shift+N 新建项目 ---------- */
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable)) return;
+  if (topModal()) return;              /* 有弹窗时不劫持 */
+  if (state.readonly) return;
+  if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault();
+    if (e.shiftKey) { $('#newProjectModal').classList.remove('hidden'); return; }
+    const p = proj();
+    if (!p) { toast('请先选择或新建一个项目'); return; }
+    openTaskModal(p, null);
+  }
+});
+
+/* ---------- 使用引导（P1-12）：首次登录自动弹，用户菜单可随时重看 ---------- */
+function openGuide() {
+  const m = $('#guideModal'); if (!m) return;
+  const no = $('#guideNoMore');
+  if (no) { let v = false; try { v = localStorage.getItem('kb-guide-off') === '1'; } catch (e) {} no.checked = v; }
+  m.classList.remove('hidden');
+}
+function maybeAutoGuide() {
+  let off = false, seen = false;
+  try { off = localStorage.getItem('kb-guide-off') === '1'; seen = localStorage.getItem('kb-guide-seen') === '1'; } catch (e) {}
+  if (off || seen) return;
+  setTimeout(() => { if (!topModal()) openGuide(); }, 700); /* 让位给强制改密等弹窗 */
+}
+if ($('#guideDone')) {
+  $('#guideDone').onclick = () => {
+    try {
+      localStorage.setItem('kb-guide-seen', '1');
+      if ($('#guideNoMore') && $('#guideNoMore').checked) localStorage.setItem('kb-guide-off', '1');
+      else localStorage.removeItem('kb-guide-off');
+    } catch (e) {}
+    $('#guideModal').classList.add('hidden');
+  };
+}
 $('#nuAdd').onclick = async () => {
   const name = $('#nuName').value.trim(), pw = $('#nuPass').value, role = $('#nuRole').value;
   if (!name) { toast('用户名必填'); return; }
@@ -2245,8 +2897,14 @@ $('#nuAdd').onclick = async () => {
 $('#pwSave').onclick = async () => {
   const old = $('#pwOld').value, next = $('#pwNew').value;
   if (next.length < 6) { $('#pwErr').textContent = '新密码至少 6 位'; return; }
-  try { await api('/password', { method: 'POST', body: JSON.stringify({ old, next }) }); $('#passwordModal').classList.add('hidden'); toast('密码已修改'); }
-  catch (e) { $('#pwErr').textContent = e.message; }
+  try {
+    await api('/password', { method: 'POST', body: JSON.stringify({ old, next }) });
+    const m = $('#passwordModal');
+    m.classList.remove('force');                                  /* 解除强制态（P1-8） */
+    $$('[data-close]', m).forEach(b => b.style.display = '');
+    m.classList.add('hidden');
+    toast('密码已修改');
+  } catch (e) { $('#pwErr').textContent = e.message; }
 };
 $('#newProjectBtn').onclick = () => { if (state.readonly) { toast('只读模式，无法新建项目'); return; } $('#newProjectModal').classList.remove('hidden'); };
 $('#roBtn').onclick = async () => {
@@ -2267,9 +2925,14 @@ $('#addTaskBtn').onclick = () => { if (!proj()) { toast('请先创建项目'); r
 $('#taskSave').onclick = saveTask;
 $('#delProjectBtn').onclick = async () => {
   const p = proj(); if (!p) return;
-  if (!confirm('删除整个项目「' + p.name + '」？此操作不可恢复。')) return;
-  try { await api('/projects/' + p.id, { method: 'DELETE' }); state.projects = state.projects.filter(x => x.id !== p.id); state.currentId = state.projects[0] ? state.projects[0].id : null; render(); }
-  catch (e) { toast(e.message); }
+  if (!confirm('删除整个项目「' + p.name + '」？删除后 30 天内可在回收站恢复。')) return;
+  try {
+    const r = await api('/projects/' + p.id, { method: 'DELETE' });
+    state.projects = state.projects.filter(x => x.id !== p.id);
+    state.currentId = state.projects[0] ? state.projects[0].id : null;
+    render();
+    toastUndo('已删除项目「' + p.name + '」', r && r.trashId);
+  } catch (e) { toast(e.message); }
 };
 $('#archiveBtn').onclick = async () => {
   const p = proj(); if (!p) return;
@@ -2282,14 +2945,66 @@ $('#archiveBtn').onclick = async () => {
   } catch (e) { toast(e.message); }
 };
 $$('[data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.add('hidden'));
-$$('.modal').forEach(m => m.onclick = e => { if (e.target === m) m.classList.add('hidden'); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('.modal').forEach(m => m.classList.add('hidden')); });
+$$('.modal').forEach(m => m.onclick = e => { if (e.target === m && !m.classList.contains('force')) m.classList.add('hidden'); });
+/* Esc 只关最上层弹窗（原实现会一次全关，误伤叠层） */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const m = topModal();
+  if (!m) return;
+  if (m.id === 'loginModal' && !state.user && !state.demo) return; /* 未登录时不许 Esc 关掉登录框 */
+  if (m.classList.contains('force')) return;                       /* 强制改密不可跳过 */
+  m.classList.add('hidden');
+});
+
+/* ---------- 模态可访问性（P2-14）：焦点陷阱 + 关闭归还焦点 ---------- */
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+const _modalReturn = new WeakMap();
+function visibleModals() { return $$('.modal').filter(m => !m.classList.contains('hidden')); }
+function topModal() { const v = visibleModals(); return v.length ? v[v.length - 1] : null; }
+function focusablesIn(m) { return [...m.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null || el === document.activeElement); }
+
+/* Tab 在弹窗内循环，不逃到背景页 */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const m = topModal(); if (!m) return;
+  const items = focusablesIn(m);
+  if (!items.length) { e.preventDefault(); return; }
+  const first = items[0], last = items[items.length - 1], a = document.activeElement;
+  const outside = !m.contains(a);
+  if (e.shiftKey && (a === first || outside)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (a === last || outside)) { e.preventDefault(); first.focus(); }
+}, true);
+
+function bindModalA11y(m) {
+  const sync = () => {
+    const open = !m.classList.contains('hidden');
+    if (open && !m.dataset.open) {
+      m.dataset.open = '1';
+      _modalReturn.set(m, document.activeElement);
+      const box = m.querySelector('.modal-box') || m;
+      box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+      const h = m.querySelector('.modal-head h3');
+      if (h) { if (!h.id) h.id = 'mh-' + Math.random().toString(36).slice(2, 8); box.setAttribute('aria-labelledby', h.id); }
+      setTimeout(() => {
+        const t = m.querySelector('[autofocus]') || m.querySelector('.inp:not([disabled])') || focusablesIn(m)[0];
+        if (t) { try { t.focus(); } catch (err) { /* 忽略不可聚焦 */ } }
+      }, 30);
+    } else if (!open && m.dataset.open) {
+      delete m.dataset.open;
+      const r = _modalReturn.get(m); _modalReturn.delete(m);
+      if (r && document.body.contains(r)) { try { r.focus(); } catch (err) { /* 触发元素已移除 */ } }
+    }
+  };
+  new MutationObserver(sync).observe(m, { attributes: true, attributeFilter: ['class'] });
+  sync(); /* 处理「页面加载即打开」（如登录框） */
+}
+$$('.modal').forEach(bindModalA11y);
 
 /* =========================================================
    AI 助手 + 移动端抽屉 + 模板共创
    ========================================================= */
 const PHASE_OPTIONS = ['需求立项', '设计开发', '打样试制', '测试验证', '量产导入', '上市运营'];
-let aiTasks = null;
+// 工具中文名（展示"AI 做了什么"）
 
 /* ---- 移动端抽屉 ---- */
 function openSidebar() { $('#sidebar').classList.add('open'); $('#scrim').classList.remove('hidden'); }
@@ -2298,57 +3013,352 @@ $('#menuBtn').onclick = openSidebar;
 $('#scrim').onclick = closeSidebar;
 $$('.tab').forEach(b => { const o = b.onclick; b.onclick = () => { o && o(); closeSidebar(); }; });
 
-/* ---- AI 助手：生成任务清单 ---- */
-async function loadAiConfig() {
-  try { const c = await api('/ai/config'); $('#aiGenNote').textContent = c.configured ? ('已接入：' + (c.model || '')) : '未配置 AI Key：将使用内置模板智能建议'; return c; }
-  catch (e) { return null; }
+/* ---- AI 输出 Markdown → 结构化 HTML（轻量自研渲染器；XSS 安全：先转义后解析） ---- */
+function mdInline(t) { // 行内：`code` / **加粗** / *斜体* / [文本](http链接)，入参须已 esc
+  t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  t = t.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
 }
-function openAiModal() { $('#aiModal').classList.remove('hidden'); $('#aiPreview').innerHTML = ''; $('#aiCreateRow').style.display = 'none'; $('#aiGenNote').textContent = ''; loadAiConfig(); $('#aiDesc').focus(); }
-$('#aiBtn').onclick = openAiModal;
-async function aiGenerate() {
-  const desc = $('#aiDesc').value.trim();
-  if (!desc) { toast('请先描述你的项目'); return; }
-  const btn = $('#aiGenBtn'); btn.disabled = true; const old = btn.textContent; btn.textContent = '生成中…';
+function mdTblSep(ln) { // 表格分隔行：| --- | :---: |
+  const t = String(ln || '').trim();
+  if (!t || t[0] !== '|') return false;
+  const cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|');
+  return cells.length > 0 && cells.every(c => /^\s*:?-{3,}:?\s*$/.test(c));
+}
+function mdToHtml(text) {
+  if (text == null) return '';
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let i = 0;
+  const listKind = t => t[0] === '>' ? 'quote' : (/^\d[.)]\s+/.test(t) ? 'ol' : (/^[-*+]\s+/.test(t) ? 'ul' : ''));
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (!t) { i++; continue; }
+    if (/^```/.test(t)) { // 代码块
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { buf.push(lines[i]); i++; }
+      i++;
+      out.push('<pre><code>' + esc(buf.join('\n')) + '</code></pre>');
+      continue;
+    }
+    if (t[0] === '|' && i + 1 < lines.length && mdTblSep(lines[i + 1])) { // 表格
+      const rows = [];
+      while (i < lines.length && lines[i].trim()[0] === '|') { rows.push(lines[i]); i++; }
+      const cells = r => r.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => mdInline(esc(c.trim())));
+      let h = '<div class="tblwrap"><table>';
+      rows.forEach((r, idx) => {
+        if (idx === 1) return; // 第二行是分隔行 |---|---|，不渲染
+        const cs = cells(r);
+        if (idx === 0) h += '<thead><tr>' + cs.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>';
+        else h += '<tr>' + cs.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+      });
+      out.push(h + '</tbody></table></div>');
+      continue;
+    }
+    const hd = t.match(/^(#{1,4})\s+(.*)$/); // 标题
+    if (hd) { out.push('<b class="md-h md-h' + hd[1].length + '">' + mdInline(esc(hd[2])) + '</b>'); i++; continue; }
+    if (/^(-{3,}|\*{3,})\s*$/.test(t)) { out.push('<hr>'); i++; continue; } // 分隔线
+    const kind = listKind(t); // 列表 / 引用（收集连续同类行）
+    if (kind) {
+      const buf = [];
+      while (i < lines.length) {
+        const tt = lines[i].trim();
+        const k = listKind(tt);
+        if (!k || k !== kind) break;
+        if (k === 'quote') buf.push('<div>' + mdInline(esc(tt.replace(/^>\s?/, ''))) + '</div>');
+        else buf.push('<li>' + mdInline(esc(tt.replace(/^[-*+]\s+|\d+[.)]\s+/, ''))) + '</li>');
+        i++;
+      }
+      out.push(kind === 'quote' ? '<blockquote>' + buf.join('') + '</blockquote>' : '<' + kind + '>' + buf.join('') + '</' + kind + '>');
+      continue;
+    }
+    const para = []; // 普通段落（连续非空行合并）
+    while (i < lines.length) {
+      const tt = lines[i].trim();
+      if (!tt || /^```/.test(tt) || (tt[0] === '|' && i + 1 < lines.length && mdTblSep(lines[i + 1])) || /^#{1,4}\s/.test(tt) || listKind(tt)) break;
+      para.push(mdInline(esc(tt)));
+      i++;
+    }
+    if (para.length) out.push('<p>' + para.join('<br>') + '</p>');
+  }
+  return out.join('\n');
+}
+
+/* ---- AI 助手：对话式 Agent（可查询并操作看板） ---- */
+const TOOL_LABEL = {
+  list_projects: '查询项目列表', get_overview: '获取全局概览', get_project: '查看项目详情',
+  search_tasks: '搜索任务', create_project: '创建项目', add_task: '新增任务',
+  update_task: '修改任务', update_project: '修改项目', delete_task: '删除任务', delete_project: '删除项目'
+};
+let aiHistory = [];   // 对话上下文（回传后端做多轮）
+let aiBusy = false;
+let aiPending = null; // 待确认的危险操作
+let aiSessions = [];  // 当前用户的对话记录列表 [{id,title,updatedAt,msgCount}]
+let aiSessionId = null; // 当前会话 id（null = 尚未落库的新对话）
+let aiSaved = 0;        // aiHistory 中已持久化到当前会话的条数（增量保存游标）
+
+/* ---- 对话记录（会话列表 / 新建 / 切换 / 删除 / 增量持久化）---- */
+function aiShortTs(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  const y = d.getFullYear() === now.getFullYear() ? '' : d.getFullYear() + '/';
+  return y + (d.getMonth() + 1) + '/' + d.getDate();
+}
+// 会话标题（未命名时取首条用户消息）
+function aiSessionTitle() {
+  const firstUser = (aiHistory || []).find(m => m && m.role === 'user');
+  const s = (firstUser && firstUser.content || '').trim().replace(/\s+/g, ' ');
+  return s ? s.slice(0, 18) : '新对话';
+}
+async function aiLoadSessions() {
   try {
-    const r = await api('/ai/generate-tasks', { method: 'POST', body: JSON.stringify({ description: desc }) });
-    aiTasks = (r.tasks || []).map(t => ({ title: String(t.title || ''), phase: String(t.phase || ''), estimateDays: Number(t.estimateDays) || 3, assignee: String(t.assignee || '') }));
-    $('#aiGenNote').textContent = r.note || (r.source === 'ai' ? '由大模型生成' : '');
-    renderAiPreview(aiTasks);
-    $('#aiCreateRow').style.display = 'flex';
-    $('#aiProjName').value = desc.slice(0, 24) || 'AI 生成项目';
-  } catch (e) { toast(e.message); }
-  finally { btn.disabled = false; btn.textContent = old; }
+    const r = await api('/ai/sessions', { timeout: 15000 });
+    aiSessions = Array.isArray(r.sessions) ? r.sessions : [];
+  } catch (e) { aiSessions = []; }
+  aiRenderSess();
 }
-function renderAiPreview(tasks) {
-  const box = $('#aiPreview'); box.innerHTML = '';
-  if (!tasks.length) { box.innerHTML = '<div class="ai-empty">未生成任务，换个描述试试。</div>'; return; }
-  tasks.forEach((t, i) => {
-    const row = document.createElement('div'); row.className = 'ai-row';
-    row.innerHTML = `<span class="ar-seq">${i + 1}</span>
-      <input class="ar-title" value="${esc(t.title)}" data-i="${i}">
-      <select class="ar-phase" data-i="${i}">${PHASE_OPTIONS.map(o => `<option ${o === t.phase ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
-      <input class="ar-days" type="number" min="0" value="${t.estimateDays}" data-i="${i}">`;
-    box.appendChild(row);
+function aiRenderSess() {
+  const el = $('#aiSessList'); if (!el) return;
+  el.innerHTML = '';
+  (aiSessions || []).forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'ai-sess' + (s.id === aiSessionId ? ' active' : '');
+    const title = document.createElement('span');
+    title.className = 'ai-sess-t'; title.textContent = s.title || '新对话';
+    const ts = document.createElement('span');
+    ts.className = 'ai-sess-ts'; ts.textContent = aiShortTs(s.updatedAt);
+    const del = document.createElement('button');
+    del.className = 'ai-sess-del'; del.title = '删除此对话';
+    del.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+    del.onclick = async ev => { ev.stopPropagation(); await aiDeleteSession(s.id); };
+    item.appendChild(title); item.appendChild(ts); item.appendChild(del);
+    item.onclick = () => aiSwitchSession(s.id);
+    el.appendChild(item);
   });
-  box.querySelectorAll('.ar-title').forEach(el => el.oninput = () => { aiTasks[el.dataset.i].title = el.value; });
-  box.querySelectorAll('.ar-phase').forEach(el => el.onchange = () => { aiTasks[el.dataset.i].phase = el.value; });
-  box.querySelectorAll('.ar-days').forEach(el => el.oninput = () => { aiTasks[el.dataset.i].estimateDays = Number(el.value) || 0; });
+  const meta = $('#aiSessMeta');
+  if (meta) meta.textContent = aiSessions.length ? ('共 ' + aiSessions.length + ' 个对话') : '';
 }
-async function aiCreate() {
-  if (!aiTasks || !aiTasks.length) { toast('先生成任务清单'); return; }
-  const name = ($('#aiProjName').value || 'AI 生成项目').trim();
-  const order = [], map = {};
-  aiTasks.forEach(t => { const ph = t.phase || PHASE_OPTIONS[0]; if (!map[ph]) { map[ph] = 'p' + (order.length + 1); order.push({ id: map[ph], name: ph, color: PHASE_COLORS[order.length % PHASE_COLORS.length] }); } });
-  const phases = order.length ? order : [{ id: 'p1', name: PHASE_OPTIONS[0], color: PHASE_COLORS[0] }];
-  const tasks = aiTasks.map(t => ({ title: t.title || '未命名', phaseId: map[t.phase || PHASE_OPTIONS[0]] || phases[0].id, estimateDays: t.estimateDays || 0, assignee: t.assignee || '' }));
+// 把 aiHistory[aiSaved..] 的新消息增量保存到当前会话；无会话则先自动创建（标题取首问）
+async function aiPersist() {
+  const unsaved = (aiHistory || []).length - aiSaved;
+  if (unsaved <= 0) return;
+  const fresh = aiHistory.slice(aiSaved).map(m => ({ role: m.role, content: m.content, meta: m.steps ? { steps: m.steps } : undefined }));
   try {
-    const np = await api('/projects', { method: 'POST', body: JSON.stringify({ name, phases, tasks, type: 'C端', level: 'B' }) });
-    state.projects.push(np); state.currentId = np.id; $('#aiModal').classList.add('hidden'); aiTasks = null;
-    toast('项目已创建：' + np.name); render();
-  } catch (e) { toast(e.message); }
+    let sid = aiSessionId;
+    if (!sid) {
+      const c = await api('/ai/sessions', { method: 'POST', body: JSON.stringify({ title: aiSessionTitle() }), timeout: 15000 });
+      sid = c.id; aiSessionId = sid;
+    }
+    await api('/ai/sessions/' + sid + '/messages', { method: 'POST', body: JSON.stringify({ messages: fresh }), timeout: 15000 });
+    aiSaved = (aiHistory || []).length;
+    // 未命名会话 → 用首问做标题，刷新列表顺序
+    const sess = aiSessions.find(s => s.id === sid);
+    if (!sess || sess.title === '新对话' || sess.title === '') {
+      const t = aiSessionTitle();
+      if (t && t !== '新对话') { try { await api('/ai/sessions/' + sid, { method: 'PUT', body: JSON.stringify({ title: t }), timeout: 15000 }); } catch (e) {} }
+    }
+    await aiLoadSessions();
+  } catch (e) { console.error('[ai] 保存对话记录失败:', e); }
 }
-$('#aiGenBtn').onclick = aiGenerate;
-$('#aiCreateBtn').onclick = aiCreate;
+async function aiNewSession() {
+  if (aiBusy) return;
+  await aiPersist(); // 当前未命名对话先落库（若有内容）
+  aiSessionId = null; aiSaved = 0; aiHistory = [];
+  const log = $('#aiChatLog'); if (log) log.innerHTML = '';
+  aiMsg('ai', '你好，我是看板 AI 助手。我能查进度、找逾期任务、建项目、改任务负责人和状态；<b>删除类操作会先请你确认</b>才会执行。');
+  aiRenderSess();
+  aiSideClose(); // 新对话后收起历史浮层
+  const inp = $('#aiInput'); if (inp) { inp.disabled = false; setTimeout(() => inp.focus(), 60); }
+}
+async function aiSwitchSession(id) {
+  if (aiBusy) return;
+  await aiPersist(); // 切换前把当前会话未保存内容落库
+  try {
+    const r = await api('/ai/sessions/' + id + '/messages', { timeout: 15000 });
+    const msgs = Array.isArray(r.messages) ? r.messages : [];
+    aiSessionId = id; aiHistory = msgs.map(m => ({ role: m.role, content: m.content, steps: (m.meta && m.meta.steps) || null }));
+    aiSaved = aiHistory.length;
+    const log = $('#aiChatLog'); if (log) log.innerHTML = '';
+    if (!aiHistory.length) aiMsg('ai', '这个对话还是空的，说点什么开始吧。');
+    aiHistory.forEach(m => {
+      if (m.role === 'user') aiMsg('user', esc(m.content).replace(/\n/g, '<br>'));
+      else aiMsg('ai', mdToHtml(m.content || ''), m.steps || []);
+    });
+    aiRenderSess();
+    aiSideClose(); // 切换完成收起浮层，回到对话视图
+    const inp = $('#aiInput'); if (inp) { inp.disabled = false; setTimeout(() => inp.focus(), 60); }
+  } catch (e) { toast('加载对话失败：' + (e.message || '')); }
+}
+async function aiDeleteSession(id) {
+  if (aiBusy) return;
+  if (!window.confirm('删除这组对话记录？此操作不可恢复。')) return;
+  try {
+    await api('/ai/sessions/' + id, { method: 'DELETE', timeout: 15000 });
+    if (aiSessionId === id) { aiSessionId = null; aiSaved = 0; aiHistory = []; const log = $('#aiChatLog'); if (log) log.innerHTML = ''; aiMsg('ai', '对话已删除。点「新对话」开新提问，或点右上「历史对话」图标选其他记录。'); }
+    await aiLoadSessions();
+  } catch (e) { toast('删除失败：' + (e.message || '')); }
+}
+function aiModalReset() { aiPending = null; aiSessionId = null; aiSaved = 0; aiHistory = []; aiSessions = []; const log = $('#aiChatLog'); if (log) log.innerHTML = ''; hideAiConfirm(); }
+
+async function loadAiConfig() {
+  try {
+    const c = await api('/ai/config');
+    $('#aiGenNote').textContent = c.configured ? ('已接入：' + (c.model || '')) : '未配置 AI：请在「AI 设置」填写 Key 或启用本地模型';
+    return c;
+  } catch (e) { return null; }
+}
+
+function aiScroll() { const el = $('#aiChatLog'); if (el) el.scrollTop = el.scrollHeight; }
+function aiMsg(role, html, steps) {
+  const box = document.createElement('div');
+  box.className = 'ai-msg ' + (role === 'user' ? 'ai-me' : 'ai-bot');
+  const bubble = document.createElement('div');
+  bubble.className = 'ai-bubble'; bubble.innerHTML = html;
+  box.appendChild(bubble);
+  if (steps && steps.length) box.appendChild(aiStepsEl(steps));
+  $('#aiChatLog').appendChild(box);
+  aiScroll();
+  return bubble;
+}
+function aiStepsEl(steps) {
+  const wrap = document.createElement('details');
+  wrap.className = 'ai-steps';
+  const sum = document.createElement('summary');
+  const wrote = steps.filter(s => ['create_project', 'add_task', 'update_task', 'update_project'].indexOf(s.tool) >= 0).length;
+  sum.textContent = wrote ? ('已执行 ' + wrote + ' 项修改（共 ' + steps.length + ' 步）') : ('执行了 ' + steps.length + ' 个查询');
+  wrap.appendChild(sum);
+  steps.forEach(s => {
+    const d = document.createElement('div'); d.className = 'ai-step';
+    let detail = ''; const r = s.result || {};
+    if (s.pending) detail = '等待确认…';
+    else if (r.error) detail = '失败：' + r.error;
+    else if (r.message) detail = r.message;
+    else if (r.count !== undefined) detail = '返回 ' + r.count + ' 条';
+    else if (r.name) detail = r.name;
+    d.innerHTML = '<span class="ai-step-name">' + esc(TOOL_LABEL[s.tool] || s.tool) + '</span><span class="ai-step-res">' + esc(detail) + '</span>';
+    wrap.appendChild(d);
+  });
+  return wrap;
+}
+function aiSetBusy(b) {
+  const btn = $('#aiSendBtn'); if (btn) { btn.disabled = !!b; btn.textContent = b ? '处理中…' : '发送'; }
+  const inp = $('#aiInput'); if (inp && !b) inp.disabled = false;
+}
+function showAiConfirm(pending) {
+  aiPending = pending;
+  const box = $('#aiConfirm'); if (!box) return;
+  const pv = pending.preview || {};
+  let lines = '';
+  if (pv.project) lines += '项目：' + esc(pv.project) + '<br>';
+  if (pv.task) lines += '任务：' + esc(pv.task) + '<br>';
+  if (pv.assignee) lines += '负责人：' + esc(pv.assignee) + '<br>';
+  if (pv.dueDate) lines += '截止：' + esc(pv.dueDate) + '<br>';
+  if (pv.taskCount !== undefined) lines += '含 ' + Number(pv.taskCount) + ' 个任务<br>';
+  box.innerHTML = '<div class="ai-confirm-title">⚠️ ' + esc(pv.action || '危险操作') + '</div>' +
+    '<div class="ai-confirm-body">' + lines + '<span class="ai-confirm-hint">' + esc(pv.hint || '执行后可在回收站恢复') + '</span></div>' +
+    '<div class="ai-confirm-actions"><button class="btn" id="aiCancelBtn">取消</button><button class="btn primary" id="aiOkBtn">确认执行</button></div>';
+  box.classList.remove('hidden');
+  $('#aiOkBtn').onclick = () => aiRun({ confirmToken: pending.token });
+  $('#aiCancelBtn').onclick = () => aiRun({ cancelledToken: pending.token });
+  aiScroll();
+}
+function hideAiConfirm() { aiPending = null; const b = $('#aiConfirm'); if (b) { b.classList.add('hidden'); b.innerHTML = ''; } }
+
+// 统一入口：普通提问 / 确认待执行操作 / 取消待执行操作
+// AI Agent 单轮会走「模型推理→工具调用→再推理」多步循环，本地小模型（比如 LM Studio 上的 2b）单步可能 10~30s，
+// 整轮 120s 都可能。所以前端 timeout 必须高于后端 server.js 调 LM Studio 的 120s，否则会被前端先 abort 而非后端自然完成。
+const AI_AGENT_TIMEOUT_MS = 150000; // 150s，留 30s 余量给后端多步+冷启动
+async function aiRun(payload) {
+  if (aiBusy) return;
+  aiBusy = true; aiSetBusy(true); hideAiConfirm();
+  const bubble = aiMsg('ai', '<span class="ai-typing">思考中…</span>');
+  const isConfirm = !!(payload.confirmToken || payload.cancelledToken);
+  try {
+    const body = Object.assign({ history: isConfirm ? aiCtx() : aiCtx().slice(0, -1) }, payload);
+    const r = await api('/ai/agent', { method: 'POST', body: JSON.stringify(body), timeout: AI_AGENT_TIMEOUT_MS });
+    const text = r.text || r.error || '（无响应）';
+    bubble.innerHTML = mdToHtml(text);
+    const steps = r.steps || [];
+    if (steps.length) {
+      const box = bubble.parentElement;
+      const old = box.querySelector('.ai-steps'); if (old) old.remove();
+      box.appendChild(aiStepsEl(steps));
+    }
+    if (r.mode === 'text' && $('#aiAgentMode')) $('#aiAgentMode').textContent = '文本协议（模型不支持函数调用）';
+    aiHistory.push({ role: 'ai', content: text, steps: (steps && steps.length) ? steps : null });
+    if (r.pending) showAiConfirm(r.pending);
+    // 数据被改动 → 静默刷新看板（用户无需手动 F5）
+    const changed = r.changed || steps.some(s => s.committed || ['create_project', 'add_task', 'update_task', 'update_project'].indexOf(s.tool) >= 0);
+    if (changed) { try { await loadAll(); render(); } catch (e) { console.error('[ai] 刷新看板失败:', e); } }
+  } catch (e) {
+    bubble.innerHTML = '<span class="ai-err">出错：' + esc((e && e.message) || '请求失败') + '</span>';
+    // 出错也把 user 提问落库（保留提问记录，AI 侧缺失可见）
+  } finally {
+    aiBusy = false; aiSetBusy(false); aiScroll();
+    aiPersist(); // 增量保存本轮对话（fire-and-forget，内部自捕错）
+  }
+}
+
+async function aiSend() {
+  const el = $('#aiInput');
+  const text = ((el && el.value) || '').trim();
+  if (!text || aiBusy) return;
+  el.value = '';
+  aiMsg('user', esc(text).replace(/\n/g, '<br>'));
+  aiHistory.push({ role: 'user', content: text });
+  await aiRun({ message: text });
+}
+
+// 供后端做多轮上下文：只保留 role/content，steps 等本地展示字段不发出
+function aiCtx() { return (aiHistory || []).map(m => ({ role: m.role === 'ai' ? 'ai' : 'user', content: String(m.content || '') })); }
+
+async function openAiModal() {
+  $('#aiModal').classList.remove('hidden');
+  loadAiConfig();
+  aiLoadSessions(); // 对话记录列表
+  const log = $('#aiChatLog');
+  if (!aiHistory.length && log && !log.children.length) {
+    aiMsg('ai', '你好，我是看板 AI 助手。我能查进度、找逾期任务、建项目、改任务负责人和状态；<b>删除类操作会先请你确认</b>才会执行。');
+  }
+  const inp = $('#aiInput'); if (inp) { inp.disabled = false; setTimeout(() => inp.focus(), 60); }
+  aiScroll();
+}
+$('#aiBtn').onclick = openAiModal;
+$('#aiNewBtn').onclick = aiNewSession;
+$('#aiSendBtn').onclick = aiSend;
+$('#aiInput').onkeydown = e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); }
+};
+$$('#aiChips .ai-chip').forEach(b => {
+  b.onclick = () => { const inp = $('#aiInput'); if (aiBusy || !inp) return; inp.value = b.dataset.q || ''; aiSend(); };
+});
+
+/* ---- 历史对话浮层（标题栏「历史对话」图标开合，平时不占空间） ---- */
+function aiSideOpen() {
+  const side = $('#aiSide'); if (!side) return;
+  side.classList.add('open');
+  const b = $('#aiHistBtn'); if (b) b.classList.add('active');
+  aiScroll();
+}
+function aiSideClose() {
+  const side = $('#aiSide'); if (side) side.classList.remove('open');
+  const b = $('#aiHistBtn'); if (b) b.classList.remove('active');
+}
+function aiSideToggle() { const side = $('#aiSide'); if (side) { side.classList.contains('open') ? aiSideClose() : aiSideOpen(); } }
+$('#aiHistBtn').onclick = aiSideToggle;
+$('#aiSideClose').onclick = ev => { ev.stopPropagation(); aiSideClose(); };
+// 浮层开着时点对话区任意处 → 收起（点会话项/删除按钮/头部图标不触发关闭由内部处理）
+document.addEventListener('click', ev => {
+  const side = $('#aiSide');
+  if (!side || !side.classList.contains('open')) return;
+  if (side.contains(ev.target)) return;
+  if (ev.target && ev.target.closest && ev.target.closest('#aiHistBtn, #aiNewBtn')) return;
+  aiSideClose();
+});
 
 /* ---- AI 设置 ---- */
 async function openAiSettings() {
@@ -2376,26 +3386,30 @@ $('#aiKeyClear').onclick = async () => {
     toast('API Key 已清除');
   } catch (e) { $('#aiSettingsMsg').textContent = '清除失败：' + e.message; }
 };
-// 本地大模型：检测本机 Ollama
+// 本地大模型：检测本机 LM Studio / Ollama
+let localModelMap = {};
 $('#aiDetectOllama').onclick = async () => {
   const msg = $('#aiOllamaMsg'), sel = $('#aiLocalModel');
   msg.textContent = '检测中…';
   try {
-    const r = await api('/ai/ollama-models');
+    const r = await api('/ai/local-models');
     if (r.online && r.models.length) {
-      sel.innerHTML = r.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      localModelMap = {};
+      r.models.forEach(m => { localModelMap[m.id] = m.base_url; });
+      sel.innerHTML = r.models.map(m => `<option value="${esc(m.id)}">${esc(m.id)} · ${esc(m.source)}</option>`).join('');
       sel.style.display = '';
-      msg.textContent = '已检测到 Ollama，选择模型自动配置：';
-    } else { sel.style.display = 'none'; msg.textContent = '未检测到本机 Ollama（需先安装并启动：ollama serve）'; }
+      msg.textContent = '已检测到本地模型，选择后自动配置：';
+    } else { sel.style.display = 'none'; msg.textContent = '未检测到本机模型（请先启动 LM Studio 或 Ollama）'; }
   } catch (e) { sel.style.display = 'none'; msg.textContent = '检测失败：' + e.message; }
 };
 $('#aiLocalModel').onchange = () => {
-  $('#aiBase').value = 'http://127.0.0.1:11434/v1';
-  $('#aiModel').value = $('#aiLocalModel').value;
+  const id = $('#aiLocalModel').value;
+  $('#aiBase').value = localModelMap[id] || 'http://127.0.0.1:1234/v1';
+  $('#aiModel').value = id;
   $('#aiLocal').checked = true;
   $('#aiKey').value = '';
   $('#aiKeyClear').style.display = 'none';
-  $('#aiSettingsMsg').textContent = '已选用本地模型「' + $('#aiLocalModel').value + '」，点「保存设置」生效（无需 Key）';
+  $('#aiSettingsMsg').textContent = '已选用本地模型「' + id + '」，点「保存设置」生效（无需 Key）';
 };
 $('#aiSaveBtn').onclick = async () => {
   try {
@@ -2407,10 +3421,16 @@ $('#aiSaveBtn').onclick = async () => {
   } catch (e) { $('#aiSettingsMsg').textContent = '保存失败：' + e.message; }
 };
 
-/* ---- AI 项目总结 ---- */
+/* ---- AI 项目总结（Markdown 结构化渲染） ---- */
+let aiSummaryRaw = '';
+function aiSummarySet(text) {
+  aiSummaryRaw = String(text || '');
+  const v = $('#aiSummaryView');
+  if (v) v.innerHTML = mdToHtml(aiSummaryRaw);
+}
 async function aiSummarize(mode) {
-  const m = $('#aiSummaryModal'); const ta = $('#aiSummaryText');
-  m.classList.remove('hidden'); ta.value = '生成中…';
+  const m = $('#aiSummaryModal');
+  m.classList.remove('hidden'); aiSummarySet('生成中…');
   let projects;
   if (mode === 'daily' || mode === 'weekly' || mode === 'monthly') {
     projects = reportProjects(mode); // 全局：全部进行中 + 归档时间窗口内的归档项目
@@ -2419,12 +3439,22 @@ async function aiSummarize(mode) {
     if (!p) { toast('请先选择项目'); m.classList.add('hidden'); return; }
     projects = [p];
   }
-  if (!projects.length) { ta.value = '当前没有可总结的项目'; return; }
-  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ projects, mode }) }); ta.value = r.text || ''; }
-  catch (e) { ta.value = '生成失败：' + e.message; }
+  if (!projects.length) { aiSummarySet('当前没有可总结的项目'); return; }
+  try { const r = await api('/ai/summarize', { method: 'POST', body: JSON.stringify({ projects, mode }), timeout: 60000 }); aiSummarySet(r.text || '（空）'); }
+  catch (e) { aiSummarySet('生成失败：' + e.message); }
 }
 $('#aiSummaryClose').onclick = () => $('#aiSummaryModal').classList.add('hidden');
-$('#aiSummaryCopy').onclick = () => { const ta = $('#aiSummaryText'); ta.select(); try { document.execCommand('copy'); } catch (e) {} toast('已复制'); };
+$('#aiSummaryCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText(aiSummaryRaw); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = aiSummaryRaw; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e2) { /* 忽略 */ }
+    ta.remove();
+  }
+  toast('已复制 Markdown 文本');
+};
 
 /* ---- 模板共创：导出参考模版（Excel）/ 导入社区模板 ---- */
 $('#tplExportBtn').onclick = () => {
@@ -2498,7 +3528,7 @@ function projStats(p) {
   return { total, done, progress, overdue, status, scolor, phaseName, phaseColor };
 }
 function donutSVG(segments) {
-  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  const total = segments.reduce((s, x) => s + x.value, 0);
   const r = 46, sw = 16, C = 2 * Math.PI * r, gap = C * 0.02; let off = 0; let paths = '';
   paths += `<circle cx="62" cy="62" r="${r}" fill="none" stroke="var(--bg-2)" stroke-width="${sw}"/>`;
   segments.forEach(s => {
@@ -2506,15 +3536,18 @@ function donutSVG(segments) {
     if (len > 0) paths += `<circle cx="62" cy="62" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 62 62)"/>`;
     off += full;
   });
-  return `<svg viewBox="0 0 124 124" class="donut">${paths}<text x="62" y="60" text-anchor="middle" class="donut-c">${total}</text><text x="62" y="75" text-anchor="middle" class="donut-t">个项目</text></svg>`;
+  const centerLabel = total === 0 ? '暂无项目' : '个项目';
+  return `<svg viewBox="0 0 124 124" class="donut">${paths}<text x="62" y="60" text-anchor="middle" class="donut-c">${total}</text><text x="62" y="75" text-anchor="middle" class="donut-t">${centerLabel}</text></svg>`;
+}
+function emptyDonut() {
+  return `<svg viewBox="0 0 124 124" class="donut"><circle cx="62" cy="62" r="46" fill="none" stroke="var(--bg-2)" stroke-width="16"/><text x="62" y="60" text-anchor="middle" class="donut-c">0</text><text x="62" y="75" text-anchor="middle" class="donut-t">暂无项目</text></svg>`;
 }
 function renderPanorama() {
   const active = state.projects.filter(p => (p.status || 'active') !== 'archived');
   const archived = state.projects.filter(p => (p.status || 'active') === 'archived');
-  let totDone = 0, totTasks = 0, overdue = 0, weekMs = 0;
+  let totDone = 0, totTasks = 0, overdue = 0;
   active.forEach(p => {
     const s = projStats(p); totDone += s.done; totTasks += s.total; overdue += s.overdue;
-    (p.tasks || []).forEach(t => { if (t.isMilestone && t.dueDate) { const dd = dayDiff(t.dueDate, TODAY()); if (dd >= 0 && dd <= 7) weekMs++; } });
   });
   const prog = totTasks ? Math.round(totDone / totTasks * 100) : (archived.length ? 100 : 0);
   $('#panorama').innerHTML = `
@@ -2528,7 +3561,6 @@ function renderPanorama() {
       <div class="kpi"><div class="kpi-l">进行中项目</div><div class="kpi-v">${active.length}</div></div>
       <div class="kpi"><div class="kpi-l">已归档项目</div><div class="kpi-v">${archived.length}</div></div>
       <div class="kpi"><div class="kpi-l">逾期节点</div><div class="kpi-v ${overdue ? 'warn' : 'good'}">${overdue}</div></div>
-      <div class="kpi"><div class="kpi-l">本周里程碑</div><div class="kpi-v">${weekMs}</div></div>
     </div>
     <div class="pano-grid">
       <div class="ptile span2" data-tile="pipe">
@@ -2576,17 +3608,22 @@ function renderPipe() {
 }
 function renderDonut() {
   const total = state.projects.length;
-  const counts = {}; state.projects.forEach(p => counts[p.type] = (counts[p.type] || 0) + 1);
-  const segs = Object.keys(TYPE_COLORS()).filter(t => counts[t]).map(t => ({ label: t, value: counts[t] || 0, color: typeColor(t) }));
-  $('#donutBox').innerHTML = donutSVG(segs.length ? segs : [{ label: '—', value: 1, color: '#bbb' }]);
-  $('#typeLegend').innerHTML = segs.map(s => `<div class="legend-row"><i style="background:${s.color}"></i><span class="lname">${s.label}</span><span class="lval">${s.value} 个 · ${Math.round(s.value / total * 100)}%</span></div>`).join('') || '<div class="empty">暂无数据</div>';
+  if (!total) { $('#donutBox').innerHTML = emptyDonut(); $('#typeLegend').innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  const counts = {}; state.projects.forEach(p => counts[p.type || ''] = (counts[p.type || ''] || 0) + 1);
+  const known = Object.keys(TYPE_COLORS());
+  const segs = known.filter(t => counts[t]).map(t => ({ label: t, value: counts[t], color: typeColor(t) }));
+  const rest = Object.keys(counts).filter(k => !known.includes(k)).reduce((s, k) => s + counts[k], 0);
+  if (rest) segs.push({ label: '未分类', value: rest, color: '#bbb' });
+  $('#donutBox').innerHTML = donutSVG(segs);
+  $('#typeLegend').innerHTML = segs.map(s => `<div class="legend-row"><i style="background:${s.color}"></i><span class="lname">${s.label}</span><span class="lval">${s.value} 个 · ${Math.round(s.value / total * 100)}%</span></div>`).join('');
 }
 function renderLevelDonut() {
   const total = state.projects.length;
+  if (!total) { $('#levelDonutBox').innerHTML = emptyDonut(); $('#levelLegend').innerHTML = '<div class="empty">暂无数据</div>'; return; }
   const counts = {}; state.projects.forEach(p => counts[p.level || 'B'] = (counts[p.level || 'B'] || 0) + 1);
   const segs = Object.keys(LEVEL_COLORS()).filter(l => counts[l]).map(l => ({ label: l + '级', value: counts[l], color: levelColor(l) }));
-  $('#levelDonutBox').innerHTML = donutSVG(segs.length ? segs : [{ label: '—', value: 1, color: '#bbb' }]);
-  $('#levelLegend').innerHTML = segs.map(s => `<div class="legend-row"><i style="background:${s.color}"></i><span class="lname">${s.label}</span><span class="lval">${s.value} 个 · ${Math.round(s.value / total * 100)}%</span></div>`).join('') || '<div class="empty">暂无数据</div>';
+  $('#levelDonutBox').innerHTML = donutSVG(segs);
+  $('#levelLegend').innerHTML = segs.map(s => `<div class="legend-row"><i style="background:${s.color}"></i><span class="lname">${s.label}</span><span class="lval">${s.value} 个 · ${Math.round(s.value / total * 100)}%</span></div>`).join('');
 }
 function renderLoad() {
   const counts = {};
@@ -2774,7 +3811,6 @@ function buildPhaseSwim(box, mode) {
         if (mode === 'daily') n = phTasks.filter(t => t.dueDate === refD || (!t.done && t.startDate && t.startDate <= refD && (!t.dueDate || t.dueDate >= refD))).length;
         else n = phTasks.filter(t => t.dueDate && t.dueDate >= mI && t.dueDate <= sI).length;
         if (n) sub += ` · ${mode === 'daily' ? '今日' : '本周'} ${n}`;
-        if (phTasks.some(t => t.isMilestone)) sub += ' · ⚑';
         cells += `<div class="sw-col"><div class="sw-pos" style="background:${ph.color}"><b>${esc(p.name)}</b><small>${sub}</small></div></div>`;
       } else {
         const prog = phTasks.length ? Math.round(doneCnt / phTasks.length * 100) : 0;
@@ -2821,12 +3857,11 @@ function buildDaily(wrap) {
     </div>
     <div class="report-wrap">
       <div class="ptile span2" style="padding:20px 22px">
-        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 今日任务数 / 里程碑</span></h4>
+        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 今日任务数</span></h4>
         <div id="swimBox"></div>
         <div class="sw-legend">
           <span><i style="background:#0a84ff"></i>当前阶段色块（按阶段着色）</span>
           <span><i style="background:var(--accent)"></i>已完成项目</span>
-          <span>⚑ 里程碑</span>
         </div>
       </div>
     </div>`;
@@ -2839,30 +3874,11 @@ function buildWeekly(wrap) {
   const { mon, days } = weekRange(state.weekDate);
   const monIso = isoDate(mon), sunIso = isoDate(days[6]);
   const projs = reportProjects('weekly');
-  let wkTotal = 0, wkDone = 0, wkMs = 0;
+  let wkTotal = 0, wkDone = 0;
   projs.forEach(p => (p.tasks || []).forEach(t => {
-    if (t.dueDate && t.dueDate >= monIso && t.dueDate <= sunIso) { wkTotal++; if (t.done) wkDone++; if (t.isMilestone) wkMs++; }
+    if (t.dueDate && t.dueDate >= monIso && t.dueDate <= sunIso) { wkTotal++; if (t.done) wkDone++; }
   }));
-  // 待完成项目清单：本周内未完成的任务（与本周有交集），按项目分组、逾期优先
-  const fmtMD = s => s ? s.slice(5).replace('-', '/') : '';
-  const todoRows = [];
-  projs.forEach(p => {
-    const list = (p.tasks || []).filter(t => {
-      if (t.done) return false;
-      const s = t.startDate ? parseD(t.startDate) : null;
-      const d = t.dueDate ? parseD(t.dueDate) : null;
-      return (!s || s <= days[6]) && (!d || d >= mon);
-    }).map(t => ({ ...t, overdue: t.dueDate && t.dueDate < monIso }));
-    if (list.length) todoRows.push({ p, list });
-  });
-  todoRows.sort((a, b) => (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
-  const todoTotal = todoRows.reduce((a, r) => a + r.list.length, 0);
-  const todoOverdue = todoRows.reduce((a, r) => a + r.list.filter(t => t.overdue).length, 0);
-  const todoHtml = todoRows.length ? todoRows.map(({ p, list }) => `
-      <div class="todo-proj">
-        <div class="todo-proj-h"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}<span class="todo-cnt">${list.length}</span></div>
-        ${list.map(t => `<div class="todo-t"><span class="todo-chk">□</span>${esc(t.title)}${t.isMilestone ? ' <span class="todo-ms">⚑</span>' : ''}${t.estimateDays ? `<span class="todo-days">${t.estimateDays}天</span>` : ''}<span class="todo-date">${fmtMD(t.startDate)} ~ ${fmtMD(t.dueDate)}${t.overdue ? ' <b class="todo-warn">⚠逾期</b>' : ''}</span></div>`).join('')}
-      </div>`).join('') : '<div class="todo-empty">🎉 本周没有待完成任务</div>';
+  // 待完成清单已迁至「待办」页（见 buildTodos）
   wrap.innerHTML = `
     <div class="report-hero">
       <div class="eyebrow">Weekly Report</div>
@@ -2880,50 +3896,231 @@ function buildWeekly(wrap) {
     <div class="pano-kpis">
       <div class="kpi"><div class="kpi-l">本周任务</div><div class="kpi-v">${wkTotal}</div></div>
       <div class="kpi"><div class="kpi-l">本周完成</div><div class="kpi-v good">${wkDone}</div></div>
-      <div class="kpi"><div class="kpi-l">本周里程碑</div><div class="kpi-v">${wkMs}</div></div>
       <div class="kpi"><div class="kpi-l">涉及项目</div><div class="kpi-v">${projs.length}</div></div>
     </div>
     <div class="report-wrap">
       <div class="ptile span2" style="padding:20px 22px">
-        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 本周任务数 / 里程碑</span></h4>
+        <h4>阶段泳道图 <span class="ted">各项目当前所处阶段 · 色块内含阶段进度 / 本周任务数</span></h4>
         <div id="swimBox"></div>
         <div class="sw-legend">
           <span><i style="background:#0a84ff"></i>当前阶段色块（按阶段着色）</span>
           <span><i style="background:var(--accent)"></i>已完成项目</span>
-          <span>⚑ 里程碑</span>
         </div>
       </div>
-      <div class="ptile span2" style="padding:20px 22px">
-        <h4 class="tile-head"><span>待完成项目清单 <em class="ted">本周内未完成的任务 · 按项目分组 · 逾期优先</em></span><button class="btn" id="todoExportBtn" title="导出本周待办清单为 Excel">${ICON.download} 导出 Excel</button></h4>
-        <div class="todo-list">
-          <div class="todo-kpis"><span>涉及项目 <b>${todoRows.length}</b></span><span>本周待完成 <b>${todoTotal}</b></span><span class="todo-warn">已逾期 <b>${todoOverdue}</b></span></div>
-          ${todoHtml}
-        </div>
-      </div>
+      <!-- 待完成清单已迁至「待办」页（buildTodos） -->
     </div>`;
   $('#wpPrev').onclick = () => { const x = new Date(state.weekDate); x.setDate(x.getDate() - 7); state.weekDate = x; renderReport(); };
   $('#wpNext').onclick = () => { const x = new Date(state.weekDate); x.setDate(x.getDate() + 7); state.weekDate = x; renderReport(); };
   $('#wpThis').onclick = () => { state.weekDate = new Date(); renderReport(); };
-  const eb = $('#todoExportBtn'); if (eb) eb.onclick = downloadTodoExcel;
+  // 本周待办导出已迁至「待办」页（buildTodos 内重新绑定 #todoExportBtn）
   buildPhaseSwim($('#swimBox'), 'weekly');
 }
-async function downloadTodoExcel() {
-  const { mon, days } = weekRange(state.weekDate);
-  const projs = reportProjects('weekly');
-  if (!projs.length) { toast('本周没有可导出的项目'); return; }
+// 待办导出：按 range 切日/周/月,带 X-Auth-Token,401 自动重登录
+async function downloadTodoExcel(range) {
+  const kind = range || 'week';
   try {
-    const r = await fetch('/api/reports/todo-export', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projects: projs, mon: isoDate(mon), sun: isoDate(days[6]) })
+    // 按 range 计算日期范围（前端用 collectTodos 已过滤的 tasks,故范围用于后端文件命名/二次过滤）
+    const today = TODAY();
+    let monIso = today, sunIso = today;
+    if (kind === 'week') { const { mon, days } = weekRange(state.weekDate || new Date()); monIso = isoDate(mon); sunIso = isoDate(days[6]); }
+    else if (kind === 'nextweek') { const { mon, days } = weekRange(state.weekDate || new Date()); monIso = isoDate(addDays(mon, 7)); sunIso = isoDate(addDays(days[6], 7)); }
+    else if (kind === 'month') { const d = state.monthlyDate || new Date(); monIso = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); sunIso = isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+    // 前端按 collectTodos(kind) 预过滤（保持与待办页语义一致：逾期 + 周期内到期）
+    const rows = collectTodos(kind);
+    if (!rows.length) { toast((kind === 'today' ? '今天' : kind === 'week' ? '本周' : kind === 'nextweek' ? '下周' : '本月') + '没有可导出的待办任务'); return; }
+    const projects = rows.map(({ p, list }) => ({ id: p.id, name: p.name, color: p.color, owner: p.owner, tasks: list.map(t => ({
+      id: t.id, title: t.title, done: !!t.done,
+      startDate: t.startDate, dueDate: t.dueDate, estimateDays: t.estimateDays || 0,
+      overdue: !!t.overdue, carryover: !!t.carryover, phaseId: t.phaseId, phaseName: t.phaseName || ''
+    })) }));
+    const r = await fetch(API + '/reports/todo-export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+      body: JSON.stringify({ kind, range: { mon: monIso, sun: sunIso }, projects })
     });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status); }
+    if (r.status === 401 && !state.demo) { const ok = await showLogin(); if (ok) return downloadTodoExcel(kind); throw new Error('未登录'); }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     const blob = await r.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = '周报待办清单.xlsx';
+    const nameMap = { today: '今日待办_', week: '周报待办清单_', month: '本月待办_', nextweek: '下周待办_' };
+    a.download = nameMap[kind] + today.replace(/-/g, '') + '.xlsx';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  } catch (err) { toast('导出失败：' + err.message); }
+    toast('已导出 ' + a.download);
+  } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
+}
+
+/* ---------- 待办页（P0-4）：今日 / 本周 / 本月未完成任务，按项目分组、逾期优先、点击直接编辑 ---------- */
+function collectTodos(range) {
+  const today = TODAY();
+  const f = state.todoFilter || {};
+  const q = (f.q || '').trim().toLowerCase();
+  const ref = { monIso: null, sunIso: null, moFirstIso: null, moEndIso: null };
+  if (range === 'week') {
+    const { mon, days } = weekRange(state.weekDate || new Date());
+    ref.monIso = isoDate(mon); ref.sunIso = isoDate(days[6]);
+  } else if (range === 'nextweek') {
+    const { mon, days } = weekRange(state.weekDate || new Date());
+    ref.monIso = isoDate(addDays(mon, 7)); ref.sunIso = isoDate(addDays(days[6], 7)); // 下周一到下周日
+    ref.thisSunIso = isoDate(days[6]);                                             // 本周日（顺延判定基准）
+  } else if (range === 'month') {
+    const d = state.monthlyDate || new Date();
+    const y = d.getFullYear(), mo = d.getMonth();
+    ref.moFirstIso = isoDate(new Date(y, mo, 1)); ref.moEndIso = isoDate(new Date(y, mo + 1, 0));
+  }
+  const base = range === 'today' ? today : (range === 'week' || range === 'nextweek' ? ref.thisSunIso || ref.monIso : ref.moFirstIso);
+  const rows = [];
+  activeProjects().forEach(p => {
+    // 下周待办（顺延模型）：本周未完成(done=false)自动顺延 + 下周原本计划。已完成排除。
+    if (range === 'nextweek') {
+      let list = (p.tasks || []).filter(t => {
+        if (t.done || !t.dueDate) return false;
+        const carry = t.dueDate <= ref.thisSunIso;                                 // 本周(含更早)未完成 → 顺延
+        const next = t.dueDate >= ref.monIso && t.dueDate <= ref.sunIso;           // 下周计划
+        if (f.overdueOnly && !carry) return false;                                 // 仅逾期：只留顺延项
+        if (q && !(t.title || '').toLowerCase().includes(q) && !(p.name || '').toLowerCase().includes(q)) return false;
+        return carry || next;
+      });
+      if (!list.length) return;
+      list = list.map(t => ({ ...t, carryover: t.dueDate <= ref.thisSunIso, overdue: t.dueDate < today }))
+                .sort((a, b) => (a.carryover === b.carryover ? (a.dueDate || '').localeCompare(b.dueDate || '') : (a.carryover ? -1 : 1))); // 顺延在前（B）
+      rows.push({ p, list });
+      return;
+    }
+    let list = (p.tasks || []).filter(t => {
+      if (t.done || !t.dueDate) return false;
+      if (range === 'today') { if (!(t.dueDate <= today)) return false; }          // 逾期 + 今天到期
+      else if (range === 'week') { if (!(t.dueDate <= ref.sunIso)) return false; }   // 逾期 + 本周(周一~周日)内到期
+      else { if (!(t.dueDate <= ref.moEndIso)) return false; }                       // 逾期 + 本月内到期
+      // 过滤（C）：仅逾期 / 关键词（任务标题或项目名任一包含）
+      if (f.overdueOnly && !(t.dueDate < base)) return false;
+      if (q && !(t.title || '').toLowerCase().includes(q) && !(p.name || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+    if (!list.length) return;
+    list = list.map(t => ({ ...t, overdue: t.dueDate < base }))
+              .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));   // 项目内按到期日升序（逾期最早最前）（B）
+    rows.push({ p, list });
+  });
+  rows.sort((a, b) => (b.list.filter(t => t.carryover).length - a.list.filter(t => t.carryover).length) || (b.list.filter(t => t.overdue).length - a.list.filter(t => t.overdue).length) || a.p.name.localeCompare(b.p.name, 'zh'));
+  return rows;
+}
+function buildTodos() {
+  const wrap = $('#todos');
+  const range = state.todoRange || 'today';
+  const f = state.todoFilter || {};
+  const titleMap = { today: '今日待办', week: '本周待办', month: '本月待办' };
+  const subMap = { today: '逾期 + 今天到期', week: '逾期 + 本周(周一~周日)内到期', month: '逾期 + 本月内到期' };
+  wrap.innerHTML = `
+    <div class="report-hero">
+      <div class="eyebrow">To-Do</div>
+      <h1 class="pano-title">我的待办</h1>
+      <p class="pano-sub">未完成任务 · 按项目分组 · 逾期优先 · 点击任务跳转至对应项目看板</p>
+    </div>
+    <div class="todo-bar">
+      <div class="todo-tabs">
+        <button class="todo-tab${range === 'today' ? ' active' : ''}" data-range="today">今日</button>
+        <button class="todo-tab${range === 'week' ? ' active' : ''}" data-range="week">本周</button>
+        <button class="todo-tab${range === 'month' ? ' active' : ''}" data-range="month">本月</button>
+      </div>
+      <div class="todo-filters">
+        <label class="tf"><input type="checkbox" id="tfOverdue"${f.overdueOnly ? ' checked' : ''}> 仅逾期</label>
+        <input class="tf-q" id="tfQ" placeholder="搜索项目 / 任务…" value="${esc(f.q || '')}">
+        <button class="btn todo-export" id="todoExportBtn" title="导出待办清单为 Excel（日/周/月可选）">${ICON.download} 导出</button>
+      </div>
+    </div>
+    <div class="report-wrap">
+      <div class="ptile span2" style="padding:20px 22px">
+        <h4 class="tile-head"><span>${titleMap[range]} <em class="ted">${subMap[range]}</em></span></h4>
+        <div class="todo-list" id="todoList"></div>
+      </div>
+    </div>`;
+  renderTodoList();
+  // 事件委托（wrap 元素持久，innerHTML 重建不影响绑定）
+  wrap.onclick = (e) => {
+    const tab = e.target.closest('.todo-tab');
+    if (tab) { state.todoRange = tab.dataset.range; buildTodos(); return; }   // 切换 tab（A）：只渲染当前段，去重
+    if (e.target.closest('#todoExportBtn')) { openExportModal(); return; }    // 独立导出功能键 → 弹模态框选范围
+    const ph = e.target.closest('.todo-proj-h');
+    if (ph) {                                                                 // 分组折叠（B）：持久化到 localStorage
+      const box = ph.closest('.todo-proj');
+      const on = box.classList.toggle('collapsed');
+      const ck = 'kb-todo-collapse-' + range + '-' + ph.dataset.toggle;
+      try { localStorage.setItem(ck, on ? '1' : '0'); } catch (err) {}
+      const caret = ph.querySelector('.todo-caret'); if (caret) caret.textContent = on ? '▸' : '▾';
+      return;
+    }
+    const tt = e.target.closest('.todo-t');                                    // 点击任务 -> 跳转对应项目看板并定位
+    if (tt) {
+      const p = state.projects.find(x => x.id === tt.dataset.pid);
+      const t = p && (p.tasks || []).find(x => x.id === tt.dataset.tid);
+      if (!p || !t) return;
+      state.currentId = p.id;          // 切到该任务所属项目
+      state._jumpTaskId = t.id;        // 看板打开后滚动居中并高亮该任务
+      state.view = 'board';            // 跳转至对应项目看板
+      render();
+    }
+  };
+  wrap.onchange = (e) => {                                                     // 过滤开关（C）：整体重渲
+    if (e.target.id === 'tfOverdue') { state.todoFilter.overdueOnly = e.target.checked; buildTodos(); }
+  };
+  wrap.oninput = (e) => {                                                      // 搜索（C）：仅局部刷新，保持搜索框焦点
+    if (e.target.id === 'tfQ') { state.todoFilter.q = e.target.value; renderTodoList(); }
+  };
+}
+// 导出模态框：日/周/月三选一,显示 preview(任务数/项目数),确认调 downloadTodoExcel
+function openExportModal() {
+  const counts = {};
+  let total = 0;
+  ['today', 'week', 'month', 'nextweek'].forEach(k => {
+    const rows = collectTodos(k);
+    const n = rows.reduce((a, r) => a + r.list.length, 0);
+    counts[k] = { tasks: n, projs: rows.length };
+    total += n;
+  });
+  const titleMap = { today: '今日待办', week: '本周待办', month: '本月待办', nextweek: '下周待办' };
+  const opt = (k) => `<label class="exp-opt"><input type="radio" name="expRange" value="${k}"${k === 'week' ? ' checked' : ''}><span class="exp-name">${titleMap[k]}</span><span class="exp-meta">${counts[k].tasks} 个任务 · 涉及 ${counts[k].projs} 个项目</span></label>`;
+  const m = $('#exportModal');
+  m.innerHTML = `
+    <div class="modal-box" style="width:min(420px,92vw)">
+      <div class="modal-head"><h3>${ICON.download} 导出待办清单</h3><button class="x" data-close>×</button></div>
+      <p class="pi-sub" style="margin:0 0 14px">选择导出的时间范围（共 ${total} 个未完成任务可导出）</p>
+      <div class="exp-opts">${opt('today')}${opt('week')}${opt('month')}${opt('nextweek')}</div>
+      <div class="modal-acts" style="margin-top:18px">
+        <button class="btn" data-close>取消</button>
+        <button class="btn primary" id="expOk">${ICON.download} 导出 Excel</button>
+      </div>
+    </div>`;
+  m.classList.remove('hidden');
+  m.querySelectorAll('[data-close]').forEach(el => el.onclick = () => m.classList.add('hidden'));
+  $('#expOk').onclick = () => {
+    const k = (m.querySelector('input[name="expRange"]:checked') || {}).value || 'week';
+    m.classList.add('hidden');
+    downloadTodoExcel(k);
+  };
+}
+function renderTodoList() {
+  const range = state.todoRange || 'today';
+  const el = $('#todoList'); if (!el) return;
+  const rows = collectTodos(range);
+  const fmtMD = s => s ? s.slice(5).replace('-', '/') : '';
+  const total = rows.reduce((a, r) => a + r.list.length, 0);
+  const over = rows.reduce((a, r) => a + r.list.filter(t => t.overdue).length, 0);
+  const listHtml = rows.length ? rows.map(({ p, list }) => {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem('kb-todo-collapse-' + range + '-' + p.id) === '1'; } catch (e) {}
+    return `
+      <div class="todo-proj${collapsed ? ' collapsed' : ''}" data-pid="${p.id}" style="--pc:${p.color}">
+        <div class="todo-proj-h" data-toggle="${p.id}"><span class="todo-caret">${collapsed ? '▸' : '▾'}</span><span class="dot" style="background:${p.color}"></span><span class="pname">${esc(p.name)}</span><span class="todo-cnt">${list.length}</span></div>
+        <div class="todo-tasks">
+          ${list.map(t => `<div class="todo-t${t.overdue ? ' over' : ''}" data-pid="${p.id}" data-tid="${t.id}"><span class="todo-dot ${t.overdue ? 'over' : ''}"></span><span class="todo-tt">${esc(t.title)}${t.estimateDays ? ` <span class="todo-days">${t.estimateDays}天</span>` : ''}</span><span class="todo-due">${fmtMD(t.startDate)} ~ ${fmtMD(t.dueDate)}${t.overdue ? ' ⚠' : ''}</span><span class="todo-go">看板↗</span></div>`).join('')}
+        </div>
+      </div>`;
+  }).join('') : '<div class="todo-empty">🎉 ' + (range === 'today' ? '今天没有待办' : '本' + (range === 'week' ? '周' : '月') + '没有待完成任务') + '</div>';
+  el.innerHTML = `
+    <div class="todo-kpis"><span>涉及项目 <b>${rows.length}</b></span><span>待完成 <b>${total}</b></span><span class="todo-warn">已逾期 <b>${over}</b></span></div>
+    ${listHtml}`;
 }
 
 /* ---------- 月度计划：本月内「试产发布」的项目 + 勾选纳入计划 ---------- */
@@ -3097,8 +4294,11 @@ function renderMonthly() {
     out.getContext('2d').drawImage(imgObj, sx, sy, sw, sh, 0, 0, 256, 256);
     const dataUrl = out.toDataURL('image/png');
     try {
-      const r = await fetch('/api/brand-logo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: dataUrl }) });
-      if (!r.ok) throw new Error('保存失败');
+      /* 后端已加角色校验（P2-16），必须带鉴权头，否则 401 */
+      const hd = { 'Content-Type': 'application/json' };
+      const tk = getToken(); if (tk) hd['X-Auth-Token'] = tk;
+      const r = await fetch('/api/brand-logo', { method: 'POST', headers: hd, body: JSON.stringify({ data: dataUrl }) });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || '保存失败'); }
       ts = String(Date.now());
       try { localStorage.setItem('kb-brand-ts', ts); } catch (e) {}
       img.src = '/brand-logo.png?t=' + ts;
@@ -3108,27 +4308,197 @@ function renderMonthly() {
   };
 })();
 
-loadAll();
+/* PWA：注册 Service Worker（P2-17）。仅在安全上下文（https / localhost）生效，
+   注册失败不影响主流程 —— 离线能力是增强项，不是依赖。 */
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW 注册失败（不影响使用）:', e && e.message));
+  });
+}
+
+/* ---------- 版本查看：本地版本 ↔ GitHub 最新 Release ---------- */
+// 版本比较：按 '.' 拆数字段，首个 '-' 之后当决胜后缀。
+// 回归点：原实现只按 '.' 拆，导致 '1.4.7-hotfix3' 与 '1.4.7-hotfix4' 被当作 [1,4,7]==[1,4,7]
+// → cmpVer 返回 0 → checkUpdate 走 "已是最新" 分支，生产环境页脚自相矛盾（badge=hotfix3，状态=hotfix4）。
+function cmpVer(a, b) {
+  const parse = v => {
+    const s = String(v == null ? '' : v);
+    const i = s.indexOf('-');
+    const main = i >= 0 ? s.slice(0, i) : s;
+    const suffix = i >= 0 ? s.slice(i + 1) : '';
+    const nums = main.split('.').map(x => { const n = parseInt(x, 10); return Number.isFinite(n) ? n : 0; });
+    return { nums, suffix };
+  };
+  const pa = parse(a), pb = parse(b);
+  const len = Math.max(pa.nums.length, pb.nums.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa.nums[i] || 0, y = pb.nums[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  if (pa.suffix !== pb.suffix) return pa.suffix < pb.suffix ? -1 : 1;
+  return 0;
+}
+async function refreshVersion() {
+  try {
+    const v = await api('/version');
+    const badge = document.getElementById('verBadge');
+    if (badge) badge.textContent = 'v' + (v.version || '?') + (v.demo ? ' · demo' : '');
+  } catch (e) { /* 版本接口不可用则忽略 */ }
+}
+async function checkUpdate() {
+  const status = document.getElementById('verStatus');
+  if (status) status.textContent = '检查中…';
+  let local = '0.0.0';
+  try { const v = await api('/version'); local = v.version || '0.0.0'; } catch (e) {}
+  try {
+    // 经服务端代理（/api/latest-release）规避浏览器 CSP 对 api.github.com 的限制
+    const d = await api('/latest-release');
+    if (!d || !d.ok) throw new Error((d && d.error) || '无法获取最新版本');
+    const latest = d.version;
+    const cmp = cmpVer(local, latest);
+    if (cmp < 0) {
+      if (status) { status.innerHTML = '有更新 <b>v' + latest + '</b>（当前 v' + local + '）— 在开发机打包 update.zip 并部署'; status.style.color = '#E0241B'; }
+      toast('发现新版本 v' + latest);
+    } else if (cmp > 0) {
+      if (status) { status.textContent = '本地 v' + local + ' 高于 GitHub v' + latest + '（未发布）'; status.style.color = '#888'; }
+    } else {
+      if (status) { status.textContent = '已是最新（v' + latest + '）✓'; status.style.color = '#2f855a'; }
+      toast('已是最新版本 v' + latest);
+    }
+  } catch (e) {
+    if (status) { status.textContent = '无法连接 GitHub（离线或限流）'; status.style.color = '#888'; }
+  }
+}
+const _verCheck = document.getElementById('verCheck');
+if (_verCheck) _verCheck.addEventListener('click', checkUpdate);
+
+/* 一键升级（admin 可见）：prepare → 确认 → confirm → 重启 */
+function updateUpgradeBtn() {
+  const w = document.getElementById('verUpgradeWrap');
+  if (w) w.style.display = (state.user && state.user.role === 'admin') ? '' : 'none';
+}
+async function doUpgrade() {
+  const status = document.getElementById('verStatus');
+  const bar = document.getElementById('verBar');
+  const barFill = document.getElementById('verBarFill');
+  const barText = document.getElementById('verBarText');
+  function setBar(pct, txt, color) {
+    if (barFill) { barFill.style.width = Math.max(0, Math.min(100, pct)) + '%'; barFill.style.background = color || ''; }
+    if (barText) { barText.textContent = txt; }
+    if (bar) bar.style.display = (pct == null) ? 'none' : '';
+  }
+  function setStatus(txt, color) { if (status) { status.textContent = txt; status.style.color = color || '#2b6cb0'; } }
+  let pollTimer = null;
+  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+  try {
+    setStatus('比对中…');
+    setBar(0, '准备中…', '#e2e8f0');
+    const pre = await api('/admin/upgrade/prepare', { method: 'POST', timeout: 60000 });
+    if (!pre || !pre.need) {
+      setBar(null);
+      setStatus('已是最新（v' + ((pre && pre.local) || '?') + '），无需升级', '#2f855a');
+      return;
+    }
+    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务（公网约中断 10-30 秒）。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) {
+      setBar(null); setStatus('已取消', '#718096'); return;
+    }
+    setStatus('启动升级任务…');
+    // confirm 阶段立即返回 taskId（<200ms），不再 15s/5min 超时
+    const r = await api('/admin/upgrade/confirm', { method: 'POST', body: JSON.stringify({ token: pre.token }) });
+    if (!r || !r.ok || !r.taskId) {
+      setBar(null);
+      // 后端 r.error 已自描述（含"升级失败"前缀），前端不再重复拼接
+      setStatus((r && r.error) || '启动升级失败（未知错误）', '#E0241B');
+      toast((r && r.error) || '启动升级失败');
+      return;
+    }
+    const taskId = r.taskId;
+    setStatus('升级中…', '#2b6cb0');
+    setBar(0, '已启动，等待下载…', '#3182ce');
+    // 轮询任务状态（每秒；进度变化时刷新；完成/错误停轮询）
+    let lastPhase = null, lastPct = -1;
+    pollTimer = setInterval(async () => {
+      try {
+        const st = await api('/admin/upgrade/status?taskId=' + encodeURIComponent(taskId), { method: 'GET', timeout: 10000 });
+        if (!st) return;
+        if (st.phase !== lastPhase || st.progress !== lastPct) {
+          lastPhase = st.phase; lastPct = st.progress;
+          const color = st.phase === 'error' ? '#E0241B' : (st.phase === 'done' ? '#2f855a' : '#3182ce');
+          setBar(st.progress, st.message || st.phase, color);
+        }
+        if (st.finished) {
+          stopPoll();
+          if (st.phase === 'done') {
+            setStatus('升级完成，服务重启中…刷新即见 v' + pre.latest, '#2f855a');
+            toast('升级成功，看板正在重启（v' + pre.latest + '）');
+          } else if (st.phase === 'error') {
+            setStatus('升级失败：' + (st.message || '未知错误'), '#E0241B');
+            toast('升级失败：' + (st.message || '未知错误'));
+          } else {
+            setStatus('任务结束：' + (st.message || st.phase), '#718096');
+          }
+        }
+      } catch (e) {
+        // 单次轮询失败不打断（弱网可能抖），下轮重试
+        console.warn('[upgrade] 轮询失败:', e && e.message);
+      }
+    }, 1000);
+  } catch (e) {
+    stopPoll();
+    setBar(null);
+    // 不重复「升级失败：」前缀；原始 e.message 已自描述（前端网络失败/api() 已翻译为可读中文）
+    setStatus('升级出错：' + ((e && e.message) || String(e)), '#E0241B');
+    toast('升级出错：' + ((e && e.message) || '请重试'));
+  }
+}
+const _verUpgrade = document.getElementById('verUpgrade');
+if (_verUpgrade) _verUpgrade.addEventListener('click', doUpgrade);
+updateUpgradeBtn();
+// 登录为 admin 后揭示按钮（轮询至多 30 秒，开销极低）
+let _upgTicks = 0;
+const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 || (state.user && state.user.role === 'admin')) clearInterval(_upgTimer); }, 3000);
+
+if (typeof window !== 'undefined') { boot(); refreshVersion(); }
+// 仅测试环境导出：Node require 时可调用 boot 做启动冒烟测试；浏览器中 module 未定义，自动跳过，零副作用。
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { boot, probeAuth, showLogin, loadAll, hideSplash, getState: () => state, collectTodos, weekRange, addDays, isoDate, TODAY, cmpVer, mdToHtml };
+}
 
 </script>
-<script>
+<script nonce="@NONCE@">
 (function(){
   var root = document.documentElement;
   var btn = document.getElementById('themeToggle');
   if(!btn) return;
   var MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6 6 0 0021 12.8z"/></svg>';
   var SUN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19 12a7 7 0 00-7-7"/></svg>';
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  /* 三态主题：auto(跟随系统) / light / dark。auto 时不写 data-theme，交给 CSS prefers-color-scheme */
+  function label(effDark, auto){
+    btn.innerHTML = effDark ? SUN + ' 浅色' : MOON + ' 深色';
+    btn.title = auto ? '当前跟随系统（点击切换，长按/双击恢复跟随）' : '当前手动指定主题';
+    btn.setAttribute('aria-label', (auto ? '主题跟随系统，' : '') + '切换为' + (effDark ? '浅色' : '深色') + '主题');
+  }
+  function applyAuto(){
+    root.removeAttribute('data-theme');
+    try{ localStorage.removeItem('kb-theme'); }catch(e){}
+    label(!!(mq && mq.matches), true);
+  }
   function apply(t){
     root.setAttribute('data-theme', t);
-    btn.innerHTML = (t === 'light') ? MOON + ' 深色' : SUN + ' 浅色';
     try{ localStorage.setItem('kb-theme', t); }catch(e){}
+    label(t === 'dark', false);
   }
-  var saved = 'light';
-  try{ saved = localStorage.getItem('kb-theme') || 'light'; }catch(e){}
-  apply(saved);
+  var saved = null;
+  try{ saved = localStorage.getItem('kb-theme'); }catch(e){}
+  if(saved === 'light' || saved === 'dark') apply(saved); else applyAuto();
+  if(mq && mq.addEventListener) mq.addEventListener('change', function(){ if(!root.hasAttribute('data-theme')) applyAuto(); });
   btn.addEventListener('click', function(){
-    apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    var effDark = root.hasAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : !!(mq && mq.matches);
+    apply(effDark ? 'light' : 'dark');
   });
+  /* 双击恢复「跟随系统」 */
+  btn.addEventListener('dblclick', function(){ applyAuto(); });
 })();
 </script>
 </body>

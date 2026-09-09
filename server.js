@@ -272,30 +272,58 @@ async function saveAI(cfg) {
 // 已配置判定：云 Key 或本地模型（local 标志）任一即可
 function aiConfigured(cfg) { return !!(cfg && (cfg.api_key || cfg.local)); }
 function maskKey(k) { if (!k) return ''; const s = String(k); if (s.length <= 8) return '****'; return s.slice(0, 3) + '****' + s.slice(-4); }
-function chatCompletions(cfg, messages, temperature) {
+// 完整版：返回 { content, tool_calls, message, raw }——Agent 用，支持 function calling
+// opts: { temperature, tools }（tools 为空则退化成普通对话；模型不支持 tools 时多数服务会忽略或报 400，由 agent 自动降级文本协议）
+function chatCompletionsFull(cfg, messages, opts) {
   return new Promise((resolve, reject) => {
+    const o = opts || {};
     const base = String(cfg.base_url || 'https://api.openai.com/v1').replace(/\/+$/, '');
     let url; try { url = new URL(base + '/chat/completions'); } catch (e) { return reject(new Error('base_url 无效')); }
-    const payload = JSON.stringify({ model: cfg.model || 'gpt-4o-mini', messages, temperature: (typeof temperature === 'number' ? temperature : 0.7), stream: false });
+    const body = { model: cfg.model || 'gpt-4o-mini', messages, temperature: (typeof o.temperature === 'number' ? o.temperature : 0.7), stream: false };
+    if (o.tools && o.tools.length) body.tools = o.tools;
+    // 给本地小模型显式 max_tokens，避免 LM Studio 默认值（如 128）把输出截成空字符串；
+    // OpenAI 云端不传则由模型默认值（gpt-4o-mini=16384 等），保持原行为。
+    if (typeof o.max_tokens === 'number') body.max_tokens = o.max_tokens;
+    else if (cfg.api_key) { /* 云端有 Key：不强制覆盖，沿用原行为 */ }
+    else { body.max_tokens = 1024; }
+    const payload = JSON.stringify(body);
     const data = Buffer.from(payload);
     const isHttps = url.protocol === 'https:';
     const lib = isHttps ? https : require('http');
     const headers = { 'Content-Type': 'application/json', 'Content-Length': data.length };
     if (cfg.api_key) headers['Authorization'] = 'Bearer ' + cfg.api_key; // 本地模型无 Key 不带头
-    const options = { hostname: url.hostname, port: url.port || (isHttps ? 443 : 80), path: url.pathname + url.search, method: 'POST', headers, timeout: 60000 };
+    const options = { hostname: url.hostname, port: url.port || (isHttps ? 443 : 80), path: url.pathname + url.search, method: 'POST', headers, timeout: 120000 };
     const req = lib.request(options, resp => {
       let buf = ''; resp.on('data', d => buf += d);
       resp.on('end', () => {
         try {
           const j = JSON.parse(buf);
-          const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-          if (t) resolve(t); else { console.error('AI 未返回内容:', (buf || '').slice(0, 300)); reject(new Error('AI 未返回内容')); }
+          const choice = j.choices && j.choices[0];
+          const msg = choice && choice.message;
+          if (msg) {
+            // 兼容 LM Studio 本地模型：把 reasoning_content 当 content 兜底（许多小模型把正文放进 reasoning）
+            const content = msg.content || msg.reasoning_content || '';
+            resolve({
+              content,
+              tool_calls: msg.tool_calls || null,
+              reasoning: msg.reasoning_content || '',
+              finish_reason: choice.finish_reason || '',
+              message: msg, raw: j
+            });
+          } else { console.error('AI 未返回内容:', (buf || '').slice(0, 300)); reject(new Error('AI 未返回内容')); }
         } catch (e) { console.error('解析 AI 响应失败:', e.message, (buf || '').slice(0, 300)); reject(new Error('解析 AI 响应失败')); }
       });
     });
     req.on('error', e => reject(e));
     req.on('timeout', () => req.destroy(new Error('AI 请求超时')));
     req.write(data); req.end();
+  });
+}
+// 兼容旧调用：只要文本
+function chatCompletions(cfg, messages, temperature) {
+  return chatCompletionsFull(cfg, messages, { temperature }).then(r => {
+    if (!r.content && !r.reasoning) throw new Error('AI 未返回内容');
+    return r.content;
   });
 }
 
@@ -399,9 +427,57 @@ function fullReportRole(role) { return FULL_REPORT.includes(role); }
 
 // 重复任务逻辑（shiftByRecurrence / spawnNextRecurrence / RECUR / RECUR_NAME）已移至 lib/recurrence.js
 
+/* ---------- AI Agent：让 AI 助手能调用看板工具（读写项目/任务） ----------
+   依赖注入而非 require server 内部函数，避免循环依赖；所有工具以当前登录用户身份执行，受角色可见与只读模式约束。 */
+const createAgent = require('./lib/ai-agent.js');
+const agent = createAgent({
+  db, uid, isoDate, addDays, recalcProject, scheduleTasks, PHASE_COLORS, canAllRole, isManagerRole,
+  chat: chatCompletionsFull,
+  isReadOnly: () => { try { return fs.readFileSync(RO_FLAG, 'utf8').trim() === '1'; } catch (e) { return false; } }
+});
 
 /* AI 助手路由（原巨石路由内联块抽取，缩小主函数；Node 原生 https，支持本地大模型） */
 async function handleAi(p, req, res) {
+    // ---- AI 对话记录（会话 CRUD + 消息，owner 隔离；写操作受全局 viewer 只读闸门保护）----
+    // 路径：/api/ai/sessions、/api/ai/sessions/:id（重命名/删除）、/api/ai/sessions/:id/messages
+    const sessMatch = p.match(/^\/api\/ai\/sessions(?:\/([^/]+)(?:\/messages)?)?$/);
+    if (sessMatch) {
+      const sessionId = sessMatch[1];
+      if (!sessionId && req.method === 'GET') {
+        return send(res, 200, { sessions: db.aiListSessions(req.user.id) });
+      }
+      if (!sessionId && req.method === 'POST') {
+        const body = await readBody(req);
+        const s = db.aiCreateSession(req.user.id, body && body.title);
+        return send(res, 200, s);
+      }
+      if (sessionId && p.endsWith('/messages')) {
+        if (req.method === 'GET') {
+          const msgs = db.aiListMessages(req.user.id, sessionId);
+          if (!msgs) return send(res, 404, { error: '对话不存在' });
+          return send(res, 200, { messages: msgs });
+        }
+        if (req.method === 'POST') {
+          const body = await readBody(req);
+          const out = db.aiAppendMessages(req.user.id, sessionId, body && body.messages);
+          if (!out) return send(res, 404, { error: '对话不存在' });
+          return send(res, 200, out);
+        }
+        return send(res, 405, { error: '方法不允许' });
+      }
+      if (sessionId && req.method === 'PUT') {
+        const body = await readBody(req);
+        const ok = db.aiRenameSession(req.user.id, sessionId, body && body.title);
+        if (!ok) return send(res, 404, { error: '对话不存在' });
+        return send(res, 200, { ok: true });
+      }
+      if (sessionId && req.method === 'DELETE') {
+        const ok = db.aiDeleteSession(req.user.id, sessionId);
+        if (!ok) return send(res, 404, { error: '对话不存在' });
+        return send(res, 200, { ok: true });
+      }
+      return send(res, 405, { error: '方法不允许' });
+    }
     if (p === '/api/ai/config') {
       if (req.method === 'GET') { const c = await loadAI(); return send(res, 200, { base_url: c.base_url, model: c.model, configured: aiConfigured(c), key_masked: maskKey(c.api_key), local: !!c.local }); }
       if (req.method === 'POST') {
@@ -418,17 +494,58 @@ async function handleAi(p, req, res) {
       }
       return send(res, 405, { error: '方法不允许' });
     }
-    // 本地大模型：探测本机 Ollama（OpenAI 兼容本地服务），返回可用模型列表
-    if (p === '/api/ai/ollama-models' && req.method === 'GET') {
+    // 本地大模型：同时探测本机 LM Studio（OpenAI 兼容 /v1/models，端口 1234）与 Ollama（原生 /api/tags，端口 11434），返回可用模型列表
+    if (p === '/api/ai/local-models' && req.method === 'GET') {
+      const models = []; const seen = new Set();
+      const push = (id, source, base_url) => { if (id && !seen.has(id)) { seen.add(id); models.push({ id, source, base_url }); } };
+      // LM Studio：OpenAI 兼容接口
       try {
-        const body = await new Promise((resolve, reject) => {
+        const lmBody = await new Promise((resolve, reject) => {
+          const rq = http.get('http://127.0.0.1:1234/v1/models', { timeout: 2000 }, resp => { let b = ''; resp.on('data', d => b += d); resp.on('end', () => resolve(b)); });
+          rq.on('error', reject); rq.on('timeout', () => rq.destroy(new Error('timeout')));
+        });
+        const lm = JSON.parse(lmBody);
+        (lm.data || []).forEach(m => push(m.id, 'LM Studio', 'http://127.0.0.1:1234/v1'));
+      } catch (e) { /* LM Studio 未启动，跳过 */ }
+      // Ollama：原生接口
+      try {
+        const olBody = await new Promise((resolve, reject) => {
           const rq = http.get('http://127.0.0.1:11434/api/tags', { timeout: 2000 }, resp => { let b = ''; resp.on('data', d => b += d); resp.on('end', () => resolve(b)); });
           rq.on('error', reject); rq.on('timeout', () => rq.destroy(new Error('timeout')));
         });
-        const j = JSON.parse(body);
-        const models = ((j.models || []).map(m => m.name)).filter(Boolean);
-        return send(res, 200, { online: true, models });
-      } catch (e) { return send(res, 200, { online: false, models: [] }); }
+        const ol = JSON.parse(olBody);
+        (ol.models || []).forEach(m => push(m.name, 'Ollama', 'http://127.0.0.1:11434/v1'));
+      } catch (e) { /* Ollama 未启动，跳过 */ }
+      return send(res, 200, { online: models.length > 0, models });
+    }
+    // AI Agent：可用工具清单（前端展示"我能帮你做什么"）
+    if (p === '/api/ai/agent/tools' && req.method === 'GET') {
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      return send(res, 200, {
+        tools: agent.TOOLS.map(t => ({
+          name: t.function.name,
+          description: t.function.description,
+          write: agent.WRITE_TOOLS.has(t.function.name),
+          danger: agent.DANGER_TOOLS.has(t.function.name)
+        }))
+      });
+    }
+    // AI Agent：对话 + 工具调用（删除类操作返回 pending，需前端确认后才落地）
+    if (p === '/api/ai/agent' && req.method === 'POST') {
+      if (!req.user) return send(res, 401, { error: '请先登录' });
+      if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
+      const body = await readBody(req);
+      const c = await loadAI();
+      if (!aiConfigured(c)) return send(res, 400, { error: 'AI 未配置：请先在「AI 设置」中填写 API Key 或启用本地模型' });
+      const message = String(body.message || '').trim();
+      if (!message && !body.confirmToken && !body.cancelledToken) return send(res, 400, { error: '请输入内容' });
+      try {
+        const out = await agent.runAgent({ cfg: c, user: req.user, message, history: body.history, confirmToken: body.confirmToken, cancelledToken: body.cancelledToken });
+        return send(res, 200, Object.assign({ ok: true }, out));
+      } catch (e) {
+        console.error('AI agent 失败:', (e && e.message) || e);
+        return send(res, 502, { error: 'AI Agent 执行失败：' + ((e && e.message) || '服务不可用') });
+      }
     }
     if (p === '/api/ai/chat' && req.method === 'POST') {
       if (!rateLimit('ai:' + req.user.id, 30, 60 * 1000)) return send(res, 429, { error: 'AI 调用过于频繁，请稍后再试' });
@@ -477,7 +594,7 @@ async function handleAi(p, req, res) {
         const total = (proj.tasks || []).length, done = (proj.tasks || []).filter(t => t.done).length;
         const overdue = (proj.tasks || []).filter(t => !t.done && t.dueDate && t.dueDate < isoDate(new Date())).length;
         const phaseStat = (proj.phases || []).map(ph => { const ts = (proj.tasks || []).filter(t => t.phaseId === ph.id); return ph.name + '：' + ts.filter(t => t.done).length + '/' + ts.length + ' 完成'; }).join('；');
-        const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文写一段 120 字以内的项目总结，突出进度、风险与下一步。';
+        const sys = '你是项目复盘助手。根据以下结构化数据，用简洁中文输出 160 字以内的 Markdown 排版总结：首句总览进度与主要风险，之后用「- 」要点列出进展、风险/逾期、下一步，关键数字用 **加粗**。不要输出长段散文。';
         const user = `项目：${proj.name}\n整体进度：${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）\n逾期节点：${overdue}\n各阶段：${phaseStat}`;
         try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
         catch (e) { console.error('AI 总结失败:', e); return send(res, 502, { error: 'AI 服务暂时不可用，请稍后重试' }); }
@@ -489,7 +606,7 @@ async function handleAi(p, req, res) {
         const arch = (proj.status || 'active') === 'archived' ? '（已归档）' : '';
         return `「${proj.name}」进度${total ? Math.round(done / total * 100) : 0}%（${done}/${total}）${overdue ? '，逾期' + overdue + '项' : ''}${cur ? '，当前阶段：' + cur.name : ''}${arch}`;
       }).join('\n');
-      const sys = '你是项目组合复盘助手。根据以下所有项目的结构化摘要，用简洁中文写一段 160 字以内的全局' + modeLabel + '，归纳整体进展、点名风险项目、给出下一步建议。';
+      const sys = '你是项目组合复盘助手。根据以下所有项目的结构化摘要，用简洁中文输出 200 字以内的 Markdown 排版' + modeLabel + '：首句整体判断，之后用「- 」要点列出整体进展、点名风险项目（含数字）、下一步建议，重要数字用 **加粗**。不要输出长段散文。';
       const user = `共 ${projects.length} 个项目：\n${lines}`;
       try { const text = await chatCompletions(c, [{ role: 'system', content: sys }, { role: 'user', content: user }], 0.5); return send(res, 200, { text }); }
       catch (e) { console.error('AI 总结失败:', e); return send(res, 502, { error: 'AI 服务暂时不可用，请稍后重试' }); }
@@ -590,7 +707,10 @@ const server = http.createServer(async (req, res) => {
       return send(res, 401, { error: '未授权：请先登录（X-Auth-Token）' });
     }
     // viewer 只读：任何写操作一律拒绝（含项目/任务/选项/AI/用户）
-    if (req.method !== 'GET' && req.user && req.user.role === 'viewer') {
+    // 例外：/api/ai/summarize 为纯只读 AI 文本生成（读项目数据→调 LLM→返回 Markdown，不落任何库），
+    //       viewer 也应能用（日报/周报/月报页的「AI 总结」按钮对只读访客可见）。
+    const VIEWER_AI_READONLY = ['/api/ai/summarize'];
+    if (req.method !== 'GET' && req.user && req.user.role === 'viewer' && !VIEWER_AI_READONLY.includes(p)) {
       return send(res, 403, { error: '只读访客，无修改权限' });
     }
     // P1-8 强制改密闸门：仍在用初始密码的账号，除改密外禁止任何写操作（服务端强制，不依赖前端弹窗）

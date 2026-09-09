@@ -482,6 +482,85 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 .ai-row .ar-days { width: 58px; flex: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 12px; font-family: inherit; background: var(--surface); color: var(--text); text-align: center; }
 .ai-empty { font-size: 13px; color: var(--text-3); padding: 10px 2px; }
 
+/* ---- AI 助手：对话式 Agent（消息流 / 工具步骤 / 危险操作确认） ---- */
+/* 布局：左侧对话记录栏 + 右侧对话区 */
+.ai-body { position: relative; display: flex; min-height: 420px; max-height: 64vh; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 2px; }
+.ai-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 10px 14px 8px; }
+.ai-main .ai-log { flex: 1; max-height: none; }
+/* 头部右侧图标组（新对话 / 历史对话 / 关闭） */
+.ai-head-right { display: flex; align-items: center; gap: 6px; }
+.ai-ico { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid transparent; background: none; border-radius: 8px; cursor: pointer; color: var(--text-2); }
+.ai-ico:hover { background: var(--surface); color: var(--text-1); border-color: var(--border); }
+.ai-ico.active { color: var(--accent); background: var(--surface); }
+/* 历史对话浮层（默认收起，点「历史对话」图标展开） */
+.ai-side { display: none; position: absolute; top: 0; right: 0; bottom: 0; width: 236px; flex-direction: column; background: var(--bg-2); border-left: 1px solid var(--border); box-shadow: -8px 0 18px rgba(0, 0, 0, .07); z-index: 6; }
+.ai-side.open { display: flex; }
+.ai-side-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 2px 14px; font-size: 13px; color: var(--text-1); }
+.ai-sess-list { flex: 1; overflow-y: auto; padding: 4px 6px 8px; }
+.ai-sess { position: relative; display: flex; align-items: center; gap: 6px; padding: 8px 26px 8px 10px; border-radius: 8px; cursor: pointer; font-size: 12.5px; margin: 1px 0; color: var(--text-2); }
+.ai-sess:hover { background: var(--surface); }
+.ai-sess.active { background: var(--accent); color: var(--on-accent); }
+.ai-sess-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-sess-ts { flex: none; font-size: 10.5px; opacity: .7; }
+.ai-sess-del { display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); border: 0; background: none; cursor: pointer; color: inherit; opacity: .75; padding: 3px; border-radius: 5px; }
+.ai-sess:hover .ai-sess-del { display: block; }
+.ai-sess-del:hover { opacity: 1; background: rgba(128,128,128,.22); }
+.ai-side-foot { padding: 6px 12px; font-size: 11px; color: var(--text-3); border-top: 1px solid var(--border); }
+.ai-log { display: flex; flex-direction: column; gap: 12px; max-height: min(52vh, 430px); overflow-y: auto; padding: 4px 2px 8px; }
+.ai-msg { display: flex; }
+.ai-msg.ai-me { justify-content: flex-end; }
+.ai-bubble { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.65; word-break: break-word; }
+.ai-bot .ai-bubble { background: var(--bg-2); border: 1px solid var(--border); border-top-left-radius: 4px; }
+.ai-me .ai-bubble { background: var(--accent); color: var(--on-accent); border-top-right-radius: 4px; }
+.ai-typing { color: var(--text-3); }
+.ai-err { color: var(--danger-strong); }
+.ai-steps { margin-top: 7px; font-size: 12px; color: var(--text-2); }
+.ai-steps summary { cursor: pointer; user-select: none; color: var(--text-3); }
+.ai-steps summary:hover { color: var(--accent); }
+
+/* ---- AI 输出 Markdown 结构化渲染 ---- */
+.md { font-size: 13.5px; line-height: 1.7; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 6px 0; }
+.md b.md-h { display: block; font-weight: 700; margin: 10px 0 4px; color: var(--text); }
+.md .md-h1 { font-size: 15px; }
+.md .md-h2 { font-size: 14px; }
+.md .md-h3, .md .md-h4 { font-size: 13.5px; }
+.md ul, .md ol { margin: 6px 0; padding-left: 20px; }
+.md li { margin: 2px 0; }
+.md code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12px; font-family: Consolas, Menlo, monospace; }
+.md pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; overflow-x: auto; margin: 8px 0; }
+.md pre code { background: none; border: 0; padding: 0; font-size: 12px; }
+.md blockquote { margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--accent); background: var(--bg-2); border-radius: 0 6px 6px 0; color: var(--text-2); }
+.md hr { border: 0; border-top: 1px dashed var(--border); margin: 10px 0; }
+.md strong { font-weight: 700; color: var(--text); }
+.md em { font-style: italic; }
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md .tblwrap { overflow-x: auto; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; }
+.md table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.md th, .md td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; white-space: nowrap; }
+.md th { background: var(--surface); font-weight: 600; }
+.md tbody tr:nth-child(even) { background: var(--surface); }
+.md-h + p, .md p:empty { display: none; }
+.ai-summary-view { max-height: 46vh; overflow-y: auto; min-height: 170px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.ai-step { display: flex; gap: 8px; padding: 3px 0 3px 4px; }
+.ai-step-name { color: var(--text-2); flex: none; }
+.ai-step-res { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 8px; }
+.ai-chip { font-size: 12px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; font-family: inherit; }
+.ai-chip:hover { border-color: var(--accent); color: var(--accent); }
+.ai-input-row { display: flex; gap: 10px; align-items: flex-end; }
+.ai-input-row .inp { flex: 1; margin: 0; min-height: 46px; resize: vertical; font-family: inherit; }
+.ai-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.ai-badge { font-size: 11px; color: var(--text-3); margin-left: auto; margin-right: 6px; }
+.ai-confirm { margin: 10px 0 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent); background: color-mix(in srgb, var(--danger) 9%, transparent); }
+.ai-confirm-title { font-size: 13px; font-weight: 600; color: var(--danger-strong); margin-bottom: 6px; }
+.ai-confirm-body { font-size: 12.5px; color: var(--text-2); line-height: 1.7; }
+.ai-confirm-hint { display: block; margin-top: 5px; color: var(--text-3); font-size: 11.5px; }
+.ai-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+
 /* =========================================================
    日报 / 周报实时展示页（阶段泳道图）
    ========================================================= */
