@@ -4416,11 +4416,13 @@ async function doUpgrade() {
     setStatus('升级中…', '#2b6cb0');
     setBar(0, '已启动，等待下载…', '#3182ce');
     // 轮询任务状态（每秒；进度变化时刷新；完成/错误停轮询）
-    let lastPhase = null, lastPct = -1;
+    // 容错：升级最后会重启服务，期间端口/隧道不可达属预期，不判失败，继续等（最多 120s）
+    let lastPhase = null, lastPct = -1, failCount = 0;
     pollTimer = setInterval(async () => {
       try {
         const st = await api('/admin/upgrade/status?taskId=' + encodeURIComponent(taskId), { method: 'GET', timeout: 10000 });
         if (!st) return;
+        failCount = 0;
         if (st.phase !== lastPhase || st.progress !== lastPct) {
           lastPhase = st.phase; lastPct = st.progress;
           const color = st.phase === 'error' ? '#E0241B' : (st.phase === 'done' ? '#2f855a' : '#3182ce');
@@ -4429,7 +4431,7 @@ async function doUpgrade() {
         if (st.finished) {
           stopPoll();
           if (st.phase === 'done') {
-            setStatus('升级完成，服务重启中…刷新即见 v' + pre.latest, '#2f855a');
+            setStatus('升级完成，服务重启中…约 30 秒后按 Ctrl+F5 硬刷新，应见 v' + pre.latest, '#2f855a');
             toast('升级成功，看板正在重启（v' + pre.latest + '）');
           } else if (st.phase === 'error') {
             setStatus('升级失败：' + (st.message || '未知错误'), '#E0241B');
@@ -4439,8 +4441,17 @@ async function doUpgrade() {
           }
         }
       } catch (e) {
-        // 单次轮询失败不打断（弱网可能抖），下轮重试
-        console.warn('[upgrade] 轮询失败:', e && e.message);
+        // 服务重启/隧道重连期间会连续失败，属预期：显示等待，不判失败
+        failCount++;
+        if (failCount <= 120) {
+          setStatus('服务重启中…（' + failCount + 's）请稍候，不要关闭页面', '#2b6cb0');
+          setBar(Math.max(lastPct, 98), '服务重启中…（' + failCount + 's）', '#3182ce');
+        } else {
+          stopPoll();
+          setBar(null);
+          setStatus('等待服务恢复超时：请 1 分钟后手动刷新页面确认版本（若失败请查 logs/upgrade-*.log）', '#E0241B');
+        }
+        console.warn('[upgrade] 轮询失败(' + failCount + '):', e && e.message);
       }
     }, 1000);
   } catch (e) {

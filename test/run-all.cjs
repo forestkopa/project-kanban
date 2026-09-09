@@ -30,6 +30,7 @@ run('后端 API 集成', [path.join(__dirname, 'api.integration.test.cjs')], nod
 run('角色分级强制(live)', [path.join(__dirname, 'api-roles.test.cjs')], nodeOpts);
 run('升级链路集成(v1.4.6 回归)', [path.join(__dirname, 'upgrade.integration.test.cjs')], nodeOpts);
 run('隧道守护稳定性(watchdog)', [path.join(__dirname, 'watchdog-tunnel.test.cjs')], nodeOpts);
+run('升级锁(watchdog 不打断解压)', [path.join(__dirname, 'watchdog-upgrade-lock.test.cjs')], nodeOpts);
 // 冒烟脚本路径：默认相对 ROOT 根目录的 _smoke_v2.js，换机/CI 用 KB_SMOKE 覆盖
 run('前端 jsdom 冒烟', [process.env.KB_SMOKE || path.join(ROOT, '_smoke_v2.js')],
   { stdio: 'inherit', cwd: WS, env: { ...process.env, NODE_PATH: path.join(WS, 'node_modules') } });

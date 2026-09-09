@@ -65,12 +65,26 @@ function pidOfPort(port) {
 
 function log(msg) { console.log(new Date().toISOString() + ' [watchdog] ' + msg); }
 
+// 升级锁（路径与 lib/upgrade.js 的 lockFile() 保持一致）：
+// 一键升级解压覆盖期间会创建该文件。此时若继续按 mtime 判定「代码更新」并 taskkill server，
+// 会把正在执行升级的进程杀掉 → 解压半途中断、任务状态随内存丢失 → 「提示完成但版本没变」。
+// 有锁时：跳过代码热重载（端口挂了仍正常拉起），升级结束后由 upgrade.js 解锁。
+function upgradeLocked() {
+  try { return fs.existsSync(path.join(ROOT, 'data', 'upgrade.lock')); } catch (e) { return false; }
+}
+
 async function ensureServer() {
   const snap = newestMtime();
+  const locked = upgradeLocked();
   for (const s of SERVERS) {
     if (await isUp(s.port)) {
       // 接管运行中实例时记录其 PID（watchdog 自身重启后也能自动重启它）
       if (!s.pid) s.pid = pidOfPort(s.port);
+      if (locked) {
+        // 升级进行中：只记录快照（若无）不重启，避免打断解压
+        if (!s.snap) { s.snap = snap; log(s.name + ' 升级锁生效，接管实例（暂不热重载）'); }
+        continue;
+      }
       // 端口活着：检测到代码更新 → 杀掉当前进程，下一轮自动用新代码拉起
       if (s.snap && snap > s.snap) {
         log(s.name + ' 检测到代码更新（端口 ' + s.port + '），自动重启');

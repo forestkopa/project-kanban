@@ -2,6 +2,17 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.5.1（2026-09-09）
+- **修复「一键升级提示完成但版本没变」**（生产服务器升级失效，代码一个文件都没换）。
+  - 根因：`watchdog.js` 的代码热重载与升级流程打架——`Expand-Archive` 逐文件覆盖 `server.js` / `public/` / `lib/` 时文件 mtime 变化，watchdog 每 15s 探测到「代码更新」就 `taskkill` 掉**正在执行升级的 server 进程**；而任务状态只存在内存，进程被杀即丢失 → 前端轮询得到「任务不存在/已结束」误以为完成，实际解压半途中断、版本未变。
+  - 修复①**升级锁**：升级（及离线脚本）期间创建 `data/upgrade.lock`，watchdog 有锁时跳过热重载（端口挂了仍照常拉起，自愈不失效）；成功/失败后均强制解锁。
+  - 修复②**解压后强制校验**：比对 `package.json` 版本号是否等于目标版本，不符直接判 `error` 并提示改用离线升级（不再静默"完成"）。
+  - 修复③**任务状态持久化**到 `data/upgrade-task.json`，进程被重启后前端仍能拉到 `done`，不再显示「任务不存在」。
+  - 修复④**解压改用系统内置 `tar.exe`**（bsdtar，支持 zip、无 260 字符路径限制），失败回退 `Expand-Archive`；下载超时 180s → 600s 并重试 3 次。
+  - 修复⑤**全过程写日志** `logs/upgrade-YYYY-MM-DD.log`（此前 watchdog 以 `stdio:'ignore'` 拉起，无任何日志可查）。
+  - 前端：升级重启期间请求失败不再静默，显示「服务重启中…（N s）」并持续等待最多 120s。
+  - 新增回归测试：`test/watchdog-upgrade-lock.test.cjs`（3 场景）+ 升级集成测试扩展（版本未变必判 error、持久化跨重启可读、结束必解锁、日志落盘），全套 28 套件通过。
+
 ## v1.5.0（2026-09-09）
 - **AI 助手升级为对话式 Agent**（新增 `lib/ai-agent.js`）：不再只是「问答」，而是理解意图 → 调工具 → 多步执行。
   - 10 个工具：只读 4（list_projects / get_overview / get_project / search_tasks）、写入 4（create_project / add_task / update_task / update_project）、危险 2（delete_task / delete_project，**先返回确认 token、二次确认才执行，删除进回收站可恢复**）。

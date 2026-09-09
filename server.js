@@ -846,7 +846,8 @@ const server = http.createServer(async (req, res) => {
       const url = new URL(req.url, 'http://localhost');
       const taskId = url.searchParams.get('taskId');
       if (!taskId) return send(res, 400, { error: '缺少 taskId' });
-      const st = Upgrade.getTaskStatus(taskId);
+      // 传 ROOT：进程若已被 watchdog 重启（内存 tasks 清空），从 data/upgrade-task.json 恢复快照
+      const st = Upgrade.getTaskStatus(taskId, ROOT);
       if (!st) return send(res, 200, { taskId, phase: 'unknown', progress: 0, message: '任务不存在或已过期（10 分钟后清理）', finished: true });
       return send(res, 200, st);
     }

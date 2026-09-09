@@ -45,9 +45,17 @@ if ($bcExit -ge 8)
   Write-Warning ("robocopy 备份退出码 " + $bcExit + "（0-7 视为成功）")
 }
 
+# 1.5 升级锁：解压期间禁止 watchdog 按 mtime 热重载（data/upgrade.lock）
+#     否则覆盖到一半 watchdog 会重启 server → 新进程加载「半新半旧」代码，可能起不来。
+$lock = Join-Path $Root 'data\upgrade.lock'
+New-Item -ItemType File -Force -Path $lock -Value ([string]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())) | Out-Null
+Write-Host ("==> 已加升级锁 " + $lock)
+
 # 2. 解压覆盖（保留 data/ 与 config.yml）
-Write-Host ("==> 解压覆盖 " + $Zip + " -> " + $Root + "（保留 data/ 与 config.yml）")
-$skip = @('data', 'config.yml')
+try
+{
+  Write-Host ("==> 解压覆盖 " + $Zip + " -> " + $Root + "（保留 data/ 与 config.yml）")
+  $skip = @('data', 'config.yml')
 $tmp = Join-Path $env:TEMP ("kb-ux-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 Expand-Archive -Path $Zip -DestinationPath $tmp -Force
@@ -65,6 +73,23 @@ Get-ChildItem $tmp | Where-Object { $_.Name -notin $skip } | ForEach-Object {
   }
 }
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+}
+finally
+{
+  Remove-Item -Force $lock -ErrorAction SilentlyContinue
+  Write-Host ("==> 已释放升级锁")
+}
+
+# 2.5 校验：package.json 版本号（与解压前对比，未变说明没覆盖成功）
+$newVerCheck = 'unknown'
+try
+{
+  $newVerCheck = ((Get-Content (Join-Path $Root 'package.json') -Raw -ErrorAction Stop) | ConvertFrom-Json).version
+}
+catch
+{
+}
+Write-Host ("==> 解压后版本: v" + $newVerCheck)
 
 # 3. 重启服务（需管理员权限；失败要明确提示，不能静默吞掉）
 Write-Host ("==> 重启服务 " + $Service)
