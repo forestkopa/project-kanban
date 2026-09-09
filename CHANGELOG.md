@@ -2,6 +2,17 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.5.3（2026-09-09）修复在线升级「解压失败（两种方式均失败）」
+
+生产首次在线升级实测（1.5.1 → 1.5.2）在解压环节失败。错误被正确捕获并展示（v1.5.1 的"不再静默失败"生效），但报错只有 `Command failed: tar.exe -xf ...` 半截信息，**真实原因（stderr）全被吞掉**。深挖出四个问题一并修复：
+
+- **① tar.exe 被 PATH 里的 GNU tar 劫持（头号嫌疑）**：`spawnSync('tar.exe')` 按 PATH 查找。机器装了 Git 后，PATH 里 MSYS 的 GNU tar 可能排在 Windows 内置 bsdtar（System32）之前——**GNU tar 根本不支持 zip 格式**，解 zip 必失败。修复：改用 `System32\tar.exe` 绝对路径，杜绝劫持。
+- **② execSync 字符串拼命令的转义地狱**：`JSON.stringify` 出来的 `\"`、`\\` 过 cmd.exe 后语义不清。修复：tar 改 `spawnSync` 数组参数（路径原样传递零转义）；PowerShell 改 `-EncodedCommand`（UTF-16LE base64），彻底绕开引号转义。
+- **③ 下载完整性校验不足**：此前只查文件 >1KB——**下载截断/CDN 错误页的坏 zip 会直接进解压**，恰好能同时解释 tar 与 Expand-Archive 双双失败。修复：三重校验（收到的字节数 == content-length、== Release 声明的 asset 大小、文件头必须为 `PK` 魔数），任一不符即判失败并重试下载。
+- **④ 失败信息与现场**：解压失败时错误信息必带 **stderr 尾部**（最多 400 字符，不再只有 "Command failed"）；失败的 zip 不再删除，改名为 `upgrade-failed-*.zip` 留在项目根目录供人工诊断。
+- **⑤ 顺带修**：下载流 `ws.end()` 改为等待落盘完成再 stat（原实现立即返回可能读到未写完的大小）。
+- 测试：升级集成测试扩至 13 断言——新增魔数闸拦截损坏 zip、解压失败信息带真实 stderr（断言不含 undefined）、完好 zip 经真实 System32 tar 成功解压三组回归；全套 29 套件通过。
+
 ## v1.5.2（2026-09-09）测试基建加固（零业务代码改动）
 
 依据第三方评估报告（v1.5.1 快照，综合 8.7/10）指出的两条 P1 建议修复，仅改 `test/`，**不触碰 server.js / db.js / public/**，服务器功能零变化。

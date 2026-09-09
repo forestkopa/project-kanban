@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const assert = require('assert');
+const cp_spawnSync = require('child_process').spawnSync;
 
 const SRC = path.join(__dirname, '..', 'lib', 'upgrade.js');
 
@@ -26,13 +27,13 @@ function buildModule(ROOT, opts) {
       return { version: '1.4.6', tag: 'v1.4.6', url: 'http://localhost/mock', assetUrl: 'http://localhost/mock.zip' };
     }`
   );
-  // 下载改为瞬间写本地占位（不联网；需 >1KB 才能通过「下载文件过小」校验）
+  // 下载改为瞬间写本地占位（不联网；需 >1KB 且以 PK 魔数开头才能通过 v1.5.3 完整性校验）
   src = src.replace(
     /async function downloadFileWithProgress\([\s\S]*?\n}/,
     `async function downloadFileWithProgress(url, dest, onProgress) {
-      fs.writeFileSync(dest, Buffer.alloc(4096, 0));
-      if (onProgress) onProgress(4096, 4096);
-      return 4096;
+      fs.writeFileSync(dest, Buffer.concat([Buffer.from('PK\\x03\\x04'), Buffer.alloc(4096, 0)]));
+      if (onProgress) onProgress(4100, 4100);
+      return 4100;
     }`
   );
   // 解压改为写落地标记（不真解析 zip）；breakExtract 时不改 package.json，模拟覆盖失败
@@ -165,6 +166,40 @@ function freshRoot() {
     assert.ok(!fs.existsSync(path.join(ROOT2, 'data', 'upgrade.lock')), '失败后也必须解锁');
     console.log('✓ 解压后版本未变 → 判 error 并解锁（不再「提示完成但版本没变」）');
     try { fs.rmSync(ROOT2, { recursive: true, force: true }); } catch (e) {}
+
+    // ---------- v1.5.3 回归：真实 extractZip（不 mock，走真 tar.exe / 魔数闸 / stderr 带出） ----------
+    const RealU = require(SRC); // 真实模块（顶层无副作用，可安全 require）
+    const tmpd = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-upg-zip-'));
+    // ① 损坏 zip（无 PK 魔数）→ 魔数闸直接拦截，且错误信息可读
+    const badZip = path.join(tmpd, 'bad.zip');
+    fs.writeFileSync(badZip, 'THIS IS NOT A ZIP FILE.........');
+    let threwBad = false, badMsg = '';
+    try { RealU.extractZip(badZip, tmpd); } catch (e) { threwBad = true; badMsg = e.message; }
+    assert.ok(threwBad && /不是有效 zip/.test(badMsg), '非 zip 文件应被魔数闸拦截: ' + badMsg);
+    console.log('✓ 魔数闸：损坏/非 zip 文件直接拦截（不浪费两种解压尝试）');
+    // ② PK 头但内容损坏 → 两种解压都失败时，错误信息必须带 stderr（不再只有 "Command failed"）
+    const corruptZip = path.join(tmpd, 'corrupt.zip');
+    fs.writeFileSync(corruptZip, Buffer.concat([Buffer.from('PK\x03\x04'), Buffer.alloc(64, 0x00)]));
+    let threwCorrupt = false, corruptMsg = '';
+    try { RealU.extractZip(corruptZip, tmpd); } catch (e) { threwCorrupt = true; corruptMsg = e.message; }
+    assert.ok(threwCorrupt && /解压失败（两种方式均失败）/.test(corruptMsg), '损坏 zip 应报两种方式均失败');
+    assert.ok(/tar\(exit=/.test(corruptMsg), '错误信息应带 tar 退出码与 stderr: ' + corruptMsg.slice(0, 120));
+    assert.ok(!/\bundefined\b/.test(corruptMsg), '错误信息不应含 undefined');
+    console.log('✓ 解压失败信息带真实 stderr（不再只显示半截 Command failed）');
+    // ③ 完好 zip → 真实 tar.exe 数组参数解压成功（验证转义修复）
+    const hello = path.join(tmpd, 'hello.txt');
+    fs.writeFileSync(hello, 'hello upgrade');
+    const goodZip = path.join(tmpd, 'good.zip');
+    const mk = cp_spawnSync('powershell.exe', ['-NoProfile', '-Command',
+      'Compress-Archive -LiteralPath "' + hello + '" -DestinationPath "' + goodZip + '" -Force']);
+    assert.ok(fs.existsSync(goodZip) && fs.statSync(goodZip).size > 22, 'Compress-Archive 应生成测试 zip');
+    const dest3 = path.join(tmpd, 'out');
+    fs.mkdirSync(dest3, { recursive: true });
+    const how = RealU.extractZip(goodZip, dest3);
+    assert.ok(how === 'tar' || how === 'expand', '应通过某种方式解压成功，实际=' + how);
+    assert.ok(fs.existsSync(path.join(dest3, 'hello.txt')), '解压后 hello.txt 应落地');
+    console.log('✓ 完好 zip 经真实 ' + how + ' 解压成功（spawnSync 数组参数零转义）');
+    try { fs.rmSync(tmpd, { recursive: true, force: true }); } catch (e) {}
 
     console.log('\n=== 升级链路集成测试全部通过 ===');
     process.exit(0);
