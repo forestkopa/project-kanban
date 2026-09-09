@@ -2,6 +2,16 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.5.2（2026-09-09）测试基建加固（零业务代码改动）
+
+依据第三方评估报告（v1.5.1 快照，综合 8.7/10）指出的两条 P1 建议修复，仅改 `test/`，**不触碰 server.js / db.js / public/**，服务器功能零变化。
+
+- **P1-① 补齐 npm test 漏跑的 26 断言**：`test/run-all.cjs` 此前未纳入 `formula-engine`、`db-report`（node:test）、`todo-nextweek`、`frontend-boot` 四个套件——其中后两个正是 v1.4.7 hotfix3/4 的**修复回归测试**，漏跑等于这两条防线在 `npm test` 下形同虚设。现已全部纳入，聚合覆盖 304 → 330 断言。
+- **P1-① 新增「防漏网自检」**：`run-all.cjs` 末尾扫描 `test/` 下所有 `*.test.cjs|js` 与 `*.e2e.cjs`，凡未出现在本次调度列表中的一律**打印清单 + 置退出码 1**。以后新增测试文件忘记加进聚合入口会当场报错，不会再静默漏跑（已用临时探针文件实测验证报警生效）。
+- **P1-② API 集成测试摆脱对运行中 5180 的依赖**：`test/_harness.cjs` 新增 `startDemoInstance()`（自起 `--demo` + `KB_DATA_DIR` 临时库实例，免登录 admin 视角）；`api.integration.test.cjs` A 段由硬编码 `http://127.0.0.1:5180` 改为自起隔离实例，结束即销毁。此前 5180 没启动/版本不一致/数据被污染会导致测试误报假绿。
+- **顺带加固**：`waitFor()` 增加 `expectDemo` 显式校验（`demo===true/false` 必须匹配才算就绪），避免端口被其他进程占用时"连上就算通过"而测错实例；聚合结果新增「N 通过 / M 失败」套件计数，失败套件名直接列出。
+- 验证：`npm test` → 19 套件全绿、19 个测试文件全部纳入聚合、`SMOKE_OK` 0 捕获错误。
+
 ## v1.5.1（2026-09-09）
 - **修复「一键升级提示完成但版本没变」**（生产服务器升级失效，代码一个文件都没换）。
   - 根因：`watchdog.js` 的代码热重载与升级流程打架——`Expand-Archive` 逐文件覆盖 `server.js` / `public/` / `lib/` 时文件 mtime 变化，watchdog 每 15s 探测到「代码更新」就 `taskkill` 掉**正在执行升级的 server 进程**；而任务状态只存在内存，进程被杀即丢失 → 前端轮询得到「任务不存在/已结束」误以为完成，实际解压半途中断、版本未变。

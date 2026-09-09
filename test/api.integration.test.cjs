@@ -1,10 +1,9 @@
-// 后端 API 集成测试：直连本机 5180(演示/admin) + 5181(真实/admin token) 只读冒烟
-// 不打公网隧道；测试产生的 demo 项目会清理，并还原项目排序
+// 后端 API 集成测试：自起两个隔离实例（演示模式 + 真实模式），零外部依赖
+// A 段曾直连本机运行中 5180 → 实例没起/版本不一致/data 被污染就会误报假绿。
+// 现改为 startDemoInstance() 自起临时库实例（--demo + KB_DATA_DIR），测试与本机运行状态彻底解耦。
 const fs = require('fs');
 const path = require('path');
-const { startRealInstance, req } = require('./_harness.cjs');
-
-const DEMO = 'http://127.0.0.1:5180';
+const { startRealInstance, startDemoInstance, req } = require('./_harness.cjs');
 
 let pass = 0, fail = 0; const fails = [];
 function ok(name, cond, extra) {
@@ -13,61 +12,71 @@ function ok(name, cond, extra) {
 }
 
 async function main() {
-  console.log('\n=== A. 演示版 5180（admin 视角，免登录）===');
-  let createdId = null, originalOrder = null;
+  console.log('\n=== A. 演示版实例（隔离临时库 · 免登录 admin 视角）===');
+  let demoInst = null, createdId = null, originalOrder = null;
   try {
-    const ro = await req(DEMO, 'GET', '/api/readonly');
-    ok('GET /api/readonly → 200 且 demo=true', ro.status === 200 && ro.json && ro.json.demo === true, ro.json);
+    demoInst = await startDemoInstance();
+    const DEMO = demoInst.base;
+    console.log('  [i] 演示实例已启动: ' + DEMO + '（临时库，测试结束销毁）');
+    try {
+      const ro = await req(DEMO, 'GET', '/api/readonly');
+      ok('GET /api/readonly → 200 且 demo=true', ro.status === 200 && ro.json && ro.json.demo === true, ro.json);
 
-    const opt = await req(DEMO, 'GET', '/api/options');
-    ok('GET /api/options → 200 且含 productTypes', opt.status === 200 && opt.json && opt.json.productTypes, opt.json);
+      const opt = await req(DEMO, 'GET', '/api/options');
+      ok('GET /api/options → 200 且含 productTypes', opt.status === 200 && opt.json && opt.json.productTypes, opt.json);
 
-    const tpl = await req(DEMO, 'GET', '/api/templates');
-    ok('GET /api/templates → 200 且为数组', tpl.status === 200 && Array.isArray(tpl.json), tpl.json);
+      const tpl = await req(DEMO, 'GET', '/api/templates');
+      ok('GET /api/templates → 200 且为数组', tpl.status === 200 && Array.isArray(tpl.json), tpl.json);
 
-    const list0 = await req(DEMO, 'GET', '/api/projects');
-    ok('GET /api/projects → 200 且为数组', list0.status === 200 && Array.isArray(list0.json), list0.json && list0.json.length);
-    originalOrder = list0.json.map(p => p.id);
+      const list0 = await req(DEMO, 'GET', '/api/projects');
+      ok('GET /api/projects → 200 且为数组', list0.status === 200 && Array.isArray(list0.json), list0.json && list0.json.length);
+      originalOrder = list0.json.map(p => p.id);
 
-    const created = await req(DEMO, 'POST', '/api/projects', { name: '__test_project__', type: 'C端', level: 'B', startDate: '2026-08-28', phases: [{ id: 'ph1', name: '需求立项' }], tasks: [] });
-    ok('POST /api/projects → 201 且返回 id', created.status === 201 && created.json && created.json.id, created.json);
-    createdId = created.json.id;
+      const created = await req(DEMO, 'POST', '/api/projects', { name: '__test_project__', type: 'C端', level: 'B', startDate: '2026-08-28', phases: [{ id: 'ph1', name: '需求立项' }], tasks: [] });
+      ok('POST /api/projects → 201 且返回 id', created.status === 201 && created.json && created.json.id, created.json);
+      createdId = created.json.id;
 
-    const got = await req(DEMO, 'GET', '/api/projects/' + createdId);
-    ok('GET /api/projects/:id → 200', got.status === 200 && got.json && got.json.id === createdId, got.json);
+      const got = await req(DEMO, 'GET', '/api/projects/' + createdId);
+      ok('GET /api/projects/:id → 200', got.status === 200 && got.json && got.json.id === createdId, got.json);
 
-    const upd = await req(DEMO, 'PUT', '/api/projects/' + createdId, { name: '__test_project_2__' });
-    ok('PUT /api/projects/:id → 200 且名称更新', upd.status === 200 && upd.json && upd.json.name === '__test_project_2__', upd.json);
+      const upd = await req(DEMO, 'PUT', '/api/projects/' + createdId, { name: '__test_project_2__' });
+      ok('PUT /api/projects/:id → 200 且名称更新', upd.status === 200 && upd.json && upd.json.name === '__test_project_2__', upd.json);
 
-    const phaseId = (got.json.phases && got.json.phases[0] && got.json.phases[0].id) || '';
-    const tk = await req(DEMO, 'POST', '/api/projects/' + createdId + '/tasks', { title: '__task__', phaseId, assignee: 'admin' });
-    ok('POST /api/projects/:id/tasks → 201 且返回任务', tk.status === 201 && tk.json && tk.json.id, tk.json);
-    const tid = tk.json.id;
+      const phaseId = (got.json.phases && got.json.phases[0] && got.json.phases[0].id) || '';
+      const tk = await req(DEMO, 'POST', '/api/projects/' + createdId + '/tasks', { title: '__task__', phaseId, assignee: 'admin' });
+      ok('POST /api/projects/:id/tasks → 201 且返回任务', tk.status === 201 && tk.json && tk.json.id, tk.json);
+      const tid = tk.json.id;
 
-    const tkUpd = await req(DEMO, 'PUT', '/api/projects/' + createdId + '/tasks/' + tid, { done: true });
-    ok('PUT 任务 done=true → 200', tkUpd.status === 200 && tkUpd.json && tkUpd.json.done === true, tkUpd.json);
+      const tkUpd = await req(DEMO, 'PUT', '/api/projects/' + createdId + '/tasks/' + tid, { done: true });
+      ok('PUT 任务 done=true → 200', tkUpd.status === 200 && tkUpd.json && tkUpd.json.done === true, tkUpd.json);
 
-    const tkDel = await req(DEMO, 'DELETE', '/api/projects/' + createdId + '/tasks/' + tid);
-    ok('DELETE 任务 → 200', tkDel.status === 200, tkDel.status);
+      const tkDel = await req(DEMO, 'DELETE', '/api/projects/' + createdId + '/tasks/' + tid);
+      ok('DELETE 任务 → 200', tkDel.status === 200, tkDel.status);
 
-    const rep = await req(DEMO, 'GET', '/api/report');
-    ok('GET /api/report → 200 且为数组(全量)', rep.status === 200 && Array.isArray(rep.json), rep.json);
+      const rep = await req(DEMO, 'GET', '/api/report');
+      ok('GET /api/report → 200 且为数组(全量)', rep.status === 200 && Array.isArray(rep.json), rep.json);
 
-    const users = await req(DEMO, 'GET', '/api/users');
-    ok('GET /api/users → 200 且为数组(admin 可见全量)', users.status === 200 && Array.isArray(users.json), users.json);
+      const users = await req(DEMO, 'GET', '/api/users');
+      ok('GET /api/users → 200 且为数组(admin 可见全量)', users.status === 200 && Array.isArray(users.json), users.json);
 
-    // —— 核心修复点：排序端点（manager/admin/viewer canAll）——
-    const reversed = [createdId, ...originalOrder.slice().reverse()];
-    const ord1 = await req(DEMO, 'PUT', '/api/projects/order', { ids: reversed });
-    ok('PUT /api/projects/order（含新建项）→ 200', ord1.status === 200, ord1.json);
-    const list1 = await req(DEMO, 'GET', '/api/projects');
-    ok('排序已持久化(新建项置顶)', list1.json[0].id === createdId, list1.json.map(p => p.id));
+      // —— 核心修复点：排序端点（manager/admin/viewer canAll）——
+      const reversed = [createdId, ...originalOrder.slice().reverse()];
+      const ord1 = await req(DEMO, 'PUT', '/api/projects/order', { ids: reversed });
+      ok('PUT /api/projects/order（含新建项）→ 200', ord1.status === 200, ord1.json);
+      const list1 = await req(DEMO, 'GET', '/api/projects');
+      ok('排序已持久化(新建项置顶)', list1.json[0].id === createdId, list1.json.map(p => p.id));
+    } finally {
+      // 临时库初始为空时 originalOrder=[]，还原无意义且端点会 400，故仅在非空时还原
+      if (originalOrder && originalOrder.length) { const rb = await req(DEMO, 'PUT', '/api/projects/order', { ids: originalOrder }); if (rb.status !== 200) console.log('  [warn] 还原排序失败', rb.status); }
+      if (createdId) { const d = await req(DEMO, 'DELETE', '/api/projects/' + createdId); if (d.status !== 204 && d.status !== 200) console.log('  [warn] 清理测试项目失败', d.status); }
+    }
+    const verifyList = await req(DEMO, 'GET', '/api/projects');
+    ok('测试项目已清理(列表不含测试项)', !createdId || !verifyList.json.some(p => p.id === createdId));
+  } catch (e) {
+    ok('演示实例启动/冒烟', false, String((e && e.message) || e));
   } finally {
-    if (originalOrder) { const rb = await req(DEMO, 'PUT', '/api/projects/order', { ids: originalOrder }); if (rb.status !== 200) console.log('  [warn] 还原排序失败', rb.status); }
-    if (createdId) { const d = await req(DEMO, 'DELETE', '/api/projects/' + createdId); if (d.status !== 204 && d.status !== 200) console.log('  [warn] 清理测试项目失败', d.status); }
+    if (demoInst) demoInst.stop();
   }
-  const verifyList = await req(DEMO, 'GET', '/api/projects');
-  ok('测试项目已清理(列表不含测试项)', !createdId || !verifyList.json.some(p => p.id === createdId));
 
   console.log('\n=== B. 真实版实例（隔离临时库：admin 写操作冒烟 + P1-8 闸门绕过验证）===');
   let inst = null;

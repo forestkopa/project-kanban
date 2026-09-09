@@ -28,16 +28,49 @@ async function req(base, method, p, body, token) {
   let j = null; try { j = await r.json(); } catch (_) {}
   return { status: r.status, json: j };
 }
-async function waitFor(base, timeoutMs = 20000) {
+// 等待实例就绪。opts.expectDemo=true 要求 demo===true（演示实例），false 要求 demo===false（真实实例）。
+// 必须显式校验 demo 标志：否则端口被别的进程占用时会"连上就通过"，测错实例。
+async function waitFor(base, opts) {
+  const o = opts || {};
+  const timeoutMs = o.timeoutMs || 20000;
+  const want = o.expectDemo === true;
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     try {
       const r = await fetch(base + '/api/readonly');
-      if (r.ok) { const j = await r.json().catch(() => null); if (j && j.demo === false) return true; }
+      if (r.ok) { const j = await r.json().catch(() => null); if (j && j.demo === want) return true; }
     } catch (_) {}
     await new Promise(r => setTimeout(r, 300));
   }
   return false;
+}
+
+// 启动一个隔离的"演示模式"实例（--demo + 独立临时数据目录）：免登录、admin 视角、写操作不受改密闸门限制。
+// 用途：替代依赖外部运行中 5180 的测试，做到"测试自给自足、与本机运行状态解耦"。
+async function startDemoInstance() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-demo-'));
+  const PORT = await freePort();
+  const base = 'http://127.0.0.1:' + PORT;
+  const child = spawn(NODE, ['server.js', '--demo'], {
+    cwd: ROOT,
+    env: { ...process.env, PORT: String(PORT), KB_DATA_DIR: tmp },
+    stdio: 'ignore',
+  });
+  try {
+    const up = await waitFor(base, { expectDemo: true });
+    if (!up) throw new Error('演示测试实例启动超时（端口 ' + PORT + '）');
+    return {
+      base, port: PORT,
+      stop() {
+        try { child.kill('SIGTERM'); } catch (_) {}
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+      },
+    };
+  } catch (e) {
+    try { child.kill('SIGTERM'); } catch (_) {}
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+    throw e;
+  }
 }
 
 // 启动一个隔离的真实模式实例，返回 { base, token, stop }
@@ -52,7 +85,7 @@ async function startRealInstance() {
   });
   let ok2 = false;
   try {
-    ok2 = await waitFor(base);
+    ok2 = await waitFor(base, { expectDemo: false });
     if (!ok2) throw new Error('测试实例启动超时（端口 ' + PORT + '）');
     // admin 初始密码 000000 → 改密以通过 P1-8 闸门（tokens 不吊销，旧会话仍有效）
     const lg = await req(base, 'POST', '/api/login', { name: 'admin', password: DEFAULT_PW });
@@ -74,4 +107,4 @@ async function startRealInstance() {
   }
 }
 
-module.exports = { startRealInstance, req, DEFAULT_PW, TEST_PW };
+module.exports = { startRealInstance, startDemoInstance, req, DEFAULT_PW, TEST_PW };
