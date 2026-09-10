@@ -37,6 +37,22 @@ git add ... && git commit -m "..." && git push origin main # 提交推送
 git checkout -- data/projects.demo.json                    # 清理 demo 数据污染（行尾符 M 差异直接还原）
 ```
 
+## 发版一页流程（v1.5.4 起固化）
+
+> 铁律：**任何 push 前必须用户本人明确点头**（用户原话「每天推送到 github 要我同意才可以推送」）。
+
+0. 改 `package.json` 版本 + `CHANGELOG.md` 写章节（Release body 就取这一节）。
+1. **本地全量测试绿**：`node test/run-all.cjs`（含覆盖自检，漏跑文件会 code=1）。
+2. 打包升级包：`python tools/build_update_zip.py` → `~/Downloads/kanban/project-kanban-update.zip`（自检「关键文件齐全/不含 data/」）。
+3. 提交并推：`git push origin main` → `git push origin vX.Y.Z` → `git push -f origin vX.Y.Z:latest`。
+   - 本机代理偶发 `CONNECT tunnel failed, response 502` / schannel 握手失败 → **重试即可**，重试后用 `git ls-remote --tags origin` 确认远端真实状态，别信单次报错。
+4. **发 Release 并挂 update.zip**：`node tools/release-gh.cjs vX.Y.Z "<zip 路径>"`。
+   - ⚠️ **`tools/sync-release.ps1` 只建 Release（body 还是占位模板）且不挂附件** —— 本项目纪律是「每个 Release 必挂 update.zip」（服务器在线升级要下载它），所以必须再跑 `release-gh.cjs` 补 body + 附件。
+   - body 由脚本**直接读 CHANGELOG 该版本章节**，Node 直读直传 UTF-8；历史上经 `json.dumps`（默认 `ensure_ascii`）中转导致 Release 页中文乱码，勿走那条路。
+   - 幂等：Release 已存在则 PATCH，同名附件先删再传，可安全重跑。
+5. 校验（别只看脚本输出）：Release API 查 `assets[].state === 'uploaded'`、size 对得上；再对 asset 发 `Range: bytes=0-3` 请求，返回 `206` + `504b0304`（PK 魔数）才算真能下载。
+6. 服务器升级：在线点「一键升级」（已 ≥ v1.5.3 时可用），或 `tools/local-upgrade.ps1 -Zip "<zip>"` 离线兜底。升级包地址：`https://github.com/forestkopa/project-kanban/releases/download/vX.Y.Z/project-kanban-update.zip`。
+
 ## 延伸
 
 - 双实例部署见 [[01-部署与双实例]]
