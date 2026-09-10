@@ -1100,12 +1100,42 @@ function bufToBase64(buf) {
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
   return btoa(bin);
 }
-function exportPlan(type) {
-  const p = proj(); if (!p) { toast('请先选择项目'); return; }
+// 解析 Content-Disposition：优先 filename*=UTF-8''（中文名），回退 filename="ascii"
+function parseDisposition(cd) {
+  if (!cd) return '';
+  let m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (m) { try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; } }
+  m = cd.match(/filename="([^"]+)"/i);
+  return m ? m[1] : '';
+}
+// 带鉴权的二进制下载：统一走 fetch + blob。
+// ⚠️ 禁止用裸 <a href> 直链：它不会带 X-Auth-Token，而 GET 接口统一鉴权后一律 401，
+//    表现为「点了没反应/不下载」（浏览器拿到的是 401 JSON）。历史 bug：计划导出、参考模版导出。
+async function downloadAuthFile(url, fallbackName) {
+  const r = await fetch(url, { headers: { 'X-Auth-Token': getToken() } });
+  if (r.status === 401 && !state.demo) {
+    const ok = await showLogin();
+    if (ok) return downloadAuthFile(url, fallbackName);
+    throw new Error('未登录');
+  }
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
+  const blob = await r.blob();
+  if (!blob.size) throw new Error('导出内容为空（离线演示模式不支持生成文件，请使用服务器版）');
   const a = document.createElement('a');
-  a.href = `/api/projects/${p.id}/export?type=${type}`;
+  a.href = URL.createObjectURL(blob);
+  a.download = parseDisposition(r.headers.get('Content-Disposition')) || fallbackName;
   document.body.appendChild(a); a.click(); a.remove();
-  toast(type === 'initial' ? '正在导出初版计划…' : type === 'diff' ? '正在导出差异对比…' : '正在导出最新计划…');
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return a.download;
+}
+async function exportPlan(type) {
+  const p = proj(); if (!p) { toast('请先选择项目'); return; }
+  const label = type === 'initial' ? '初版计划' : type === 'diff' ? '差异对比' : '最新计划';
+  try {
+    const name = await downloadAuthFile(API + `/projects/${p.id}/export?type=${type}`,
+      `${p.name}_${label}_${isoDate(new Date()).replace(/-/g, '')}.xlsx`);
+    toast('已导出 ' + name);
+  } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
 }
 $('#exportBtn').onclick = (e) => { e.stopPropagation(); $('#exportMenu').classList.toggle('open'); };
 $$('#exportMenu button').forEach(b => b.onclick = () => { const x = b.dataset.x; $('#exportMenu').classList.remove('open'); exportPlan(x); });
@@ -1181,14 +1211,14 @@ function populateRefTplSelect() {
     const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o);
   });
 }
-$('#refTplDownload').onclick = () => {
+$('#refTplDownload').onclick = async () => {
   const sel = $('#refTplSelect');
   const t = (state.templates || []).find(x => x.id === sel.value) || (state.templates || [])[0];
   if (!t) { toast('暂无内置模版'); return; }
-  const a = document.createElement('a');
-  a.href = `/api/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`;
-  document.body.appendChild(a); a.click(); a.remove();
-  toast('已下载参考模版：' + t.name + '（开始/截止含公式，填写后导入即可级联）');
+  try {
+    await downloadAuthFile(API + `/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`, `${t.name}_参考模版.xlsx`);
+    toast('已下载参考模版：' + t.name + '（开始/截止含公式，填写后导入即可级联）');
+  } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
 };
 
 /* ---------- 事件 ---------- */
@@ -1903,13 +1933,13 @@ $('#aiSummaryCopy').onclick = async () => {
 };
 
 /* ---- 模板共创：导出参考模版（Excel）/ 导入社区模板 ---- */
-$('#tplExportBtn').onclick = () => {
+$('#tplExportBtn').onclick = async () => {
   const t = (state.templates || [])[0];
   if (!t) { toast('暂无内置模版'); return; }
-  const a = document.createElement('a');
-  a.href = `/api/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`;
-  document.body.appendChild(a); a.click(); a.remove();
-  toast('已导出参考模版：' + t.name + '（Excel，含日期公式，填写后可从 xlsx 导入）');
+  try {
+    await downloadAuthFile(API + `/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`, `${t.name}_参考模版.xlsx`);
+    toast('已导出参考模版：' + t.name + '（Excel，含日期公式，填写后可从 xlsx 导入）');
+  } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
 };
 $('#tplImportBtn').onclick = () => $('#tplImportFile').click();
 $('#tplImportFile').onchange = async (e) => {

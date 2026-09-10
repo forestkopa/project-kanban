@@ -49,6 +49,9 @@ run('升级锁(watchdog 不打断解压)', [T('watchdog-upgrade-lock.test.cjs')]
 // 前端回归（v1.4.7 hotfix3/4 的修复锁，此前未在聚合入口，导致 npm test 漏跑这两条防线）
 run('待办下周顺延回归(todo-nextweek)', [T('todo-nextweek.test.cjs')], nodeOpts);
 run('前端启动流程回归(frontend-boot)', [T('frontend-boot.test.cjs')], nodeOpts);
+// 导出下载鉴权（v1.5.4）：裸 <a href> 直链不带 token → 真实版 401「点了不下载」的回归锁
+run('导出下载鉴权(源码约束)', [T('export-auth.test.cjs')], nodeOpts);
+run('导出下载端到端(真实实例)', [T('export-download.e2e.cjs')], nodeOpts);
 // 冒烟脚本路径：默认相对 ROOT 根目录的 _smoke_v2.js，换机/CI 用 KB_SMOKE 覆盖
 run('前端 jsdom 冒烟', [process.env.KB_SMOKE || path.join(ROOT, '_smoke_v2.js')],
   { stdio: 'inherit', cwd: WS, env: { ...process.env, NODE_PATH: path.join(WS, 'node_modules') } });

@@ -14,7 +14,7 @@
 - docs/knowledge/05-项目信息选项.md — 工程师姓名/认证纯手填、类型/等级可配置(options.json)、工程师类型增删
 - docs/knowledge/06-模板体系.md — 无 JSON 导入(仅 xlsx)、参考模版导入、reference-xlsx 端点、内置 4 模板、templates.json 双实例共享
 - docs/knowledge/07-甘特公式引擎.md — 甘特方言识别(D/E 日期 F 天数 WORKDAY.INTL)、级联规则、off 数值偏移坑、状态列留空
-- docs/knowledge/08-Excel导出.md — xlsx-js-style 周报待办导出、矢车菊蓝配色表(#1F3864/#B4C7E7/#F2F7FD)
+- docs/knowledge/08-Excel导出.md — 三张表(计划表/差异对比/待办清单)统一排版：深蓝表头 #1F4E78 + 细黑边框 + 全列居中 + 真日期 yyyy/m/d；样式复用铁律与「导出必须等于页面」
 - docs/knowledge/09-GitHub托管与换机.md — 私有仓库、敏感文件清单(gitignore)、换机重配项、遗留(mappings.json死文件/projects.json入库)、常用命令
 - docs/knowledge/10-多用户与SQLite数据层.md — node:sqlite 五表、单项目粒度事务、三角色(admin/member/viewer)权限、登录/游客/记住密码、默认密码 000000、db 运维坑(删库需先停实例)
 - docs/knowledge/11-服务器部署实战与知识库接入.md — 服务器一键部署实战(NSSM 幂等/隧道蓝绿切换)与 Obsidian 知识库接入 + wiki-lint/wiki-update 技能适配
@@ -22,7 +22,7 @@
 - docs/knowledge/13-测试隔离与KB_DATA_DIR.md — KB_DATA_DIR 环境变量让 server 指向独立临时数据目录；测试自起隔离实例绕过 P1-8 强制改密闸门，零污染真实部署
 - docs/knowledge/14-待办页与日期区间语义.md — 独立「待办」页：点击任务跳转对应项目看板并高亮定位、日期用到期日区间(非重叠区间避下月串入本周)；v1.4.3 优化：tab 去重切换 + 分组折叠(localStorage) + 项目内按到期日排序 + 过滤/搜索(局部刷新保焦点)；美观改版(项目色左条/状态点/到期胶囊/.card-flash)
 - docs/knowledge/15-首屏加载优化.md — 首屏白屏等待修复：index.html 内联 splash 遮罩(消除白屏)+ loadAll 串行改 Promise.all 并行省 3×RTT(公网隧道收益最大)；app.js script 须在 splash 之后否则 hideSplash 拿不到元素
-- docs/knowledge/16-待办导出独立功能键与鉴权坑.md — 导出独立成功能键(日/周/月模态框三选一)+ 顺手修 401 bug:裸 fetch 漏传 X-Auth-Token
+- docs/knowledge/16-待办导出独立功能键与鉴权坑.md — 导出独立成功能键(日/周/月模态框三选一)+ 修 401 bug:裸 fetch 漏传 X-Auth-Token；v1.5.4 续修「导出内容≠待办页」(逾期任务被后端二次过滤整批丢掉) 并统一排版
 - docs/knowledge/17-一键升级异步化与进度条设计.md — 升级链路核心重构(v1.4.5):服务端 startUpgrade 立即返 taskId(<200ms) + 后台分阶段状态机(download 0-70% / backup 70-85% / extract 85-98% / restart 98-100%) + 前端 1s 轮询 /status + 底部 #verBar 进度条;流式 downloadFileWithProgress(边下边写盘);任务状态保留 10min 让前端重连能拉最终结果;彻底解决"升级成功但前端显示失败"+"黑屏等待"两个老问题
 
 ## 其它文档
