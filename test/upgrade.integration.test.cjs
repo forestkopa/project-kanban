@@ -168,20 +168,21 @@ function freshRoot() {
     try { fs.rmSync(ROOT2, { recursive: true, force: true }); } catch (e) {}
 
     // ---------- v1.5.3 回归：真实 extractZip（不 mock，走真 tar.exe / 魔数闸 / stderr 带出） ----------
+    // v1.5.5：extractZip 由 spawnSync 改**异步**（同步会冻结事件循环 → 升级期间服务假死），故此处 await
     const RealU = require(SRC); // 真实模块（顶层无副作用，可安全 require）
     const tmpd = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-upg-zip-'));
     // ① 损坏 zip（无 PK 魔数）→ 魔数闸直接拦截，且错误信息可读
     const badZip = path.join(tmpd, 'bad.zip');
     fs.writeFileSync(badZip, 'THIS IS NOT A ZIP FILE.........');
     let threwBad = false, badMsg = '';
-    try { RealU.extractZip(badZip, tmpd); } catch (e) { threwBad = true; badMsg = e.message; }
+    try { await RealU.extractZip(badZip, tmpd); } catch (e) { threwBad = true; badMsg = e.message; }
     assert.ok(threwBad && /不是有效 zip/.test(badMsg), '非 zip 文件应被魔数闸拦截: ' + badMsg);
     console.log('✓ 魔数闸：损坏/非 zip 文件直接拦截（不浪费两种解压尝试）');
     // ② PK 头但内容损坏 → 两种解压都失败时，错误信息必须带 stderr（不再只有 "Command failed"）
     const corruptZip = path.join(tmpd, 'corrupt.zip');
     fs.writeFileSync(corruptZip, Buffer.concat([Buffer.from('PK\x03\x04'), Buffer.alloc(64, 0x00)]));
     let threwCorrupt = false, corruptMsg = '';
-    try { RealU.extractZip(corruptZip, tmpd); } catch (e) { threwCorrupt = true; corruptMsg = e.message; }
+    try { await RealU.extractZip(corruptZip, tmpd); } catch (e) { threwCorrupt = true; corruptMsg = e.message; }
     assert.ok(threwCorrupt && /解压失败（两种方式均失败）/.test(corruptMsg), '损坏 zip 应报两种方式均失败');
     assert.ok(/tar\(exit=/.test(corruptMsg), '错误信息应带 tar 退出码与 stderr: ' + corruptMsg.slice(0, 120));
     assert.ok(!/\bundefined\b/.test(corruptMsg), '错误信息不应含 undefined');
@@ -195,10 +196,48 @@ function freshRoot() {
     assert.ok(fs.existsSync(goodZip) && fs.statSync(goodZip).size > 22, 'Compress-Archive 应生成测试 zip');
     const dest3 = path.join(tmpd, 'out');
     fs.mkdirSync(dest3, { recursive: true });
-    const how = RealU.extractZip(goodZip, dest3);
+    const prog = [];
+    const how = await RealU.extractZip(goodZip, dest3, (done, total) => prog.push([done, total]));
     assert.ok(how === 'tar' || how === 'expand', '应通过某种方式解压成功，实际=' + how);
     assert.ok(fs.existsSync(path.join(dest3, 'hello.txt')), '解压后 hello.txt 应落地');
-    console.log('✓ 完好 zip 经真实 ' + how + ' 解压成功（spawnSync 数组参数零转义）');
+    console.log('✓ 完好 zip 经真实 ' + how + ' 异步解压成功（零转义，事件循环不冻结）');
+
+    // ---------- v1.5.5 回归：解压进度上报 / 依赖自检 / 锁心跳 ----------
+    assert.ok(prog.length > 0, 'extractZip 应回调解压进度（前端要看到 88%→95% 在动）');
+    console.log('✓ 解压进度回调已触发 ' + prog.length + ' 次（末次 done=' + prog[prog.length - 1][0] + '）');
+
+    // zipEntryCount：能读 EOCD 拿到条目总数（good.zip 含 1 个文件）
+    assert.strictEqual(RealU.zipEntryCount(goodZip), 1, 'zipEntryCount 应读出条目数 1，实际=' + RealU.zipEntryCount(goodZip));
+    console.log('✓ zipEntryCount 读出 EOCD 条目总数');
+
+    // missingDeps：缺依赖必须能被检出（升级包不再携带 node_modules，新增依赖需显式报错）
+    const depRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-upg-dep-'));
+    fs.writeFileSync(path.join(depRoot, 'package.json'), JSON.stringify({ dependencies: { 'xlsx-js-style': '^1.2.0', 'left-pad': '^1.0.0' } }));
+    fs.mkdirSync(path.join(depRoot, 'node_modules', 'xlsx-js-style'), { recursive: true });
+    fs.writeFileSync(path.join(depRoot, 'node_modules', 'xlsx-js-style', 'package.json'), '{"name":"xlsx-js-style"}');
+    const miss = RealU.missingDeps(depRoot);
+    assert.deepStrictEqual(miss, ['left-pad'], '应只报出缺失的依赖，实际=' + JSON.stringify(miss));
+    fs.writeFileSync(path.join(depRoot, 'package.json'), JSON.stringify({ version: '1.0.0' }));
+    assert.deepStrictEqual(RealU.missingDeps(depRoot), [], '无 dependencies 声明时不应报缺失');
+    console.log('✓ 依赖自检：只报真实缺失的依赖（不会误伤）');
+    try { fs.rmSync(depRoot, { recursive: true, force: true }); } catch (e) {}
+
+    // 锁心跳：setUpgradeLock(true) 写入时间戳，touchUpgradeLock 刷新，解锁后文件消失
+    const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-upg-lock-'));
+    fs.mkdirSync(path.join(lockRoot, 'data'), { recursive: true });
+    RealU.setUpgradeLock(lockRoot, true);
+    const lf = path.join(lockRoot, 'data', 'upgrade.lock');
+    assert.ok(fs.existsSync(lf), '加锁后应存在 upgrade.lock');
+    const firstTs = Number(fs.readFileSync(lf, 'utf8'));
+    assert.ok(firstTs > 0, '锁内容应为时间戳（watchdog 据此判定过期残留锁）');
+    await new Promise(r => setTimeout(r, 15));
+    RealU.touchUpgradeLock(lockRoot);
+    assert.ok(Number(fs.readFileSync(lf, 'utf8')) > firstTs, '心跳应刷新锁时间戳（否则残留锁会永久禁用自愈）');
+    assert.strictEqual(RealU.isUpgradeLocked(lockRoot), true, '锁生效期间 isUpgradeLocked 应为 true');
+    RealU.setUpgradeLock(lockRoot, false);
+    assert.strictEqual(RealU.isUpgradeLocked(lockRoot), false, '解锁后锁应消失');
+    console.log('✓ 升级锁心跳：时间戳可刷新 + 解锁后文件消失');
+    try { fs.rmSync(lockRoot, { recursive: true, force: true }); } catch (e) {}
     try { fs.rmSync(tmpd, { recursive: true, force: true }); } catch (e) {}
 
     console.log('\n=== 升级链路集成测试全部通过 ===');

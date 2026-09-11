@@ -17,11 +17,20 @@ const ei = raw.indexOf(endMark);
 assert.ok(si >= 0 && ei > si, '未能定位 ensureTunnel 代码块（watchdog.js 结构变更？）');
 let block = raw.slice(si, ei);
 
-// isTunnelUp 改为可注入 mock；探测间隔压缩以便快速测试
+// isTunnelUp / 源站探测 / 升级锁闸门 改为可注入 mock；探测间隔压缩以便快速测试
 block = block.replace(
   /function isTunnelUp\(\)[\s\S]*?\n}/,
   'function isTunnelUp() { return Promise.resolve(global.__tunnelUp()); }'
 );
+block = block.replace(
+  /async function anyOriginUp\(\)[\s\S]*?\n}/,
+  'async function anyOriginUp() { return !!global.__originUp; }'
+);
+block = block.replace(
+  /function tunnelBlockedByUpgrade\(\)[\s\S]*?\n}/,
+  'function tunnelBlockedByUpgrade() { return !!global.__upgradeLocked; }'
+);
+assert.ok(/anyOriginUp/.test(block) && /tunnelBlockedByUpgrade/.test(block), 'v1.5.5 闸门函数应在代码块内（正则误替换？）');
 block = block.replace(/const TUNNEL_RECHECK_DELAY = \d+;/, 'const TUNNEL_RECHECK_DELAY = 10;');
 block = block.replace(/const TUNNEL_COOLDOWN = \d+;/, 'const TUNNEL_COOLDOWN = 300;');
 assert.ok(!/const TUNNEL_RECHECK_DELAY = 2000/.test(block), 'RECHECK_DELAY 未被压缩');
@@ -59,9 +68,12 @@ function build() {
   }
 
   // 场景2：连续 3 次真失败 → 才重启
+  // v1.5.5：新增「源站也必须正常响应」闸门 —— 源站正常而公网不通，才是隧道真故障
   {
     const { mod, calls } = build();
     global.__tunnelUp = () => false; // 持续不可达
+    global.__originUp = true;        // 本机源站正常
+    global.__upgradeLocked = false;
     let restarts = 0;
     for (let i = 0; i < 3; i++) {
       await mod.ensureTunnel();
@@ -76,6 +88,8 @@ function build() {
   {
     const { mod, calls } = build();
     global.__tunnelUp = () => false;
+    global.__originUp = true;
+    global.__upgradeLocked = false;
     for (let i = 0; i < 3; i++) await mod.ensureTunnel();
     assert.strictEqual(calls.taskkill, 1, '首次应重启 1 次');
     // 冷却期内继续失败：不应再重启
@@ -88,12 +102,53 @@ function build() {
   {
     const { mod, calls } = build();
     global.__tunnelUp = () => false;
+    global.__originUp = true;
     process.env.KANBAN_NO_TUNNEL = '1';
     for (let i = 0; i < 5; i++) await mod.ensureTunnel();
     assert.strictEqual(calls.taskkill, 0, '开发机模式不得 taskkill');
     assert.strictEqual(calls.spawn, 0, '开发机模式不得拉起 cloudflared');
     delete process.env.KANBAN_NO_TUNNEL;
     console.log('✓ 场景4 开发机模式（KANBAN_NO_TUNNEL）永不接管隧道');
+  }
+
+  // 场景5（v1.5.5 核心）：公网不可达 + **本机源站也不响应** → 问题在源站，绝不重启隧道
+  // 生产实测：升级/重启期间源站被冻住 → CF 返 502 → 旧逻辑判「隧道挂了」→ taskkill cloudflared
+  // + 90s 冷却，把 10-30 秒的正常中断放大成 9 分钟公网不可达
+  {
+    const { mod, calls } = build();
+    global.__tunnelUp = () => false;
+    global.__originUp = false;      // 源站同时不响应
+    global.__upgradeLocked = false;
+    for (let i = 0; i < 10; i++) await mod.ensureTunnel();
+    assert.strictEqual(calls.taskkill, 0, '源站不响应时不得重启隧道（重启隧道解决不了源站问题）');
+    assert.strictEqual(calls.spawn, 0, '源站不响应时不得拉起 cloudflared');
+    console.log('✓ 场景5 源站 5xx/无响应：不误杀隧道（不再把正常重启放大成数分钟故障）');
+  }
+
+  // 场景6（v1.5.5）：升级进行中 → 公网 5xx 属预期，绝不重启隧道
+  {
+    const { mod, calls } = build();
+    global.__tunnelUp = () => false;
+    global.__originUp = true;
+    global.__upgradeLocked = true;  // 升级锁生效
+    for (let i = 0; i < 10; i++) await mod.ensureTunnel();
+    assert.strictEqual(calls.taskkill, 0, '升级期间不得 taskkill cloudflared');
+    global.__upgradeLocked = false;
+    console.log('✓ 场景6 升级窗口内：不重启隧道（避免 90s 冷却把中断放大）');
+  }
+
+  // 场景7（v1.5.5）：源站恢复后，隧道真故障仍应被正确处置（闸门不会把隧道守护废掉）
+  {
+    const { mod, calls } = build();
+    global.__tunnelUp = () => false;
+    global.__originUp = false;      // 先源站不响应：不重启
+    global.__upgradeLocked = false;
+    for (let i = 0; i < 3; i++) await mod.ensureTunnel();
+    assert.strictEqual(calls.taskkill, 0, '源站不响应期间不应重启隧道');
+    global.__originUp = true;       // 源站恢复，隧道仍不通 → 应恢复重启能力
+    for (let i = 0; i < 3; i++) await mod.ensureTunnel();
+    assert.strictEqual(calls.taskkill, 1, '源站恢复后隧道仍不通，应重启隧道（闸门不会永久屏蔽）');
+    console.log('✓ 场景7 源站恢复后隧道守护恢复工作（闸门可自愈，不会永久屏蔽）');
   }
 
   console.log('\n=== 隧道守护稳定性测试全部通过 ===');

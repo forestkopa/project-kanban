@@ -69,15 +69,34 @@ function log(msg) { console.log(new Date().toISOString() + ' [watchdog] ' + msg)
 // 一键升级解压覆盖期间会创建该文件。此时若继续按 mtime 判定「代码更新」并 taskkill server，
 // 会把正在执行升级的进程杀掉 → 解压半途中断、任务状态随内存丢失 → 「提示完成但版本没变」。
 // 有锁时：跳过代码热重载（端口挂了仍正常拉起），升级结束后由 upgrade.js 解锁。
+//
+// v1.5.5：锁带**心跳**——升级任务每推进一阶段 / 每解压一批文件就刷新锁内时间戳。
+// 原缺陷：进程若在升级中途被强杀，锁文件残留 → 热重载被永久禁用（新代码永不生效、服务崩了也不自愈）。
+// 现在读到超过 LOCK_STALE_MS 没刷新的锁即视为**过期残留**，直接忽略，自愈不受影响。
+const LOCK_STALE_MS = 3 * 60 * 1000;
 function upgradeLocked() {
-  try { return fs.existsSync(path.join(ROOT, 'data', 'upgrade.lock')); } catch (e) { return false; }
+  try {
+    const p = path.join(ROOT, 'data', 'upgrade.lock');
+    const st = fs.statSync(p);
+    const raw = fs.readFileSync(p, 'utf8').trim();
+    const ts = Number(raw) || st.mtimeMs;
+    if (Date.now() - ts > LOCK_STALE_MS) return false; // 过期残留锁：不阻断自愈/热重载
+    return true;
+  } catch (e) { return false; }
 }
+
+// 忙碌判定阈值（v1.5.5）：端口仍在 LISTEN 但 HTTP 不响应 = 进程还活着、只是被冻住或正在启动，
+// 不是「崩了」。生产实测：升级同步解压期间端口无响应 97s，原逻辑每 15s 就 spawn 一个新实例
+// （实测连拉 8 次，全部在 EADDRINUSE 里空转退出），既救不了场还刷满日志。
+const BUSY_GRACE_TICKS = 4;         // 无锁：连续 4 轮（≈60s）不响应 → 判定僵死，强制重启
+const BUSY_GRACE_TICKS_LOCKED = 60; // 升级中：给足 ≈15 分钟（备份/解压各有 5 分钟硬超时兜底）
 
 async function ensureServer() {
   const snap = newestMtime();
   const locked = upgradeLocked();
   for (const s of SERVERS) {
     if (await isUp(s.port)) {
+      s.busyTicks = 0; // 端口响应正常：清空忙碌计数
       // 接管运行中实例时记录其 PID（watchdog 自身重启后也能自动重启它）
       if (!s.pid) s.pid = pidOfPort(s.port);
       if (locked) {
@@ -99,9 +118,24 @@ async function ensureServer() {
       }
       continue;
     }
-    // 端口未响应：拉起新代码
+    // 端口未响应：先区分「进程还活着只是忙」与「真崩了」（v1.5.5）
+    // 端口仍在 LISTEN 说明进程存活（只是事件循环被占住/正在启动）→ 重复 spawn 只会撞 EADDRINUSE。
+    const listenPid = pidOfPort(s.port);
+    s.busyTicks = (s.busyTicks || 0) + 1;
+    if (listenPid) {
+      s.pid = listenPid;
+      const grace = locked ? BUSY_GRACE_TICKS_LOCKED : BUSY_GRACE_TICKS;
+      if (s.busyTicks <= grace) {
+        if (s.busyTicks === 1) log(s.name + ' 端口 ' + s.port + ' 仍在监听（PID ' + listenPid + '）但暂不响应，判定为忙碌（升级/启动中），不重复拉起');
+        continue;
+      }
+      log(s.name + ' 端口 ' + s.port + ' 连续 ' + s.busyTicks + ' 轮（≈' + Math.round(s.busyTicks * INTERVAL / 1000) + 's）无响应，判定为僵死，强制重启 PID ' + listenPid);
+      try { spawnSync('taskkill', ['/F', '/PID', String(listenPid)], { timeout: 5000, stdio: 'ignore' }); } catch (e) {}
+      s.pid = null;
+    }
+    // 端口未响应且无存活监听进程（或已强制清理僵死进程）：拉起新代码
     log(s.name + ' 未响应（端口 ' + s.port + '），重新拉起 server.js ' + s.args.join(' '));
-    s.snap = snap; s.pid = null;
+    s.snap = snap; s.pid = null; s.busyTicks = 0;
     try {
       const child = spawn(NODE, [SERVER, ...s.args], { cwd: ROOT, detached: true, stdio: 'ignore', env: { ...process.env, ...s.env } });
       child.unref();
@@ -124,6 +158,28 @@ let tunnelLastRestart = 0;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// v1.5.5：把「隧道真断」与「源站拖累」分开——只看 statusCode<500 会把源站 502 误判成隧道故障。
+// 生产实测：升级期间源站被同步解压冻住 → 公网 502 → 旧逻辑 taskkill cloudflared + 90s 冷却，
+// 把一次 10-30 秒的正常中断放大成 9 分钟公网不可达（用户以为升级把服务搞挂了）。
+function originProbe(port) {
+  return new Promise(resolve => {
+    const req = http.get({ host: '127.0.0.1', port, path: '/api/version', timeout: 2500 }, r => { r.resume(); resolve(true); });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+// 本机源站是否有实例在正常响应（注意 typeof 守卫：单元测试只截取本代码块，SERVERS 不在作用域内）
+async function anyOriginUp() {
+  const list = (typeof SERVERS !== 'undefined' && SERVERS) || [];
+  for (const s of list) { if (await originProbe(s.port)) return true; }
+  return false;
+}
+// 升级进行中不重启隧道（typeof 守卫同因：单测截取的代码块里 upgradeLocked 不在作用域）
+function tunnelBlockedByUpgrade() {
+  return typeof upgradeLocked === 'function' ? upgradeLocked() : false;
+}
+let originDownLogged = false;
+
 function isTunnelUp() {
   return new Promise(resolve => {
     const req = https.get(TUNNEL_URL, { timeout: 6000 }, r => { r.resume(); resolve(r.statusCode >= 200 && r.statusCode < 500); });
@@ -138,12 +194,26 @@ async function ensureTunnel() {
 
   if (await isTunnelUp()) {
     if (tunnelFailCount) log('公网已恢复，失败计数清零（' + tunnelFailCount + ' → 0）');
-    tunnelFailCount = 0;
+    tunnelFailCount = 0; originDownLogged = false;
     return;
   }
   // 首次失败：隔 2s 复查一次，降低偶发丢包误判
   await sleep(TUNNEL_RECHECK_DELAY);
-  if (await isTunnelUp()) { log('公网复查通过，判定为偶发抖动，不重启'); tunnelFailCount = 0; return; }
+  if (await isTunnelUp()) { log('公网复查通过，判定为偶发抖动，不重启'); tunnelFailCount = 0; originDownLogged = false; return; }
+
+  // v1.5.5 闸门 1：升级进行中 → 公网 5xx 属预期（源站在覆盖文件/重启），重启隧道只会有害
+  if (tunnelBlockedByUpgrade()) {
+    tunnelFailCount = 0;
+    if (!originDownLogged) { log('公网不可达，但升级进行中：判定为源站升级窗口，不重启隧道'); originDownLogged = true; }
+    return;
+  }
+  // v1.5.5 闸门 2：本机源站自己都不响应 → 问题在源站（服务未起/正在重启），重启隧道无法解决
+  if (!(await anyOriginUp())) {
+    tunnelFailCount = 0;
+    if (!originDownLogged) { log('公网不可达，且本机源站也无响应：问题在源站而非隧道，不重启隧道（避免 90s 冷却把中断放大）'); originDownLogged = true; }
+    return;
+  }
+  originDownLogged = false;
 
   tunnelFailCount++;
   if (tunnelFailCount < TUNNEL_FAIL_THRESHOLD) {

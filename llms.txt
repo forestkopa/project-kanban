@@ -23,7 +23,8 @@
 - docs/knowledge/14-待办页与日期区间语义.md — 独立「待办」页：点击任务跳转对应项目看板并高亮定位、日期用到期日区间(非重叠区间避下月串入本周)；v1.4.3 优化：tab 去重切换 + 分组折叠(localStorage) + 项目内按到期日排序 + 过滤/搜索(局部刷新保焦点)；美观改版(项目色左条/状态点/到期胶囊/.card-flash)
 - docs/knowledge/15-首屏加载优化.md — 首屏白屏等待修复：index.html 内联 splash 遮罩(消除白屏)+ loadAll 串行改 Promise.all 并行省 3×RTT(公网隧道收益最大)；app.js script 须在 splash 之后否则 hideSplash 拿不到元素
 - docs/knowledge/16-待办导出独立功能键与鉴权坑.md — 导出独立成功能键(日/周/月模态框三选一)+ 修 401 bug:裸 fetch 漏传 X-Auth-Token；v1.5.4 续修「导出内容≠待办页」(逾期任务被后端二次过滤整批丢掉) 并统一排版
-- docs/knowledge/17-一键升级异步化与进度条设计.md — 升级链路核心重构(v1.4.5):服务端 startUpgrade 立即返 taskId(<200ms) + 后台分阶段状态机(download 0-70% / backup 70-85% / extract 85-98% / restart 98-100%) + 前端 1s 轮询 /status + 底部 #verBar 进度条;流式 downloadFileWithProgress(边下边写盘);任务状态保留 10min 让前端重连能拉最终结果;彻底解决"升级成功但前端显示失败"+"黑屏等待"两个老问题
+- docs/knowledge/17-一键升级异步化与进度条设计.md — 升级链路核心重构(v1.4.5):服务端 startUpgrade 立即返 taskId(<200ms) + 后台分阶段状态机 + 前端 1s 轮询 + 底部 #verBar 进度条;【v1.5.5 补课·必读】异步任务 ≠ 服务不阻塞:真凶是 extractZip/backupDir 用 spawnSync/execSync 冻结整个事件循环(实测解压 97s 期间端口 100% 无响应)+ 升级包塞了 1047 个 node_modules;修复=改异步 spawn + 真实进度(-v 计数/EOCD 条目数) + 包不带依赖(1139文件22.5MB→92文件2.8MB) + 依赖自检 missingDeps + 硬超时 + 锁心跳/过期锁忽略;复验 解压 97s→9.1s、端口不可达 37s→1s、总耗时 118s→24.3s、watchdog 重复拉起 8 次→0 次
+- docs/knowledge/18-守护进程误判与重复拉起.md — watchdog 两类致命误判(v1.5.5):① 源站 502 被当「隧道挂了」→ taskkill cloudflared + 90s 冷却,把 10s 中断放大成 9min(判据改为分层探测:公网不通+源站正常才重启隧道);② 端口无响应一律当「进程崩了」→ 升级期对同一端口连拉 8 个重复实例(判据改为先 pidOfPort 查监听者,存活=忙碌按宽限期跳过,持续超宽限才精确 kill 再拉起);通用法则:健康检查要回答「是谁的问题」,重启只在归因明确时做
 
 ## 其它文档
 

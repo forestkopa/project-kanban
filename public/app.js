@@ -2875,7 +2875,7 @@ async function doUpgrade() {
       setStatus('已是最新（v' + ((pre && pre.local) || '?') + '），无需升级', '#2f855a');
       return;
     }
-    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务（公网约中断 10-30 秒）。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) {
+    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务。\n升级期间页面可能短暂无响应（通常 <30 秒），请勿关闭页面。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) {
       setBar(null); setStatus('已取消', '#718096'); return;
     }
     setStatus('启动升级任务…');
@@ -2917,15 +2917,17 @@ async function doUpgrade() {
           }
         }
       } catch (e) {
-        // 服务重启/隧道重连期间会连续失败，属预期：显示等待，不判失败
+        // 服务重启/覆盖文件期间可能连续失败，属预期：显示等待，不判失败
+        // v1.5.5：不再伪造 98% 进度，也不再一律说「服务重启中」——
+        //   保留最后一次真实进度 + 说明「等待服务响应」，让用户能分辨「在忙」和「卡住」。
         failCount++;
         if (failCount <= 120) {
-          setStatus('服务重启中…（' + failCount + 's）请稍候，不要关闭页面', '#2b6cb0');
-          setBar(Math.max(lastPct, 98), '服务重启中…（' + failCount + 's）', '#3182ce');
+          setStatus('看板暂不可达（已等待 ' + failCount + 's）：正在解压覆盖文件或重启服务，请勿关闭页面', '#2b6cb0');
+          setBar(lastPct > 0 ? lastPct : 0, '等待服务响应…（已等待 ' + failCount + 's）', '#3182ce');
         } else {
           stopPoll();
           setBar(null);
-          setStatus('等待服务恢复超时：请 1 分钟后手动刷新页面确认版本（若失败请查 logs/upgrade-*.log）', '#E0241B');
+          setStatus('等待服务恢复超时（120s）。升级可能仍在后台进行：请 1 分钟后刷新页面看页脚版本号；仍不对则到服务器查 logs/upgrade-*.log 与 upgrade-failed-*.zip', '#E0241B');
         }
         console.warn('[upgrade] 轮询失败(' + failCount + '):', e && e.message);
       }
