@@ -7,14 +7,14 @@
 ## 知识笔记（原子化）
 
 - docs/knowledge/00-知识地图(MOC).md — 知识库总索引，链接所有原子笔记
-- docs/knowledge/01-部署与双实例.md — 启动命令、端口约定(5180演示/5181正式)、Cloudflare 隧道、共享文件注意
-- docs/knowledge/02-demo正式版机制.md — DEMO_MODE 开关(server.js L10)、8 处分支点表、前端通过 /api/readonly 感知、watchdog 双实例分工
+- docs/knowledge/01-部署与运行.md — 启动命令、端口 5181(单实例)、三层守护结构(kanban-watchdog→watchdog.js→server.js)、Cloudflare 隧道、NSSM 开机自启、模板文件位置(正式=项目根/隔离实例=KB_DATA_DIR)
+- docs/knowledge/02-单实例与鉴权模型.md — `--demo` 已下线并加启动守卫(必须退出，防双写 app.db)、多用户 token 鉴权(X-Auth-Token + tokens 表)、四角色与 CAN_ALL/FULL_REPORT/MANAGERS 三个判定函数、首登强制改密闸门、/api/readonly 返回 {on,tag} 与 KB_INSTANCE_TAG
 - docs/knowledge/03-看板业务规则.md — 列宽 calc((100%-80px)/6) 方案、分组折叠、拖拽排序、深色主题按钮配色变量
 - docs/knowledge/04-汇报与AI总结.md — 日报/周报/月报/全景全局化、归档窗口(completedAt)、AI 总结后端 /api/ai/summarize
 - docs/knowledge/05-项目信息选项.md — 工程师姓名/认证纯手填、类型/等级可配置(options.json)、工程师类型增删
-- docs/knowledge/06-模板体系.md — 无 JSON 导入(仅 xlsx)、参考模版导入、reference-xlsx 端点、内置 4 模板、templates.json 双实例共享
-- docs/knowledge/07-甘特公式引擎.md — 甘特方言识别(D/E 日期 F 天数 WORKDAY.INTL)、级联规则、off 数值偏移坑、状态列留空
-- docs/knowledge/08-Excel导出.md — 三张表(计划表/差异对比/待办清单)统一排版：深蓝表头 #1F4E78 + 细黑边框 + 全列居中 + 真日期 yyyy/m/d；样式复用铁律与「导出必须等于页面」
+- docs/knowledge/06-模板体系.md — 无 JSON 导入(仅 xlsx)、参考模版导入、reference-xlsx 端点(计划表方言:无「项目开始」行/序号1即项目开始/阶段列合并/必须 xlsx-js-style 写出)、内置 4 模板、templates.json(单文件)
+- docs/knowledge/07-甘特公式引擎.md — 两种导入方言、D/E/F 内部列语义、WORKDAY.INTL 公式链、两套排期语义(自然日/工作日，由任务是否带规则决定)、lit 字面量与拓扑方向两个已修 bug、off 数值偏移坑、状态列留空
+- docs/knowledge/08-Excel导出.md — 计划表/差异对比/待办清单/参考模版统一排版：深蓝表头(计划表·差异对比·参考模版 #173A5A，待办 #1F4E78) + 细黑边框 + 全列居中 + 真日期 yyyy/m/d；计划表与参考模版同构(阶段列合并 + 条件性 WORKDAY.INTL 公式链)；样式复用铁律与「导出必须等于页面」
 - docs/knowledge/09-GitHub托管与换机.md — 私有仓库、敏感文件清单(gitignore)、换机重配项、遗留(mappings.json死文件/projects.json入库)、常用命令
 - docs/knowledge/10-多用户与SQLite数据层.md — node:sqlite 五表、单项目粒度事务、三角色(admin/member/viewer)权限、登录/游客/记住密码、默认密码 000000、db 运维坑(删库需先停实例)
 - docs/knowledge/11-服务器部署实战与知识库接入.md — 服务器一键部署实战(NSSM 幂等/隧道蓝绿切换)与 Obsidian 知识库接入 + wiki-lint/wiki-update 技能适配
@@ -25,6 +25,7 @@
 - docs/knowledge/16-待办导出独立功能键与鉴权坑.md — 导出独立成功能键(日/周/月模态框三选一)+ 修 401 bug:裸 fetch 漏传 X-Auth-Token；v1.5.4 续修「导出内容≠待办页」(逾期任务被后端二次过滤整批丢掉) 并统一排版
 - docs/knowledge/17-一键升级异步化与进度条设计.md — 升级链路核心重构(v1.4.5):服务端 startUpgrade 立即返 taskId(<200ms) + 后台分阶段状态机 + 前端 1s 轮询 + 底部 #verBar 进度条;【v1.5.5 补课·必读】异步任务 ≠ 服务不阻塞:真凶是 extractZip/backupDir 用 spawnSync/execSync 冻结整个事件循环(实测解压 97s 期间端口 100% 无响应)+ 升级包塞了 1047 个 node_modules;修复=改异步 spawn + 真实进度(-v 计数/EOCD 条目数) + 包不带依赖(1139文件22.5MB→92文件2.8MB) + 依赖自检 missingDeps + 硬超时 + 锁心跳/过期锁忽略;复验 解压 97s→9.1s、端口不可达 37s→1s、总耗时 118s→24.3s、watchdog 重复拉起 8 次→0 次
 - docs/knowledge/18-守护进程误判与重复拉起.md — watchdog 两类致命误判(v1.5.5):① 源站 502 被当「隧道挂了」→ taskkill cloudflared + 90s 冷却,把 10s 中断放大成 9min(判据改为分层探测:公网不通+源站正常才重启隧道);② 端口无响应一律当「进程崩了」→ 升级期对同一端口连拉 8 个重复实例(判据改为先 pidOfPort 查监听者,存活=忙碌按宽限期跳过,持续超宽限才精确 kill 再拉起);通用法则:健康检查要回答「是谁的问题」,重启只在归因明确时做
+- docs/knowledge/19-演示版下线与单实例改造.md — 2026-09-11 彻底移除 5180 演示版(`--demo`):后端 24 处 DEMO_MODE 分支/db.ensureDemoUser/前端 state.demo 与徽章/watchdog SERVERS/deploy 服务文件/测试 harness 全清单；`--demo` 退出守卫与 PORT 默认值改 5181 的理由(防双写 app.db)；三个踩坑(批量替换把函数定义也替了→自递归、离线版跳登录是否受影响、冒烟脚本残留变量)
 
 ## 其它文档
 
@@ -37,9 +38,9 @@
 
 ## 关键约定速记
 
-- 端口：5180=demo(公网), 5181=正式(本机)；隧道指向 5180
-- 模式开关：`node server.js --demo` 为演示
-- 数据隔离：正式版 SQLite `data/app.db`；演示版 `data/demo.db`；projects.demo.json 仅作迁移种子
+- 端口：**单实例 5181**（公网隧道与 `config.yml` ingress 均指向它）；5180 演示版已于 2026-09-11 下线
+- 启动：`node server.js` 或 `node watchdog.js`；`--demo` 参数会直接报错退出（已下线）
+- 数据：SQLite `data/app.db`；测试用隔离实例走 `KB_DATA_DIR`（模板文件也随之进临时目录）
 - 账号：admin / 000000（管理员）；guest / 000000（游客只读）；新建用户默认密码 000000
 - 敏感文件不外传：ai.json / auth.token / tunnel-url.txt / options.json / *.db
 - **推送约定：每次 push GitHub 前必须同步更新 docs/knowledge/ 与 llms.txt**

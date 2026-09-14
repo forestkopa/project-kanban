@@ -103,7 +103,7 @@ Write-Host "Service status: $st" -ForegroundColor Cyan
 
 Write-Host ""
 Write-Host "== Verify ==" -ForegroundColor Cyan
-foreach ($port in 5180, 5181) {
+foreach ($port in 5181) {
     try {
         $r = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$port/api/readonly" -TimeoutSec 5
         Write-Host "  local :$port -> HTTP $($r.StatusCode) $($r.Content)" -ForegroundColor Green

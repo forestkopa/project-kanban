@@ -22,6 +22,14 @@ v1.5.5 变更：**默认不再携带 node_modules**（可用 --with-deps 退回�
   会明确报错并提示 `npm install --omit=dev`，不会静默把服务搞成 500。
   首次部署/依赖有变动的机器请用： python tools/build_update_zip.py --with-deps
 
+v1.5.6 变更：**补排除 outputs/**。
+  为什么改：outputs/ 是本机临时产物（导出预览 xlsx、parity 比对件、demo 数据备份），
+  .gitignore 里排了、这里却漏排 —— 2026-09-11 实测打出来的包里混进 19 个 outputs/ 文件
+  （含 4.5MB 的 _demo-backup-20260911/），把 2.85MB 的包虚胖到 3.4MB，
+  还把本机临时数据发到了服务器。自检同步加了「禁 outputs/ + 禁 *.xlsx|*.db|*.log|*.zip + 打印体积 top5」，
+  回归锁见 test/build-update-zip.test.cjs（真跑一遍打包查条目清单，24 断言）。
+  当前口径：约 94 文件 / 2.85MB，其中 vendor/xlsx-0.20.2.tgz（xlsx 离线依赖包）占 2.3MB。
+
 用法：
   python tools/build_update_zip.py [-o 输出目录] [--with-deps]
 默认输出： ~/Downloads/kanban/project-kanban-update.zip
@@ -38,6 +46,9 @@ WITH_DEPS = '--with-deps' in sys.argv  # v1.5.5：默认不带 node_modules，�
 EXCLUDE_DIRS = {
     '.git', '.workbuddy', '.obsidian', 'backups', 'deploy', 'data', 'logs',
     'coverage', '__pycache__', '.pytest_cache',
+    # v1.5.6：outputs/ 是本机临时产物（导出预览 xlsx、parity 比对件、demo 备份），
+    # 体积能到 4.7MB 却与运行无关 —— 漏排除会直接混进升级包（实测把 3.4MB 包撑大 1MB）。
+    'outputs',
 }
 EXCLUDE_DIR_PREFIX = ('data-backup',)          # data-backup* 通配
 EXCLUDE_DIR_PATHS = {                          # 相对 ROOT 的具体路径（本机特有巨型目录）
@@ -92,19 +103,27 @@ def build(out_dir):
             'kanban-workbench-template.html', 'lib/ai-agent.js',
             'public/index.html', 'public/app.js', 'public/style.css']
     with zipfile.ZipFile(zip_path) as z:
+        infos = z.infolist()
         names = set(z.namelist())
         missing = [m for m in must if m not in names]
-        leaked = [x for x in names if x.startswith('data/') or 'recovered-modify-backup' in x]
+        leaked = [x for x in names
+                  if x.startswith(('data/', 'outputs/', 'backups/', 'logs/'))
+                  or 'recovered-modify-backup' in x
+                  or x.endswith(('.xlsx', '.db', '.log', '.zip'))]
         dep_files = [x for x in names if x.startswith('node_modules/')]
+        top5 = sorted(infos, key=lambda i: -i.file_size)[:5]
     if missing:
         print('SELF-CHECK FAIL 缺失关键文件: %s' % missing)
         return 1
     if leaked:
-        print('SELF-CHECK FAIL 泄漏 data/ 或备份目录: %s' % leaked[:5])
+        print('SELF-CHECK FAIL 泄漏本地产物（data/ outputs/ 备份/xlsx/db/log）: %s' % leaked[:5])
         return 1
     if not WITH_DEPS and dep_files:
         print('SELF-CHECK FAIL 不该携带依赖却出现了 %d 个 node_modules 条目' % len(dep_files))
         return 1
+    # 体积守卫：列出最大 5 个条目，便于发现「某个本机大文件又被误打包」
+    print('  体积 top5: %s' % ', '.join(
+        '%s %.1fMB' % (i.filename, i.file_size / 1048576.0) for i in top5))
     # 依赖清单自检：不带 node_modules 时，把运行依赖列出来提示（目标机需已具备，
     # 否则升级流程的依赖自检会明确报错，见 lib/upgrade.js#missingDeps）
     try:

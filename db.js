@@ -248,6 +248,8 @@ function saveProject(proj, userId) {
   // 所有权只随创建设定：已有项目保持原 owner（修复：编辑他人项目时曾把 owner 覆盖为编辑者）
   const existing = db.prepare('SELECT owner_id FROM projects WHERE id=?').get(proj.id);
   const ownerId = existing ? existing.owner_id : userId;
+  // 项目开始时间由序号 1 任务的开始日期决定（兼容旧数据：无任务时保留原 proj.startDate）
+  const effectiveStartDate = (proj.tasks && proj.tasks[0] && proj.tasks[0].startDate) || proj.startDate || null;
   db.exec('BEGIN');
   try {
     db.prepare(`INSERT INTO projects (id,owner_id,name,template_id,icon,color,type,level,product_type,cert,status,completed_at,engineers_json,start_date,start_cell,baseline_json,sort,created_at)
@@ -260,7 +262,7 @@ function saveProject(proj, userId) {
         baseline_json=excluded.baseline_json, sort=excluded.sort, created_at=excluded.created_at`)
       .run(proj.id, ownerId, proj.name || '未命名项目', proj.templateId || null, proj.icon || '', proj.color || '#0a84ff',
         proj.type || 'C端', proj.level || 'B', proj.productType || '', proj.cert || '', proj.status || 'active',
-        proj.completedAt ?? null, JSON.stringify(proj.engineers || {}), proj.startDate || null, proj.startCell || null,
+        proj.completedAt ?? null, JSON.stringify(proj.engineers || {}), effectiveStartDate, proj.startCell || null,
         proj.baseline ? JSON.stringify(proj.baseline) : null, proj.sort || 0, proj.createdAt || new Date().toISOString());
     db.prepare('DELETE FROM phases WHERE project_id=?').run(proj.id);
     db.prepare('DELETE FROM tasks WHERE project_id=?').run(proj.id);
@@ -408,15 +410,6 @@ function ensureGuestUser() {
   }
   return guest;
 }
-function ensureDemoUser(seedFilePath) {
-  let demo = db.prepare("SELECT * FROM users WHERE name='demo' LIMIT 1").get();
-  if (!demo) {
-    const created = createUser('demo', randomPassword(), 'user');
-    demo = { id: created.id, name: created.name, role: created.role };
-  }
-  migrateJson(seedFilePath, demo.id);
-  return demo;
-}
 function migrateJson(seedFilePath, ownerId) {
   if (!seedFilePath) return 0;
   const marker = 'migrated:' + path.basename(seedFilePath);
@@ -440,7 +433,7 @@ function migrateJson(seedFilePath, ownerId) {
 }
 
 module.exports = { init, createUser, listUsers, updateUserRole, deleteUser, getUserByName, getUserById, verifyUser, usesDefaultPassword, changePassword, resetPassword, issueToken, tokenUserId, cleanupExpiredTokens, saveProject, listProjects, getProject, deleteProject, setOrder, reportByUser,
-  trashPush, trashList, trashGet, trashDrop, purgeTrash, ensureAdminAndMigrate, ensureDemoUser, ensureGuestUser, migrateJson, randomPassword,
+  trashPush, trashList, trashGet, trashDrop, purgeTrash, ensureAdminAndMigrate, ensureGuestUser, migrateJson, randomPassword,
   aiListSessions, aiCreateSession, aiRenameSession, aiDeleteSession, aiListMessages, aiAppendMessages };
 
 /* ---------------- AI 助手：对话记录（会话 + 消息，owner 隔离） ----------------

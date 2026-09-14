@@ -27,3 +27,8 @@ logs/
 
 # 本地抢救的看板报告备份（169MB，含 zip 归档，不入库）
 docs/recovered-modify-backup/
+
+# 导出预览 / 临时验证产物（present_files 交付用，不入库）
+outputs/
+# Excel 打开 xlsx 时生成的锁文件
+~$*.xlsx

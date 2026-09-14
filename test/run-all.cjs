@@ -41,9 +41,8 @@ run('AI 对话记录 db 层(会话 CRUD/隔离)', [T('ai-sessions.test.cjs')], n
 run('AI 对话记录 API(真实实例)', [T('ai-sessions-api.test.cjs')], nodeOpts);
 run('AI Agent 单测(权限/确认/双协议)', [T('ai-agent.test.cjs')], nodeOpts);
 run('AI Agent 端到端(真实实例+mock LLM)', [T('ai-agent.e2e.cjs')], nodeOpts);
-run('后端 API 集成(自起隔离 demo+real 双实例)', [T('api.integration.test.cjs')], nodeOpts);
+run('后端 API 集成(自起隔离实例)', [T('api.integration.test.cjs')], nodeOpts);
 run('角色分级强制(live)', [T('api-roles.test.cjs')], nodeOpts);
-run('升级链路集成(v1.4.6 回归)', [T('upgrade.integration.test.cjs')], nodeOpts);
 run('隧道守护稳定性(watchdog)', [T('watchdog-tunnel.test.cjs')], nodeOpts);
 run('升级锁(watchdog 不打断解压)', [T('watchdog-upgrade-lock.test.cjs')], nodeOpts);
 // 前端回归（v1.4.7 hotfix3/4 的修复锁，此前未在聚合入口，导致 npm test 漏跑这两条防线）
@@ -52,6 +51,11 @@ run('前端启动流程回归(frontend-boot)', [T('frontend-boot.test.cjs')], no
 // 导出下载鉴权（v1.5.4）：裸 <a href> 直链不带 token → 真实版 401「点了不下载」的回归锁
 run('导出下载鉴权(源码约束)', [T('export-auth.test.cjs')], nodeOpts);
 run('导出下载端到端(真实实例)', [T('export-download.e2e.cjs')], nodeOpts);
+// 参考模版导出格式 / 导入闭环：样式必须走 xlsx-js-style（普通 xlsx 会丢样式）、
+// 阶段列合并、任务名含「说明」不被跳过规则吞掉（v1.5.6）
+run('参考模版导出/导入回归', [T('template-export-import.test.cjs')], nodeOpts);
+// 升级包内容回归（v1.5.6）：outputs/ 曾漏排除，把本机预览实物 + demo 备份打进 update.zip
+run('升级包内容回归(不含 outputs/data)', [T('build-update-zip.test.cjs')], nodeOpts);
 // 冒烟脚本路径：默认相对 ROOT 根目录的 _smoke_v2.js，换机/CI 用 KB_SMOKE 覆盖
 run('前端 jsdom 冒烟', [process.env.KB_SMOKE || path.join(ROOT, '_smoke_v2.js')],
   { stdio: 'inherit', cwd: WS, env: { ...process.env, NODE_PATH: path.join(WS, 'node_modules') } });

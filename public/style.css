@@ -238,7 +238,6 @@ textarea.inp { resize: vertical; min-height: 64px; }
 .opt-swatch { width: 100%; aspect-ratio: 1; border: 1px solid rgba(0,0,0,.08); cursor: pointer; padding: 0; border-radius: 1px; }
 .opt-swatch:hover { transform: scale(1.15); box-shadow: 0 0 0 1px var(--accent); z-index: 1; position: relative; }
 /* 看板：列宽固定为 6 列占满的尺寸(见 .col calc)，少于 6 阶段不铺满(右侧留白)；超过 6 阶段横向滚动 */
-.tpl-ico { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--on-accent); font-weight: 700; font-size: 19px; margin-bottom: 11px; }
 .tpl-name { font-size: 15px; font-weight: 700; }
 .tpl-cat { font-size: 11.5px; color: var(--text-3); margin: 3px 0 7px; }
 .tpl-phases { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
@@ -468,7 +467,6 @@ select.inp { appearance: auto; -webkit-appearance: auto; }
 /* ---------- 移动端抽屉 + 汉堡 ---------- */
 .icon-btn { padding: 9px 11px; display: none; }
 #menuBtn { display: none; }
-.demo-badge { display: inline-flex; align-items: center; margin-left: 8px; padding: 2px 9px; font-size: 12px; line-height: 1.6; border-radius: 999px; background: rgba(10,132,255,.15); color: var(--info); border: 1px solid rgba(10,132,255,.35); white-space: nowrap; }
 
 /* ---------- AI 助手 ---------- */
 .ai-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }

@@ -5,7 +5,7 @@ category: skills
 summary: 私有仓库托管、敏感文件 gitignore 清单、换机重配项、遗留死文件与常用 git 命令。 [看板, git, 运维, 安全]
 date: 2026-08-21
 status: 已确认
-related: [[00-知识地图(MOC)], [01-部署与双实例]]
+related: [[00-知识地图(MOC)], [01-部署与运行]]
 ---
 
 # GitHub 托管与换机
@@ -31,10 +31,8 @@ related: [[00-知识地图(MOC)], [01-部署与双实例]]
 
 ```bash
 node --check server.js && node --check public/app.js     # 语法检查
-curl http://localhost:5180/api/readonly                    # demo:true 即就绪
-curl http://localhost:5180/api/projects                    # 项目数据
+curl http://localhost:5181/api/version                     # 版本号（判断部署是否生效只看这个）
 git add ... && git commit -m "..." && git push origin main # 提交推送
-git checkout -- data/projects.demo.json                    # 清理 demo 数据污染（行尾符 M 差异直接还原）
 ```
 
 ## 发版一页流程（v1.5.4 起固化）
@@ -43,7 +41,7 @@ git checkout -- data/projects.demo.json                    # 清理 demo 数据�
 
 0. 改 `package.json` 版本 + `CHANGELOG.md` 写章节（Release body 就取这一节）。
 1. **本地全量测试绿**：`node test/run-all.cjs`（含覆盖自检，漏跑文件会 code=1）。
-2. 打包升级包：`python tools/build_update_zip.py` → `~/Downloads/kanban/project-kanban-update.zip`（自检「关键文件齐全/不含 data/」）。
+2. 打包升级包：`python tools/build_update_zip.py` → `~/Downloads/kanban/project-kanban-update.zip`（自检「关键文件齐全 / 不含 data/ / 不含 outputs/ / 不含 node_modules」；v1.5.6 口径 ≈ 94 文件 / 2.85MB，回归锁 `test/build-update-zip.test.cjs`）。
 3. 提交并推：`git push origin main` → `git push origin vX.Y.Z` → `git push -f origin vX.Y.Z:latest`。
    - 本机代理偶发 `CONNECT tunnel failed, response 502` / schannel 握手失败 → **重试即可**，重试后用 `git ls-remote --tags origin` 确认远端真实状态，别信单次报错。
 4. **发 Release 并挂 update.zip**：`node tools/release-gh.cjs vX.Y.Z "<zip 路径>"`。
@@ -55,5 +53,5 @@ git checkout -- data/projects.demo.json                    # 清理 demo 数据�
 
 ## 延伸
 
-- 双实例部署见 [[01-部署与双实例]]
+- 部署与运行见 [[01-部署与运行]]
 - 知识库本篇是 [[00-知识地图(MOC)]] 的叶子节点；回家 clone 后用 Obsidian 打开 `docs/knowledge/` 即成本地 wiki。

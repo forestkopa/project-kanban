@@ -81,7 +81,7 @@ ingress:
   - service: http://localhost:5181
 ```
 
-## 5. 安装 cloudflared + 三个服务
+## 5. 安装 cloudflared + 两个服务
 
 ```bash
 # 安装 cloudflared（官方 deb）
@@ -90,9 +90,9 @@ sudo dpkg -i /tmp/cloudflared.deb
 which cloudflared   # 确认路径，若不是 /usr/local/bin/cloudflared，改 cloudflared.service 里的 ExecStart
 
 # 拷贝 systemd unit 并启用
-sudo cp /opt/project-kanban/deploy/kanban.service /opt/project-kanban/deploy/kanban-demo.service /opt/project-kanban/deploy/cloudflared.service /etc/systemd/system/
+sudo cp /opt/project-kanban/deploy/kanban.service /opt/project-kanban/deploy/cloudflared.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now kanban kanban-demo cloudflared
+sudo systemctl enable --now kanban cloudflared
 ```
 
 ## 6. git 自动提交认证（NAS 正式版落盘自动 commit）
@@ -116,8 +116,7 @@ sudo -u kanban bash -c 'git config --global credential.helper store'
 ## 7. 验证
 
 ```bash
-systemctl status kanban kanban-demo cloudflared     # 三个都 active
-curl -s http://127.0.0.1:5180 -o /dev/null -w "%{http_code}\n"   # 200
+systemctl status kanban cloudflared     # 两个都 active
 curl -s http://127.0.0.1:5181 -o /dev/null -w "%{http_code}\n"   # 200
 ```
 

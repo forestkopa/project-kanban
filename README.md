@@ -9,17 +9,14 @@
 ```bash
 cd project-kanban
 npm install          # 首次需要：安装 xlsx / xlsx-js-style
-node server.js       # 正式版：默认 http://localhost:5180（真实数据，写操作需登录）
-node server.js --demo  # 演示版：http://localhost:5180（脱敏数据 + 免登录，公网隧道指向它）
+node server.js       # 正式版：http://localhost:5181（真实数据，写操作需登录）
 ```
 
 端口约定（勿改）：
-- **5180 = 演示版**（`--demo`，脱敏数据 + 免登录，公网评委访问）
-- **5181 = 正式版**（真实数据，写操作需登录，本机日常使用；由 `watchdog.js` 以 `PORT=5181` 启动）
+- **5181 = 正式版**（唯一实例；真实数据，写操作需登录）。公网隧道与 `config.yml` ingress 都指向它。
+- ~~5180 = 演示版~~：`--demo` 演示版已于 **2026-09-11 下线**。带该参数启动会直接报错退出（防呆，避免以正式版身份在 5180 再起一个进程双写 `data/app.db`）。
 
-> 纯 `node server.js` 与 `node server.js --demo` 默认都占用 5180，故**生产双实例请用 `watchdog.js` 启动**（它会以 `PORT=5181` 拉起正式版、以 `--demo` 拉起演示版）。
-
-建议通过 `watchdog.js` 运行（崩溃自动拉起双实例 + 自动维护 Cloudflare 隧道）：
+建议通过 `watchdog.js` 运行（崩溃自动拉起 + 自动维护 Cloudflare 隧道）：
 
 ```bash
 node watchdog.js
@@ -27,19 +24,20 @@ node watchdog.js
 
 （使用内置 Node 运行：`.../node/versions/22.22.2/node.exe server.js`）
 
-## 部署架构（双实例 + 公网隧道 + 开机自启）
+## 部署架构（单实例 + 公网隧道 + 开机自启）
 
 ```
-本机 Windows
+本机 Windows / 服务器
 ├─ kanban-watchdog (NSSM 服务) ── 开机自启，每 15s 探测
-│   ├─ server.js --demo   → 5180 演示版（脱敏 + 免登录）
-│   └─ server.js PORT=5181 → 5181 正式版（真实数据 + 登录鉴权）
-└─ cloudflared (Named Tunnel) → https://kanban.forestkopa.top （指向 5180 演示版）
+│   └─ watchdog.js
+│        ├─ server.js PORT=5181 → 5181 正式版（真实数据 + 登录鉴权）
+│        └─ cloudflared (Named Tunnel) → https://kanban.forestkopa.top
 ```
 
-- **公网网址（固定，不再变化）**：`https://kanban.forestkopa.top`，由 Cloudflare Named Tunnel（`kanban-demo`，HTTP/2 协议）指向 5180 演示版；域名已固化进 `watchdog.js` 与 `config.yml`，重启/崩溃自动恢复。
+- **公网网址（固定，不再变化）**：`https://kanban.forestkopa.top`，由 Cloudflare Named Tunnel（`kanban-demo`，HTTP/2 协议）指向 **5181 正式版**；域名已固化进 `watchdog.js` 与 `config.yml`，重启/崩溃自动恢复。
 - 旧 `trycloudflare` 快速隧道已弃用（地址随机），现统一走 Named Tunnel。
-- 隧道机制：`forestkopa.top` 的 NS 已改到 Cloudflare；Zero Trust → Networks → Tunnels → `kanban-demo` 挂 Public Hostname `kanban.forestkopa.top → http://localhost:5180`；本机 `cloudflared tunnel --config config.yml run` 持久化。
+- 隧道机制：`forestkopa.top` 的 NS 已改到 Cloudflare；Zero Trust → Networks → Tunnels → `kanban-demo` 挂 Public Hostname `kanban.forestkopa.top → http://localhost:5181`；`cloudflared tunnel --config config.yml run` 持久化。
+- 开发机（DESKTOP-VOP181G）只跑本机实例、不跑隧道，须设 `KANBAN_NO_TUNNEL=1`。
 
 ## 多用户与鉴权
 
@@ -67,7 +65,7 @@ node watchdog.js
 
 ## 数据层（SQLite）
 
-- 数据层使用 Node 内置 `node:sqlite`（零额外依赖）：正式版 `data/app.db`、演示版 `data/demo.db`。
+- 数据层使用 Node 内置 `node:sqlite`（零额外依赖）：`data/app.db`。
 - 存量 `data/projects.json` 在首次启动时**幂等迁移**进 SQLite（归入 admin 名下），迁移后以 SQLite 为准。
 - `.gitignore` 已排除 `data/*.db`，**实时数据库不进版本库**（换机后首次启动自动建库 + 迁移）。
 - 模板、`options.json`（项目类型/产品类型/等级/工程师类型，gitignore 排除）仍为 JSON 文件，可改。
@@ -80,7 +78,7 @@ node watchdog.js
 git clone https://github.com/forestkopa/project-kanban.git
 cd project-kanban
 npm install
-node server.js --demo     # 演示模式（脱敏数据 + 免登录），或去掉 --demo 用真实数据
+node server.js            # 正式版（真实数据，写操作需登录）
 ```
 
 - 公网访问：域名固定 `https://kanban.forestkopa.top`，无需再读随机隧道地址；本机运行 `node watchdog.js` 即可恢复公网隧道。
@@ -123,12 +121,14 @@ install-watchdog-service.bat
 
 ## 内置模板
 
-| 模板 | 类别 | 任务数 | 要点 |
-|------|------|--------|------|
-| 智能手表 / 可穿戴 | 可穿戴 | 19 | 心率/血氧、低功耗、IP68、BQB 认证 |
-| 智能门锁 | 安防 | 21 | 指纹/NFC、防技术开启、10 万次寿命 |
-| 智能摄像头 / AI 视觉 | AI 视觉 | 20 | SoC+IMX、夜视、NPU、隐私合规 |
-| 智能音箱 / 语音助手 | 语音 | 20 | 双麦阵列、声学腔体、唤醒率、OTA |
+| 模板 | 任务数 | 要点 |
+|------|--------|------|
+| 智能门锁 | 21 | 指纹/NFC、防技术开启、10 万次寿命 |
+| 智能手表 | 19 | 心率/血氧、低功耗、IP68、BQB 认证 |
+| 智能摄像头 | 20 | SoC+IMX、夜视、NPU、隐私合规 |
+| 智能音箱 | 20 | 双麦阵列、声学腔体、唤醒率、OTA |
+
+> 模板名只表示**产品形态**。品类归属由项目上的「产品类型」字段表达（可配置，见 `data/options.json`），不再写进模板名。
 
 ## 数据与敏感文件（.gitignore 已排除）
 

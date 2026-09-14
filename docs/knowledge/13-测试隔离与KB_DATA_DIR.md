@@ -16,7 +16,7 @@ summary: 用 KB_DATA_DIR 环境变量让 server.js 指向独立临时数据目�
 ## 解法：隔离实例
 1. `server.js` 第 18 行 `DATA` 增加环境变量覆盖（向后兼容）：
    `const DATA = process.env.KB_DATA_DIR ? path.resolve(process.env.KB_DATA_DIR) : path.join(ROOT,'data');`
-2. `test/_harness.cjs` 自起独立实例：`spawn(node, ['server.js'], {env:{PORT:空闲端口, KB_DATA_DIR:临时目录}})` → 轮询 `/api/readonly` 至 `demo=false` → 登录 `admin/000000` → 调 `/api/password` 改密（`KbTest@2026`）→ 返回 `{base, token, stop()}`。
+2. `test/_harness.cjs` 自起独立实例：`spawn(node, ['server.js'], {env:{PORT:空闲端口, KB_DATA_DIR:临时目录}})` → 轮询 `/api/readonly` 至回显的 `tag` 等于本次注入的 `KB_INSTANCE_TAG`（比原先校验 `demo` 字段更严：端口被别的进程占用时不会误判就绪） → 登录 `admin/000000` → 调 `/api/password` 改密（`KbTest@2026`）→ 返回 `{base, token, stop()}`。
 3. `api.integration.test.cjs` 的 B 段、`api-roles.test.cjs` 改用 harness 实例（不再读 `data/auth.token` 直连 live 5181）。
 
 ## 关键事实

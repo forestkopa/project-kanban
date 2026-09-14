@@ -125,7 +125,7 @@ const cleanup = (ROOT) => { try { fs.rmSync(ROOT, { recursive: true, force: true
     }
 
     // 场景3c（v1.5.5）：无锁 + 端口不响应 + 监听进程仍在，但持续超过宽限期 → 判定僵死，强制重启
-    // 注意：真实 SERVERS 有两个实例（5180/5181），断言按「每个僵死实例各 kill 一次」计数
+    // 注意：断言按「每个僵死实例各 kill 一次」计数（SERVERS 长度动态取，单实例=1）
     {
       const ROOT = freshRoot();
       const { mod, calls } = build(ROOT);

@@ -22,7 +22,7 @@ const ICON = {
 };
 const AVA_COLORS = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#ff453a', '#64d2ff', '#5e5ce6', '#ff375f', '#00c7be', '#a2845e'];
 function avaColor(n) { let h = 0; const s = String(n || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return AVA_COLORS[h % AVA_COLORS.length]; }
-let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), demo: false, readonly: false, user: null, todoRange: 'today', todoFilter: { overdueOnly: false, q: '' }, _jumpTaskId: null };
+let state = { projects: [], templates: [], options: null, currentId: null, editingTaskId: null, view: 'board', cal: new Date(), dailyDate: new Date(), weekDate: new Date(), monthlyDate: new Date(), readonly: false, user: null, todoRange: 'today', todoFilter: { overdueOnly: false, q: '' }, _jumpTaskId: null };
 try { const u = localStorage.getItem('kb-user'); if (u) state.user = JSON.parse(u); } catch (e) {}
 let pending = null; // { mode:'tpl', tplId } | { mode:'import', projId }
 
@@ -52,8 +52,8 @@ async function api(path, opts = {}) {
       });
   };
   let r = await fetchT(API + path, { ...opts, method, headers });
-  // 未登录 / 会话失效 → 弹登录框，成功后重试一次（演示模式免登录不弹）
-  if (r.status === 401 && !state.demo && path !== '/login') {
+  // 未登录 / 会话失效 → 弹登录框，成功后重试一次
+  if (r.status === 401 && path !== '/login') {
     const ok = await showLogin();
     if (ok) {
       headers['X-Auth-Token'] = getToken();
@@ -136,7 +136,6 @@ function logout() {
 function updateUserUI() {
   const wrap = document.querySelector('.user-wrap'), nameEl = $('#userName'), menu = $('#userMenu');
   if (!wrap || !nameEl) return;
-  if (state.demo) { wrap.style.display = 'none'; document.body.classList.remove('viewer'); return; }
   if (state.user) {
     wrap.style.display = '';
     nameEl.textContent = state.user.name + ' ' + (ROLE_NAME[state.user.role] || state.user.role);
@@ -287,8 +286,6 @@ async function loadAll() {
     state.options = opts;
     if (ro) {
       state.readonly = !!(ro && ro.on);
-      state.demo = !!(ro && ro.demo);
-      if (state.demo) { const b = document.getElementById('demoBadge'); if (b) b.classList.remove('hidden'); }
     }
     updateUserUI();
     if (!state.currentId && state.projects[0]) state.currentId = state.projects[0].id;
@@ -644,7 +641,7 @@ function ganttRowMap(p) {
 function xlsxToCur(ref, p, rm) {
   const m = String(ref).match(/^([A-Z]+)(\d+)$/); if (!m) return ref;
   const col = m[1].toUpperCase(), r = parseInt(m[2]);
-  if (p.startCell && ref.toUpperCase() === p.startCell.toUpperCase()) return 'B1';
+  // 项目开始时间不再对应单独单元格，统一走任务坐标映射
   if (col === 'D' || col === 'E' || col === 'F') {
     const t = (p.tasks || []).find(x => x.excelRow === r);
     const nr = t ? rm.map[t.id] : r;
@@ -673,7 +670,7 @@ function curToXlsxFormula(str, p, rm) {
   let s = String(str).trim().replace(/^=/, '');
   s = s.replace(/\b([A-Z]+)(\d+)\b/g, (_, col, r) => {
     col = col.toUpperCase(); r = parseInt(r);
-    if (col === 'B' && r === 1 && p.startCell) return p.startCell.toUpperCase();
+    // 项目开始时间不再对应单独单元格，只映射任务坐标 D/E/F
     if (col === 'B' || col === 'C' || col === 'D') {
       const row = rm.rows.find(x => x.row === r);
       if (row && row.kind === 'task' && row.task.excelRow) {
@@ -750,7 +747,8 @@ function ganttRowHtml(r, p, min, dayW, trackW, bg) {
       `<div class="g-track" style="width:${trackW}px"></div></div>`;
   }
   const t = r.task;
-  const s = parseD(t.startDate || p.startDate), due = parseD(t.dueDate || t.startDate || p.startDate);
+  const projStart = p.tasks[0] && p.tasks[0].startDate ? p.tasks[0].startDate : p.startDate;
+  const s = parseD(t.startDate || projStart), due = parseD(t.dueDate || t.startDate || projStart);
   const left = dayDiff(isoDate(s), isoDate(min)) * dayW;
   const w = Math.max(dayW, dayDiff(isoDate(due), isoDate(s)) * dayW);
   const ph = p.phases.find(x => x.id === t.phaseId) || { color: '#888' };
@@ -764,20 +762,15 @@ function ganttRowHtml(r, p, min, dayW, trackW, bg) {
 }
 function renderGantt(p) {
   ensureGanttDelegation();
-  $('#viewActions').innerHTML = `<span class="va-label">项目开始</span><input type="date" id="projStart" class="inp" value="${p.startDate || ''}">`;
-  $('#projStart').onchange = e => {
-    const v = e.target.value;
-    debounce('ps', async () => {
-      try { await api('/projects/' + p.id, { method: 'PUT', body: JSON.stringify({ startDate: v }) }); p.startDate = v; const np = await api('/projects/' + p.id); Object.assign(p, np); render(); }
-      catch (err) { toast(err.message); }
-    });
-  };
+  $('#viewActions').innerHTML = ''; // 取消甘特图「项目开始」功能模块
   const wrap = $('#gantt');
   if (!p.tasks.length) { wrap.innerHTML = '<div class="empty" style="margin:auto">暂无任务</div>'; return; }
   const rm = ganttRowMap(p);
-  const starts = p.tasks.map(t => parseD(t.startDate || p.startDate));
-  const dues = p.tasks.map(t => parseD(t.dueDate || t.startDate || p.startDate));
-  let min = new Date(Math.min(...starts, parseD(p.startDate)));
+  // 项目开始时间 = 序号 1 任务的开始日期
+  const projStart = p.tasks[0] && p.tasks[0].startDate ? p.tasks[0].startDate : p.startDate;
+  const starts = p.tasks.map(t => parseD(t.startDate || projStart));
+  const dues = p.tasks.map(t => parseD(t.dueDate || t.startDate || projStart));
+  let min = new Date(Math.min(...starts, parseD(projStart)));
   let max = new Date(Math.max(...dues));
   min = addDays(min, -2); max = addDays(max, 3);
   const totalDays = Math.max(1, dayDiff(isoDate(max), isoDate(min)) + 1);
@@ -881,8 +874,7 @@ function openTplModal() {
   }
   state.templates.forEach(t => {
     const c = document.createElement('div'); c.className = 'tpl-card'; c.style.borderColor = t.color;
-    c.innerHTML = `<div class="tpl-ico" style="background:${t.color}">${esc(t.icon || '◆')}</div>
-      <button class="tpl-del" title="删除模板「${esc(t.name)}」">${ICON.del}</button>
+    c.innerHTML = `<button class="tpl-del" title="删除模板「${esc(t.name)}」">${ICON.del}</button>
       <button class="tpl-edit" title="修改模板名称「${esc(t.name)}」">${ICON.edit}</button>
       <div class="tpl-name">${esc(t.name)}</div>
       <div class="tpl-phases">${(t.phases || []).map(p => `<span style="background:${p.color}">${esc(p.name)}</span>`).join('')}</div>`;
@@ -1108,19 +1100,24 @@ function parseDisposition(cd) {
   m = cd.match(/filename="([^"]+)"/i);
   return m ? m[1] : '';
 }
+// 文件名净化：模板名可能含 / \ : * ? " < > |（用户自建/导入的模板名不受控），
+// 直接拼进 a.download 会得到非法/被截断的文件名，统一换成 _ 并收敛多余空格。
+function safeFileName(name) {
+  return String(name || '模版').replace(/[\\/:*?"<>|]/g, '_').replace(/\s*_\s*/g, '_').trim();
+}
 // 带鉴权的二进制下载：统一走 fetch + blob。
 // ⚠️ 禁止用裸 <a href> 直链：它不会带 X-Auth-Token，而 GET 接口统一鉴权后一律 401，
 //    表现为「点了没反应/不下载」（浏览器拿到的是 401 JSON）。历史 bug：计划导出、参考模版导出。
 async function downloadAuthFile(url, fallbackName) {
   const r = await fetch(url, { headers: { 'X-Auth-Token': getToken() } });
-  if (r.status === 401 && !state.demo) {
+  if (r.status === 401) {
     const ok = await showLogin();
     if (ok) return downloadAuthFile(url, fallbackName);
     throw new Error('未登录');
   }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
   const blob = await r.blob();
-  if (!blob.size) throw new Error('导出内容为空（离线演示模式不支持生成文件，请使用服务器版）');
+  if (!blob.size) throw new Error('导出内容为空（离线版不支持生成文件，请使用服务器版）');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = parseDisposition(r.headers.get('Content-Disposition')) || fallbackName;
@@ -1134,7 +1131,11 @@ async function exportPlan(type) {
   try {
     const name = await downloadAuthFile(API + `/projects/${p.id}/export?type=${type}`,
       `${p.name}_${label}_${isoDate(new Date()).replace(/-/g, '')}.xlsx`);
-    toast('已导出 ' + name);
+    // 提示本次导出是否带公式链：判定依据与后端一致 ——「任务是否携带排期规则」
+    // （用户自建/导入的带公式模版 → 带 WORKDAY.INTL，可在 Excel 改工期自动重算；内置模版 → 纯日期）
+    const src = type === 'initial' ? (p.baseline || p.tasks) : p.tasks;
+    const wf = (src || []).some(t => t.startRule || t.dueRule);
+    toast('已导出 ' + name + (type === 'diff' ? '' : (wf ? '（带公式）' : '（纯日期）')));
   } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
 }
 $('#exportBtn').onclick = (e) => { e.stopPropagation(); $('#exportMenu').classList.toggle('open'); };
@@ -1216,7 +1217,7 @@ $('#refTplDownload').onclick = async () => {
   const t = (state.templates || []).find(x => x.id === sel.value) || (state.templates || [])[0];
   if (!t) { toast('暂无内置模版'); return; }
   try {
-    await downloadAuthFile(API + `/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`, `${t.name}_参考模版.xlsx`);
+    await downloadAuthFile(API + `/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`, `${safeFileName(t.name)}_参考模版.xlsx`);
     toast('已下载参考模版：' + t.name + '（开始/截止含公式，填写后导入即可级联）');
   } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
 };
@@ -1226,7 +1227,7 @@ $$('.tab').forEach(b => b.onclick = () => { state.view = b.dataset.view; render(
 /* ---- 用户菜单：登录 / 用户管理 / 改密 / 登出 ---- */
 $('#userBtn').onclick = e => {
   e.stopPropagation();
-  if (!state.user && !state.demo) { showLogin(); return; }
+  if (!state.user) { showLogin(); return; }
   $('#userMenu').classList.toggle('open');
 };
 document.addEventListener('click', () => { const m = $('#userMenu'); if (m) m.classList.remove('open'); });
@@ -1427,7 +1428,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   const m = topModal();
   if (!m) return;
-  if (m.id === 'loginModal' && !state.user && !state.demo) return; /* 未登录时不许 Esc 关掉登录框 */
+  if (m.id === 'loginModal' && !state.user) return; /* 未登录时不许 Esc 关掉登录框 */
   if (m.classList.contains('force')) return;                       /* 强制改密不可跳过 */
   m.classList.add('hidden');
 });
@@ -1937,7 +1938,7 @@ $('#tplExportBtn').onclick = async () => {
   const t = (state.templates || [])[0];
   if (!t) { toast('暂无内置模版'); return; }
   try {
-    await downloadAuthFile(API + `/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`, `${t.name}_参考模版.xlsx`);
+    await downloadAuthFile(API + `/templates/reference-xlsx?tplId=${encodeURIComponent(t.id)}`, `${safeFileName(t.name)}_参考模版.xlsx`);
     toast('已导出参考模版：' + t.name + '（Excel，含日期公式，填写后可从 xlsx 导入）');
   } catch (err) { toast('导出失败：' + (err && err.message ? err.message : err)); }
 };
@@ -2414,7 +2415,7 @@ async function downloadTodoExcel(range) {
       headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
       body: JSON.stringify({ kind, range: { mon: monIso, sun: sunIso }, projects })
     });
-    if (r.status === 401 && !state.demo) { const ok = await showLogin(); if (ok) return downloadTodoExcel(kind); throw new Error('未登录'); }
+    if (r.status === 401) { const ok = await showLogin(); if (ok) return downloadTodoExcel(kind); throw new Error('未登录'); }
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     const blob = await r.blob();
     const a = document.createElement('a');
@@ -2818,7 +2819,7 @@ async function refreshVersion() {
   try {
     const v = await api('/version');
     const badge = document.getElementById('verBadge');
-    if (badge) badge.textContent = 'v' + (v.version || '?') + (v.demo ? ' · demo' : '');
+    if (badge) badge.textContent = 'v' + (v.version || '?');
   } catch (e) { /* 版本接口不可用则忽略 */ }
 }
 async function checkUpdate() {
@@ -2848,104 +2849,7 @@ async function checkUpdate() {
 const _verCheck = document.getElementById('verCheck');
 if (_verCheck) _verCheck.addEventListener('click', checkUpdate);
 
-/* 一键升级（admin 可见）：prepare → 确认 → confirm → 重启 */
-function updateUpgradeBtn() {
-  const w = document.getElementById('verUpgradeWrap');
-  if (w) w.style.display = (state.user && state.user.role === 'admin') ? '' : 'none';
-}
-async function doUpgrade() {
-  const status = document.getElementById('verStatus');
-  const bar = document.getElementById('verBar');
-  const barFill = document.getElementById('verBarFill');
-  const barText = document.getElementById('verBarText');
-  function setBar(pct, txt, color) {
-    if (barFill) { barFill.style.width = Math.max(0, Math.min(100, pct)) + '%'; barFill.style.background = color || ''; }
-    if (barText) { barText.textContent = txt; }
-    if (bar) bar.style.display = (pct == null) ? 'none' : '';
-  }
-  function setStatus(txt, color) { if (status) { status.textContent = txt; status.style.color = color || '#2b6cb0'; } }
-  let pollTimer = null;
-  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
-  try {
-    setStatus('比对中…');
-    setBar(0, '准备中…', '#e2e8f0');
-    const pre = await api('/admin/upgrade/prepare', { method: 'POST', timeout: 60000 });
-    if (!pre || !pre.need) {
-      setBar(null);
-      setStatus('已是最新（v' + ((pre && pre.local) || '?') + '），无需升级', '#2f855a');
-      return;
-    }
-    if (!window.confirm('确认升级到 v' + pre.latest + '？\n将自动完成：下载 update.zip → 备份当前版本 → 解压覆盖 → 重启看板服务。\n升级期间页面可能短暂无响应（通常 <30 秒），请勿关闭页面。\n备份目录：data-backup-upgrade-*（可手动回滚）。')) {
-      setBar(null); setStatus('已取消', '#718096'); return;
-    }
-    setStatus('启动升级任务…');
-    // confirm 阶段立即返回 taskId（<200ms），不再 15s/5min 超时
-    const r = await api('/admin/upgrade/confirm', { method: 'POST', body: JSON.stringify({ token: pre.token }) });
-    if (!r || !r.ok || !r.taskId) {
-      setBar(null);
-      // 后端 r.error 已自描述（含"升级失败"前缀），前端不再重复拼接
-      setStatus((r && r.error) || '启动升级失败（未知错误）', '#E0241B');
-      toast((r && r.error) || '启动升级失败');
-      return;
-    }
-    const taskId = r.taskId;
-    setStatus('升级中…', '#2b6cb0');
-    setBar(0, '已启动，等待下载…', '#3182ce');
-    // 轮询任务状态（每秒；进度变化时刷新；完成/错误停轮询）
-    // 容错：升级最后会重启服务，期间端口/隧道不可达属预期，不判失败，继续等（最多 120s）
-    let lastPhase = null, lastPct = -1, failCount = 0;
-    pollTimer = setInterval(async () => {
-      try {
-        const st = await api('/admin/upgrade/status?taskId=' + encodeURIComponent(taskId), { method: 'GET', timeout: 10000 });
-        if (!st) return;
-        failCount = 0;
-        if (st.phase !== lastPhase || st.progress !== lastPct) {
-          lastPhase = st.phase; lastPct = st.progress;
-          const color = st.phase === 'error' ? '#E0241B' : (st.phase === 'done' ? '#2f855a' : '#3182ce');
-          setBar(st.progress, st.message || st.phase, color);
-        }
-        if (st.finished) {
-          stopPoll();
-          if (st.phase === 'done') {
-            setStatus('升级完成，服务重启中…约 30 秒后按 Ctrl+F5 硬刷新，应见 v' + pre.latest, '#2f855a');
-            toast('升级成功，看板正在重启（v' + pre.latest + '）');
-          } else if (st.phase === 'error') {
-            setStatus('升级失败：' + (st.message || '未知错误'), '#E0241B');
-            toast('升级失败：' + (st.message || '未知错误'));
-          } else {
-            setStatus('任务结束：' + (st.message || st.phase), '#718096');
-          }
-        }
-      } catch (e) {
-        // 服务重启/覆盖文件期间可能连续失败，属预期：显示等待，不判失败
-        // v1.5.5：不再伪造 98% 进度，也不再一律说「服务重启中」——
-        //   保留最后一次真实进度 + 说明「等待服务响应」，让用户能分辨「在忙」和「卡住」。
-        failCount++;
-        if (failCount <= 120) {
-          setStatus('看板暂不可达（已等待 ' + failCount + 's）：正在解压覆盖文件或重启服务，请勿关闭页面', '#2b6cb0');
-          setBar(lastPct > 0 ? lastPct : 0, '等待服务响应…（已等待 ' + failCount + 's）', '#3182ce');
-        } else {
-          stopPoll();
-          setBar(null);
-          setStatus('等待服务恢复超时（120s）。升级可能仍在后台进行：请 1 分钟后刷新页面看页脚版本号；仍不对则到服务器查 logs/upgrade-*.log 与 upgrade-failed-*.zip', '#E0241B');
-        }
-        console.warn('[upgrade] 轮询失败(' + failCount + '):', e && e.message);
-      }
-    }, 1000);
-  } catch (e) {
-    stopPoll();
-    setBar(null);
-    // 不重复「升级失败：」前缀；原始 e.message 已自描述（前端网络失败/api() 已翻译为可读中文）
-    setStatus('升级出错：' + ((e && e.message) || String(e)), '#E0241B');
-    toast('升级出错：' + ((e && e.message) || '请重试'));
-  }
-}
-const _verUpgrade = document.getElementById('verUpgrade');
-if (_verUpgrade) _verUpgrade.addEventListener('click', doUpgrade);
-updateUpgradeBtn();
-// 登录为 admin 后揭示按钮（轮询至多 30 秒，开销极低）
-let _upgTicks = 0;
-const _upgTimer = setInterval(() => { updateUpgradeBtn(); if (++_upgTicks > 10 || (state.user && state.user.role === 'admin')) clearInterval(_upgTimer); }, 3000);
+/* 一键升级功能已移除（v1.5.7）：仅保留版本显示（/api/version + /api/latest-release + 页脚“检查更新”） */
 
 if (typeof window !== 'undefined') { boot(); refreshVersion(); }
 // 仅测试环境导出：Node require 时可调用 boot 做启动冒烟测试；浏览器中 module 未定义，自动跳过，零副作用。

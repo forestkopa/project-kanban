@@ -9,7 +9,7 @@
 #   Application      = C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
 #   AppParameters    = -NoProfile -ExecutionPolicy Bypass -File "<proj>\tools\start-kanban.ps1"
 #   AppEnvironmentExtra = KANBAN_NO_TUNNEL=1
-# (Dev machine only serves localhost:5180 + 5181 and never hijacks the public tunnel.)
+# (Dev machine only serves localhost:5181 and never hijacks the public tunnel.)
 
 $ErrorActionPreference = 'Stop'
 

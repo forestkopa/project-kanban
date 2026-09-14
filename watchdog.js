@@ -1,8 +1,8 @@
 // =========================================================
 // 看板崩溃守护（watchdog）—— 本机模式（生产切换回本机）
 // 每 15 秒探测：本地服务 + cloudflared 隧道，挂了自动拉起。
-// 双实例：5180 = 演示版(--demo, 脱敏数据) ；5181 = 正式版(真实数据)
-// 公网隧道：本机跑 cloudflared Named Tunnel（kanban.forestkopa.top → 5180）
+// 单实例：5181 = 正式版(真实数据)。5180 演示版(--demo) 已于 2026-09-11 下线。
+// 公网隧道：本机跑 cloudflared Named Tunnel（kanban.forestkopa.top → 5181，见根 config.yml ingress）
 //   曾切到 NAS 部署（deploy/README-NAS.md），因 NAS 暂不支持 Ubuntu VM，
 //   恢复本机负责隧道；NAS Docker 方案就绪后可按 deploy/ 迁移。
 // =========================================================
@@ -37,10 +37,9 @@ function newestMtime() {
   return max;
 }
 
-// 守护的实例：演示版(--demo 免令牌脱敏数据) + 正式版(真实数据需令牌)
+// 守护的实例：单实例正式版（5181，真实数据需令牌）。
 // snap = 该实例当前运行代码的文件快照；child = 当前 server 子进程句柄；pid = 端口监听进程 PID（接管场景）
 const SERVERS = [
-  { port: 5180, args: ['--demo'], env: {}, name: '演示版(开发调试)', snap: 0, child: null, pid: null },
   { port: 5181, args: [], env: { PORT: '5181' }, name: '正式版(开发调试)', snap: 0, child: null, pid: null }
 ];
 

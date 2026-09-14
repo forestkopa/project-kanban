@@ -61,7 +61,7 @@ function makeEnv() {
     }
     if (u.includes('/api/templates')) return res(200, []);
     if (u.includes('/api/options')) return res(200, { types: {}, productTypes: {}, levels: {} });
-    if (u.includes('/api/readonly')) return res(200, { on: false, demo: false });
+    if (u.includes('/api/readonly')) return res(200, { on: false, tag: '' });
     if (u.includes('/api/me')) return res(401, {});
     return res(200, {});
   };

@@ -5,7 +5,7 @@ category: concepts
 summary: node:sqlite 五表、单项目粒度事务、三角色权限、登录/游客/记住密码与默认密码 000000、db 运维坑。 [看板, 多用户, SQLite, 权限, 登录]
 date: 2026-08-24
 status: 已确认
-related: ["02-demo正式版机制", "09-GitHub托管与换机"]
+related: ["02-单实例与鉴权模型", "09-GitHub托管与换机"]
 ---
 
 # 多用户与 SQLite 数据层
@@ -15,7 +15,7 @@ related: ["02-demo正式版机制", "09-GitHub托管与换机"]
 
 ## 数据层：node:sqlite（DatabaseSync）
 
-- 文件：正式版 `data/app.db`，演示版 `data/demo.db`（`.gitignore` 已排除 `data/*.db*`）
+- 文件：`data/app.db`（`.gitignore` 已排除 `data/*.db*`）；测试用隔离实例走 `KB_DATA_DIR`，库落在临时目录
 - 特点：内置模块开箱即用（Node ≥22.5，实验性警告无害）、同步 API、单文件好备份
 - **单项目粒度事务保存**（db.js `saveProject`）：每次保存 = 事务内重写该项目 phases/tasks，
   多用户并发编辑不同项目**互不覆盖**（旧 JSON 整数组保存会互相覆盖）
@@ -67,6 +67,6 @@ related: ["02-demo正式版机制", "09-GitHub托管与换机"]
 ## 运维注意
 
 - **删除 db 文件的坑**：实例运行中删 `app.db` 会因句柄锁**静默失败**（WAL）→ 残留旧数据。
-  正确顺序：先杀 5180/5181 进程 → **立即**删 `data/*.db*` 与 `admin.password` → watchdog 15s 内干净重建
+  正确顺序：先杀监听 5181 的进程 → **立即**删 `data/*.db*` 与 `admin.password` → watchdog 15s 内干净重建
 - 备份 = 拷走 `data/app.db` 单文件即可
 - 权限设计参考（docs/权限管理设计.md）：Jira 角色/项目授权分离、禅道分组、飞书访客、GitHub 四级权限

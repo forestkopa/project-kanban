@@ -110,7 +110,7 @@ const PLAN_HEAD = ['序号', '阶段', '任务', '负责人', '开始日期', '�
   Array.from({ length: 9 }, (_, c) => ok('计划表数据列「' + PLAN_HEAD[c] + '」居中', al(ws, 1, c).horizontal === 'center', al(ws, 1, c)));
   ok('计划表所有单元格垂直居中', Array.from({ length: 9 }, (_, c) => al(ws, 1, c).vertical).every(v => v === 'center'));
   // 表头：深蓝填充 + 白字加粗
-  ok('计划表表头深蓝填充（#1F4E78）', Array.from({ length: 9 }, (_, c) => (fl(ws, 0, c).fgColor || {}).rgb === 'FF1F4E78').every(Boolean));
+  ok('计划表表头深蓝填充（#173A5A）', Array.from({ length: 9 }, (_, c) => (fl(ws, 0, c).fgColor || {}).rgb === 'FF173A5A').every(Boolean));
   ok('计划表表头白色字体加粗', Array.from({ length: 9 }, (_, c) => (fnt(ws, 0, c).color || {}).rgb === 'FFFFFFFF' && fnt(ws, 0, c).bold === true).every(Boolean));
   // 细边框：四边都有 thin
   const hasThinAll = (b) => b && b.top && b.top.style === 'thin' && b.bottom && b.bottom.style === 'thin' && b.left && b.left.style === 'thin' && b.right && b.right.style === 'thin';
@@ -123,7 +123,7 @@ const DIFF_HEAD = ['序号', '阶段', '任务', '负责人', '初版开始', '�
   stylePlanSheet(ws, 2, 11, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   ok('差异对比表头 11 列全部水平居中', Array.from({ length: 11 }, (_, c) => al(ws, 0, c).horizontal).every(h => h === 'center'));
   Array.from({ length: 11 }, (_, c) => ok('差异对比数据列「' + DIFF_HEAD[c] + '」居中', al(ws, 1, c).horizontal === 'center', al(ws, 1, c)));
-  ok('差异对比表头深蓝填充', Array.from({ length: 11 }, (_, c) => (fl(ws, 0, c).fgColor || {}).rgb === 'FF1F4E78').every(Boolean));
+  ok('差异对比表头深蓝填充', Array.from({ length: 11 }, (_, c) => (fl(ws, 0, c).fgColor || {}).rgb === 'FF173A5A').every(Boolean));
 }
 
 // --- 日期：真日期单元格 + 显示格式 yyyy/m/d（v1.5.4）---
@@ -158,6 +158,39 @@ ok('PLAN_DATE_FMT 为 yyyy/m/d', PLAN_DATE_FMT === 'yyyy/m/d', PLAN_DATE_FMT);
   ok('计划表日期列套用了 yyyy/m/d', ws[S.utils.encode_cell({ r: 1, c: 4 })].z === 'yyyy/m/d' && ws[S.utils.encode_cell({ r: 1, c: 5 })].z === 'yyyy/m/d');
   ok('计划表日期列已居中', al(ws, 1, 4).horizontal === 'center' && al(ws, 1, 5).horizontal === 'center');
 }
+// 阶段列合并 + 公式两态（v1.5.6）：与「导出参考模版」同构
+{
+  const proj = {
+    phases: [{ id: 'p1', name: '阶段A' }, { id: 'p2', name: '阶段B' }],
+    tasks: [
+      { phaseId: 'p1', title: 'A1', estimateDays: 2, startDate: '2026-01-01', dueDate: '2026-01-03' },
+      { phaseId: 'p1', title: 'A2', estimateDays: 1, startDate: '2026-01-04', dueDate: '2026-01-05' },
+      { phaseId: 'p2', title: 'B1', estimateDays: 3, startDate: '2026-01-06', dueDate: '2026-01-08' }
+    ]
+  };
+  const { ws } = planSheet(proj, proj.tasks); // 任务不带规则 → 不带公式
+  const merges = (ws['!merges'] || []).map(m => S.utils.encode_cell(m.s) + ':' + S.utils.encode_cell(m.e));
+  ok('计划表阶段列按阶段跨行合并', JSON.stringify(merges) === JSON.stringify(['B2:B3', 'B4:B4']), merges);
+  ok('阶段名只写在阶段首行（续行为空）', ws.B2 && ws.B2.v === '阶段A' && !(ws.B3 && ws.B3.v), [ws.B2 && ws.B2.v, ws.B3 && ws.B3.v]);
+  ok('无规则任务 → 计划表不带公式（保持纯日期）', !(ws.E2 && ws.E2.f) && !(ws.F2 && ws.F2.f));
+  ok('无规则任务 → 日期仍是真日期单元格', ws.E2 && ws.E2.t === 'd');
+}
+{
+  const mk = (id, row, days, s, d) => ({ id, excelRow: row, phaseId: 'p1', title: 'T' + row, estimateDays: days, startDate: s, dueDate: d });
+  const t1 = mk('a', 2, 6, '2026-09-11', '2026-09-18');
+  const t2 = mk('b', 3, 4, '2026-09-21', '2026-09-24');
+  t2.startRule = { t: 'wd', base: { t: 'lit', v: 1 }, days: { t: 'lit', v: 1 }, weekend: 1 }; // 携带规则 → 触发带公式导出
+  const proj = { phases: [{ id: 'p1', name: '阶段A' }], tasks: [t1, t2] };
+  const buf = buildPlanXlsx(proj, proj.tasks);
+  const ws = S.read(buf, { type: 'buffer', cellNF: true }).Sheets['计划表'];
+  ok('带规则任务 → 计划表写 WORKDAY.INTL 开始公式', ws.E3 && ws.E3.f === '=WORKDAY.INTL(F2,1)', ws.E3 && ws.E3.f);
+  ok('带规则任务 → 计划表写 WORKDAY.INTL 截止公式', ws.F2 && ws.F2.f === '=WORKDAY.INTL(E2,G2-1)', ws.F2 && ws.F2.f);
+  ok('序号1 开始无公式（项目开始 = 固定日期）', !(ws.E2 && ws.E2.f));
+  ok('公式单元格为数值型（Excel 才会按公式重算）', ws.E3 && ws.E3.t === 'n', ws.E3 && ws.E3.t);
+  ok('公式单元格仍套用 yyyy/m/d', ws.E3 && ws.E3.z === 'yyyy/m/d', ws.E3 && ws.E3.z);
+  ok('公式链已写入 xlsx 明文', /WORKDAY\.INTL\(F2,1\)/.test(buf.toString('utf8')));
+  ok('带公式时阶段列仍合并', ((ws['!merges'] || []).length === 1));
+}
 {
   const { ws } = diffSheet({ phases: [{ id: 'p1', name: '阶段1' }], baseline: [{ id: 't1', phaseId: 'p1', title: '任务A', assignee: '张三', estimateDays: 2, done: false, startDate: '2026-01-01', dueDate: '2026-01-03' }], tasks: [{ id: 't1', phaseId: 'p1', title: '任务A', assignee: '张三', estimateDays: 3, done: false, startDate: '2026-01-02', dueDate: '2026-01-04' }] });
   const cells = [4, 5, 6, 7].map(c => ws[S.utils.encode_cell({ r: 1, c })]);
@@ -168,10 +201,10 @@ ok('PLAN_DATE_FMT 为 yyyy/m/d', PLAN_DATE_FMT === 'yyyy/m/d', PLAN_DATE_FMT);
 // 序列化校验：生成的 xlsx（默认不压缩，XML 明文）里必须真的带 fill/border/居中样式
 const xml = b => b.toString('utf8');
 ok('计划表 xlsx 内写入了居中样式', /<alignment horizontal="center" vertical="center"\/>/.test(xml(buf1)));
-ok('计划表 xlsx 内写入了深蓝填充（fgColor=#1F4E78）', /<fill[^>]*>[\s\S]*?fgColor rgb="FF1F4E78"/.test(xml(buf1)));
+ok('计划表 xlsx 内写入了深蓝填充（fgColor=#173A5A）', /<fill[^>]*>[\s\S]*?fgColor rgb="FF173A5A"/.test(xml(buf1)));
 ok('计划表 xlsx 内写入了细边框', /<left style="thin"><color rgb="FF000000"/.test(xml(buf1)) && /<top style="thin"><color rgb="FF000000"/.test(xml(buf1)));
 ok('差异对比 xlsx 内写入了居中样式', /<alignment horizontal="center" vertical="center"\/>/.test(xml(buf2)));
-ok('差异对比 xlsx 内写入了深蓝填充', /<fill[^>]*>[\s\S]*?fgColor rgb="FF1F4E78"/.test(xml(buf2)));
+ok('差异对比 xlsx 内写入了深蓝填充', /<fill[^>]*>[\s\S]*?fgColor rgb="FF173A5A"/.test(xml(buf2)));
 
 // --- 待办清单排版（v1.5.4）：与计划表统一（深蓝表头 / 细黑边框 / 全列居中 / 日期 yyyy/m/d 真日期）---
 // 结构差异：待办是 0 标题 / 1 表头 / 2 起数据，所以样式与日期格式的起始行都不是 0/1，需单独锁定。

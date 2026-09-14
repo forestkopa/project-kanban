@@ -3,7 +3,7 @@
     "id": "tpl_lock",
     "name": "智能门锁",
     "color": "#0a84ff",
-    "icon": "L",
+    "icon": "",
     "phases": [
       {
         "id": "p1",
@@ -190,7 +190,7 @@
     "id": "tpl_wearable",
     "name": "智能手表",
     "color": "#8b5cf6",
-    "icon": "W",
+    "icon": "",
     "phases": [
       {
         "id": "p1",
@@ -361,9 +361,9 @@
   },
   {
     "id": "tpl_camera",
-    "name": "智能摄像头 / AI 视觉",
+    "name": "智能摄像头",
     "color": "#10b981",
-    "icon": "C",
+    "icon": "",
     "phases": [
       {
         "id": "p1",
@@ -541,9 +541,9 @@
   },
   {
     "id": "tpl_speaker",
-    "name": "智能音箱 / 语音助手",
+    "name": "智能音箱",
     "color": "#ec4899",
-    "icon": "S",
+    "icon": "",
     "phases": [
       {
         "id": "p1",

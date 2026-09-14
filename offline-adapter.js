@@ -242,7 +242,7 @@
 
   function route(method, path, body) {
     // /readonly
-    if (method === 'GET' && path === '/readonly') return res({ on: false, demo: true });
+    if (method === 'GET' && path === '/readonly') return res({ on: false, tag: 'offline' });
     // /options
     if (path === '/options' && method === 'GET') return res(LS.g('options', null) || {});
     if (path === '/options' && method === 'POST') { LS.s('options', body || {}); return res(body || {}); }

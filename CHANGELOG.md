@@ -2,6 +2,77 @@
 
 > 反向时间顺序。完整历史见 GitHub Releases：https://github.com/forestkopa/project-kanban/releases
 
+## v1.5.7（2026-09-14）移除「一键升级」功能 + 演示版残余清理 + 公式/导出修复
+
+> 用户决策：在线升级因服务占用文件（nssm.exe / vendor/xlsx-*.tgz 等）导致解压失败，行不通；
+> 改为**仅保留版本显示**，移除应用内一键升级入口。手动升级仍可用 `tools/local-upgrade.ps1`（需先停 `kanban-watchdog` 服务释放文件锁）。
+
+### 移除一键升级（前端 + 后端 + 模块）
+- `public/index.html`：移除页脚「一键升级」链接（`verUpgradeWrap`）与升级进度条（`#verBar` / `#verBarFill` / `#verBarText`）。保留「检查更新」与版本徽标。
+- `public/app.js`：删除 `updateUpgradeBtn()` / `doUpgrade()` 及 admin 揭示定时器（原 2852–2949 行整段）。保留 `refreshVersion()` / `checkUpdate()`（纯显示）。
+- `server.js`：删除 `const Upgrade = require('./lib/upgrade.js')` 与三条 admin 路由
+  `POST /api/admin/upgrade/prepare`、`POST /api/admin/upgrade/confirm`、`GET /api/admin/upgrade/status`。
+  保留 `GET /api/version` 与 `GET /api/latest-release`（版本显示）。
+- `lib/upgrade.js`：整文件删除（已无引用，死代码）。
+- `test/upgrade.integration.test.cjs`：删除；`test/run-all.cjs` 同步摘除该套件（现有 22 套件）。
+- **保留**：`tools/local-upgrade.ps1`（独立手动升级脚本，不依赖 lib/upgrade.js）、`watchdog.js` 的
+  `tunnelBlockedByUpgrade()` 防御逻辑（无升级时恒 false，测试仍通过）、`docs/knowledge/17-一键升级…md`（历史文档）。
+
+## v1.5.6（2026-09-11）演示版下线：单实例化 + 导出格式统一 + 排期/公式修复
+
+> 用户决策：「5180 不再有用途」。此次把演示版**彻底移除**（不是只停进程）——
+> `--demo` 本质是一条鉴权后门（带参数启动即免登录 + 恒 admin 视角），移除顺带堵掉它。
+
+### 演示版（5180 / `--demo`）彻底下线
+- `server.js`：移除 **24 处** `DEMO_MODE` 分支（数据路径分流、免令牌 `authorized()`、
+  恒 admin 视角、8 处权限闸门旁路、`/api/readonly` 与 `/api/version` 的 `demo` 字段、启动日志）。
+- **新增 `--demo` 退出守卫**：带该参数启动**直接报错退出**，而不是静默忽略。
+  原因：忽略会让它在 5180 起一个「正式版」进程，**与 5181 双写同一份 `data/app.db`**。
+  同时把 `PORT` 默认值由 5180 改为 5181。
+- `db.js`：删 `ensureDemoUser()` / `removeProject` 相关导出调整；前端删 `#demoBadge`、
+  `.demo-badge`、`state.demo` 全部用法；`watchdog.js` `SERVERS` 只留 5181；
+  删 `deploy/kanban-demo.service` 并清理 NAS 部署文档。
+- 测试：`_harness.cjs` 删 `startDemoInstance()`；`waitFor()` 改为**校验 `KB_INSTANCE_TAG`**
+  （比原先校验 `demo` 字段更严：端口被别的进程占用时不会误判就绪）；
+  `api.integration` / `template-export-import` 改用真实隔离实例 + admin 令牌。
+- 离线单文件版 `offline-adapter.js`：`/readonly` 桩由 `{demo:true}` 改为 `{on:false, tag:'offline'}`（不再伪造 demo 字段）。
+- demo 数据（`demo.db`+wal/shm、`projects.demo.json`、`templates.demo.json`）已备份至
+  `outputs/_demo-backup-20260911/`（逐文件 sha1 校验）后删除。
+
+### 导出格式三处统一 + 计划表增强
+- **参考模版导出**改用 `xlsx-js-style` 建表与写出（普通 `xlsx` 不保存 `cell.s`，
+  样式会在落盘时**整体丢失**，实测掉成白板）；阶段列用 `ws['!merges']` 合并、阶段名只填首行。
+- **计划表导出同构**：同样阶段列合并；**是否带 `WORKDAY.INTL` 公式链按「任务是否携带排期规则」自动决定**
+  （内置模板无规则 → 纯日期；用户自建/导入的带公式模板 → 带公式，与 Excel 公式链逐字一致）。
+  差异对比表刻意不合并、不带公式（含新增/删除行，阶段不连续，合并会失真）。
+- 表头填充统一为「深蓝 深色25%」`#173A5A`（计划表 / 差异对比 / 参考模版）；待办表头保持 `#1F4E78`。
+- 导出文件名净化 `/ \ : * ? " < > |` → `_`（服务端 `Content-Disposition` + 前端 `safeFileName`）。
+
+### 修掉 4 个「日期会算错」的隐蔽缺陷
+- `/api/templates/import` **丢失 `excelRow`** → 用导入模板建的项目 `rowMap` 为空 → 公式全算不出、改工期日期纹丝不动。
+- `lib/formula-engine.js#evalRule` 把**数字字面量当日期**解析：`normDate(1)` 走 `new Date('1')` → 2001-01-01，
+  导致 `WORKDAY.INTL(x, 1)` 的「+1 个工作日」实际 **+0**（创建时正常，一编辑触发重算就整体少一天并沿链累积）。
+- `recalcProject` **拓扑推进方向反了**（入度按「被引用次数」统计）→ 从最后一个任务倒着算，
+  每个任务读到前置的**旧**日期 → 改上游工期后继不级联。
+- 模板写盘 3 处（导入/改名/删除）未等待落盘 → 出现「刚导入模板 → 立刻用它建项目 → 400 模板不存在」的竞态。
+
+### 其他
+- 导入跳过规则 `skip='插入新行|提示|说明|汇总|合计'` 改为**只在序号列不是数字时**生效：
+  任务名可能天然含这些词（「包装与说明书」「隐私说明」），无条件跳过会吞掉整行；
+  阶段列合并后，被吞的若正是阶段首行还会**连带丢掉整个阶段**。
+- 内置模板名清理遗留品类后缀：`智能摄像头 / AI 视觉` → `智能摄像头`、`智能音箱 / 语音助手` → `智能音箱`
+  （`.gitignore`、README 的「类别」列同步）；文件名净化守卫保留（用户自建模板名不受控）。
+- 甘特图取消顶部「项目开始」时间输入框，项目开始时间改由**计划表序号 1 任务的开始日期**决定。
+- 模板卡片去掉首字母图标块（L/W/C/S）。
+- `.gitignore` 增 `outputs/` 与 `~$*.xlsx`。
+- **升级包瘦身修正**：`tools/build_update_zip.py` 补排除 `outputs/`。此前 `.gitignore` 排了但打包脚本没排，
+  导致 `outputs/` 里的本机临时产物（导出预览 xlsx、parity 比对件，以及 `_demo-backup-20260911/` 里
+  4.5MB 的 demo 数据）**被打进了 update.zip**：包从 2.85MB 虚胖到 3.4MB，还把本机临时数据发到了服务器。
+  同时给脚本自检加了三条硬约束（禁 `outputs/`、禁 `*.xlsx|*.db|*.log|*.zip`、打印体积 top5），
+  并新增回归测试 `test/build-update-zip.test.cjs`（24 断言，真跑一遍打包查条目清单）。
+- 新增回归测试 `test/template-export-import.test.cjs`（65 断言：样式/合并/文件名/导入闭环 + 源码约束）。
+- 全量测试 `test/run-all.cjs` **23 套件通过 / 0 失败** + 覆盖自检 ✅。
+
 ## v1.5.5（2026-09-10）修复「在线升级期间服务假死数分钟」——升级链路异步化 + 升级包瘦身
 
 > 生产现象：点「一键升级」后页脚卡在「服务重启中…（70s）请稍候」，公网 `kanban.forestkopa.top`

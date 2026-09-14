@@ -27,7 +27,6 @@
     </button>
     <div id="projTitle"></div>
       <div id="projMeta"></div>
-      <span id="demoBadge" class="demo-badge hidden">演示模式 · 免令牌</span>
       <div class="search" id="searchBox">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="searchInput" placeholder="搜索任务、项目…" autocomplete="off">
@@ -380,14 +379,7 @@
   <span id="verBadge" style="font-weight:600;color:#444;">v…</span>
   <span>·</span>
   <a id="verCheck" href="javascript:void(0)" style="color:#2b6cb0;cursor:pointer;text-decoration:none;">检查更新</a>
-  <span id="verUpgradeWrap" style="display:none;"><a id="verUpgrade" href="javascript:void(0)" style="color:#2f855a;cursor:pointer;text-decoration:none;font-weight:600;">一键升级</a></span>
   <span id="verStatus"></span>
-</div>
-<div id="verBar" style="display:none;position:fixed;left:0;right:0;bottom:26px;padding:8px 16px;background:rgba(255,255,255,.97);border-top:1px solid #e2e8f0;z-index:49;backdrop-filter:blur(4px);">
-  <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
-    <div id="verBarFill" style="height:100%;width:0%;background:#3182ce;transition:width .4s ease;"></div>
-  </div>
-  <div id="verBarText" style="font-size:12px;color:#4a5568;margin-top:4px;"></div>
 </div>
 <script src="/app.js?v=@VER@"></script>
 <script nonce="@NONCE@">

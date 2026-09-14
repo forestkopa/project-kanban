@@ -66,4 +66,42 @@ describe('公式引擎：拓扑级联重算', () => {
   it('空任务：直接返回 true', () => {
     assert.equal(recalcProject({ name: '空', tasks: [] }), true);
   });
+
+  // 回归（v1.5.6）：WORKDAY.INTL(x, 1) 的「1」是字面量天数，不能被 normDate 当日期解析。
+  // 历史 bug：evalRule 的 lit 分支用 normDate(rule.v)，normDate(1) → new Date('1') → 2001-01-01，
+  // 于是推进循环的步数变成 NaN、直接不执行 → 「+1 个工作日」被算成 +0，日期链整体少一天。
+  it('lit 字面量天数不被当日期：WORKDAY.INTL(E2,1) 真的后移一个工作日', () => {
+    const p = {
+      name: 'lit', startDate: '2026-09-11',
+      tasks: [
+        { id: 'a', excelRow: 2, estimateDays: 6, startDate: '2026-09-11', dueDate: '2026-09-18' },
+        {
+          id: 'b', excelRow: 3, estimateDays: 4, startDate: '2026-09-18', dueDate: '2026-09-23',
+          startRule: parseFormula('=WORKDAY.INTL(E2,1)'), dueRule: parseFormula('=WORKDAY.INTL(D3,F3-1)')
+        }
+      ]
+    };
+    assert.equal(recalcProject(p), true);
+    assert.equal(p.tasks[1].startDate, '2026-09-21'); // 9/18 周五 → 下一工作日 9/21 周一
+    assert.equal(p.tasks[1].dueDate, '2026-09-24');   // 9/21 起 (4-1) 个工作日
+  });
+
+  // 回归（v1.5.6）：拓扑推进方向。历史 bug 入度按「被引用次数」统计 → order 逆序 →
+  // apply 从最后一个任务倒着算，每个任务读到的是前置的旧日期，改工期不往后级联。
+  it('拓扑级联方向：改上游工期后，整条链的 start 都跟着后移', () => {
+    const p = {
+      name: 'chain', startDate: '2026-09-11',
+      tasks: [
+        { id: 'a', excelRow: 2, estimateDays: 6, startDate: '2026-09-11', dueDate: '2026-09-18', dueRule: parseFormula('=WORKDAY.INTL(D2,F2-1)') },
+        { id: 'b', excelRow: 3, estimateDays: 4, startDate: '2026-09-18', dueDate: '2026-09-24', startRule: parseFormula('=WORKDAY.INTL(E2,1)'), dueRule: parseFormula('=WORKDAY.INTL(D3,F3-1)') },
+        { id: 'c', excelRow: 4, estimateDays: 2, startDate: '2026-09-25', dueDate: '2026-09-28', startRule: parseFormula('=WORKDAY.INTL(E3,1)'), dueRule: parseFormula('=WORKDAY.INTL(D4,F4-1)') }
+      ]
+    };
+    recalcProject(p);
+    p.tasks[0].estimateDays = 11; // a 工期 +5 个工作日
+    recalcProject(p);
+    assert.equal(p.tasks[0].dueDate, '2026-09-25');   // 9/11 + 10 个工作日
+    assert.equal(p.tasks[1].startDate, '2026-09-28'); // a 截止后的下一个工作日（读到的是**新**值）
+    assert.equal(p.tasks[2].startDate, '2026-10-02'); // b 截止 10/1 后的下一个工作日（旧实现会停在旧值）
+  });
 });

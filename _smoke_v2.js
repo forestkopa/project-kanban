@@ -44,10 +44,7 @@ setTimeout(async () => {
   const cards = qa('#board .card').length;
   const cols = qa('#board .col').length;
   const stats = q('#stats') ? q('#stats').textContent.replace(/\s+/g, ' ').trim() : '(none)';
-  const demo = q('#demoBadge');
-  const demoShown = demo ? !demo.classList.contains('hidden') : 'no-el';
   console.log('projects=', projCount, '| board cols=', cols, '| cards=', cards);
-  console.log('demoBadge shown=', demoShown);
   console.log('stats=', stats.slice(0, 90));
 
   // adapter fetch sanity
@@ -81,7 +78,7 @@ setTimeout(async () => {
   console.log('=== CAPTURED ERRORS (' + errors.length + ') ===');
   errors.slice(0, 10).forEach(e => console.log(' -', e.slice(0, 200)));
 
-  if (projCount >= 3 && cards > 0 && demoShown === true && errors.length === 0) {
+  if (projCount >= 3 && cards > 0 && errors.length === 0) {
     console.log('SMOKE_OK');
   } else {
     console.log('SMOKE_FAIL');

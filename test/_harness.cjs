@@ -1,10 +1,11 @@
-// 测试隔离实例 harness：自起一个"真实模式"服务进程（独立临时数据目录），
-// 完全不触碰项目 data/ 与运行中的 5180/5181，使写操作测试可在受控环境进行，
+// 测试隔离实例 harness：自起一个服务进程（独立临时数据目录 + 独立模板文件），
+// 完全不触碰项目 data/ 与运行中的 5181，使写操作测试可在受控环境进行，
 // 同时自然满足 P1-8 强制改密闸门（admin 初始密码 000000 → 测试内改密）。
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const net = require('net');
+const crypto = require('crypto');
 const path = require('path');
 
 // node 路径：优先 KB_NODE 覆盖，否则用当前运行的 node（process.execPath）。
@@ -28,64 +29,38 @@ async function req(base, method, p, body, token) {
   let j = null; try { j = await r.json(); } catch (_) {}
   return { status: r.status, json: j };
 }
-// 等待实例就绪。opts.expectDemo=true 要求 demo===true（演示实例），false 要求 demo===false（真实实例）。
-// 必须显式校验 demo 标志：否则端口被别的进程占用时会"连上就通过"，测错实例。
-async function waitFor(base, opts) {
+// 等待实例就绪：轮询 /api/readonly，要求回显的 tag 与本次注入的 KB_INSTANCE_TAG 一致。
+// 必须显式校验实例标记（原先校验 demo 标志）：否则端口被别的进程占用时会"连上就通过"，测错实例。
+async function waitFor(base, tag, opts) {
   const o = opts || {};
   const timeoutMs = o.timeoutMs || 20000;
-  const want = o.expectDemo === true;
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     try {
       const r = await fetch(base + '/api/readonly');
-      if (r.ok) { const j = await r.json().catch(() => null); if (j && j.demo === want) return true; }
+      if (r.ok) { const j = await r.json().catch(() => null); if (j && j.tag === tag) return true; }
     } catch (_) {}
     await new Promise(r => setTimeout(r, 300));
   }
   return false;
 }
 
-// 启动一个隔离的"演示模式"实例（--demo + 独立临时数据目录）：免登录、admin 视角、写操作不受改密闸门限制。
-// 用途：替代依赖外部运行中 5180 的测试，做到"测试自给自足、与本机运行状态解耦"。
-async function startDemoInstance() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-demo-'));
-  const PORT = await freePort();
-  const base = 'http://127.0.0.1:' + PORT;
-  const child = spawn(NODE, ['server.js', '--demo'], {
-    cwd: ROOT,
-    env: { ...process.env, PORT: String(PORT), KB_DATA_DIR: tmp },
-    stdio: 'ignore',
-  });
-  try {
-    const up = await waitFor(base, { expectDemo: true });
-    if (!up) throw new Error('演示测试实例启动超时（端口 ' + PORT + '）');
-    return {
-      base, port: PORT,
-      stop() {
-        try { child.kill('SIGTERM'); } catch (_) {}
-        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
-      },
-    };
-  } catch (e) {
-    try { child.kill('SIGTERM'); } catch (_) {}
-    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
-    throw e;
-  }
-}
-
-// 启动一个隔离的真实模式实例，返回 { base, token, stop }
+// 启动一个隔离实例（独立临时数据目录 + 独立模板文件），返回 { base, token, stop }
+// 2026-09-11：demo 演示版下线，原先"免登录"的 startDemoInstance 一并移除，测试统一改用本函数。
 async function startRealInstance() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-test-'));
   const PORT = await freePort();
   const base = 'http://127.0.0.1:' + PORT;
+  // 实例标记：server 把 KB_INSTANCE_TAG 原样回显在 /api/readonly，用于确认连上的确实是本进程
+  const TAG = 'kb-' + crypto.randomBytes(6).toString('hex');
   const child = spawn(NODE, ['server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(PORT), KB_DATA_DIR: tmp },
+    env: { ...process.env, PORT: String(PORT), KB_DATA_DIR: tmp, KB_INSTANCE_TAG: TAG },
     stdio: 'ignore',
   });
   let ok2 = false;
   try {
-    ok2 = await waitFor(base, { expectDemo: false });
+    ok2 = await waitFor(base, TAG);
     if (!ok2) throw new Error('测试实例启动超时（端口 ' + PORT + '）');
     // admin 初始密码 000000 → 改密以通过 P1-8 闸门（tokens 不吊销，旧会话仍有效）
     const lg = await req(base, 'POST', '/api/login', { name: 'admin', password: DEFAULT_PW });
@@ -107,4 +82,4 @@ async function startRealInstance() {
   }
 }
 
-module.exports = { startRealInstance, startDemoInstance, req, DEFAULT_PW, TEST_PW };
+module.exports = { startRealInstance, req, DEFAULT_PW, TEST_PW };
